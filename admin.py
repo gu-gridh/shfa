@@ -25,6 +25,10 @@ class AuthorFilter(AutocompleteFilter):
     title = _('Creator') # display title
     field_name = 'author' # name of the foreign key field
 
+class KeywordFilter(AutocompleteFilter):
+    title = _('Keywords') # display title
+    field_name = 'keywords' # name of the foreign key field
+
 
 
 
@@ -47,7 +51,10 @@ class ImageModel(admin.ModelAdmin):
         InstitutionFilter,
         CollectionFilter,
         AuthorFilter,
-        SiteFilter]
+        SiteFilter,
+        KeywordFilter
+        ]
+    
     list_per_page = 10
 
     def image_preview(self, obj):
@@ -70,10 +77,14 @@ class SiteAdmin(admin.GISModelAdmin):
 
     @admin.display(description=_('Read at Fornsök'))
     def get_ksamsok_link(self, obj):
+
+        if obj.ksamsok_id:
         
-        return format_html("<a href='{url}' target='_blank' rel='noopener noreferrer'>{ksamsok_id}</a>", 
+            return format_html("<a href='{url}' target='_blank' rel='noopener noreferrer'>{ksamsok_id}</a>", 
                             url="https://kulturarvsdata.se/raa/lamning/" + obj.ksamsok_id,
                             ksamsok_id=obj.ksamsok_id)
+        else:
+            return format_html("")
 
 
 @admin.register(Compilation)
