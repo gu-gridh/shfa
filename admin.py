@@ -12,7 +12,7 @@ from django.conf import settings
 class SiteFilter(AutocompleteFilter):
     title = _('Site') # display title
     field_name = 'site' # name of the foreign key field
-
+    
 class InstitutionFilter(AutocompleteFilter):
     title = _('Institution') # display title
     field_name = 'institution' # name of the foreign key field
@@ -73,7 +73,7 @@ class SiteAdmin(admin.GISModelAdmin):
     fields = get_fields(Site, exclude=DEFAULT_EXCLUDE+["id"])
     readonly_fields = [*DEFAULT_FIELDS]
     list_display = ['raa_id', 'lamning_id', 'askeladden_id', 'get_ksamsok_link']
-    search_fields = ['lamning_id', 'raa_id']
+    search_fields = ['raa_id', 'lamning_id']
 
     @admin.display(description=_('Read at Fornsök'))
     def get_ksamsok_link(self, obj):
@@ -93,6 +93,7 @@ class CompilationAdmin(admin.ModelAdmin):
     list_display = ["name"]
     search_fields = ["name"]
     autocomplete_fields = ["images"]
+    ordering = ('name',)
 
 @admin.register(Author)
 class AuthorAdmin(admin.ModelAdmin):
@@ -100,6 +101,7 @@ class AuthorAdmin(admin.ModelAdmin):
     readonly_fields = ['legacy_id']
     list_display = ["name"]
     search_fields = ["name"]
+    ordering = ('name',)
 
 @admin.register(Collection)
 class CollectionAdmin(admin.ModelAdmin):
@@ -107,6 +109,7 @@ class CollectionAdmin(admin.ModelAdmin):
     readonly_fields = ['legacy_id']
     list_display = ["name"]
     search_fields = ["name"]
+    ordering = ('name',)
 
 @admin.register(Institution)
 class InstitutionAdmin(admin.ModelAdmin):
@@ -114,6 +117,7 @@ class InstitutionAdmin(admin.ModelAdmin):
     readonly_fields = ['legacy_id']
     list_display = ["name", "address", "url", "email"]
     search_fields = ["name"]
+    ordering = ('name',)
 
 @admin.register(ImageTypeTag)
 class ImageTypeTagAdmin(admin.ModelAdmin):
@@ -127,6 +131,7 @@ class RockCarvingObjectAdmin(admin.ModelAdmin):
 
     list_display = ["name", "code"]
     search_fields = ["name"]
+    ordering = ('name',)
 
 @admin.register(KeywordTag)
 class KeywordTagAdmin(admin.ModelAdmin):
