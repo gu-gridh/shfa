@@ -74,6 +74,7 @@ class SiteAdmin(admin.GISModelAdmin):
     readonly_fields = [*DEFAULT_FIELDS]
     list_display = ['raa_id', 'lamning_id', 'askeladden_id', 'get_ksamsok_link']
     search_fields = ['raa_id', 'lamning_id']
+    ordering = ('raa_id',)
 
     @admin.display(description=_('Read at Fornsök'))
     def get_ksamsok_link(self, obj):
