@@ -8,6 +8,8 @@ from admin_auto_filters.filters import AutocompleteFilter
 from rangefilter.filters import NumericRangeFilter
 from django.contrib.admin import EmptyFieldListFilter
 from django.conf import settings
+from PIL import Image as ima
+import os
 
 class SiteFilter(AutocompleteFilter):
     title = _('Site') # display title
@@ -63,6 +65,16 @@ class ImageModel(admin.ModelAdmin):
     def thumbnail_preview(self, obj):
         return format_html(f'<img src="{settings.ORIGINAL_URL}/{obj.file}" height="100" />')
 
+
+    def conver_images(path, image):
+        im = image.file.path
+        im = ima.open(im)
+        rgb_im = im.convert("RGB")
+        # exporting the image
+        rgb_im.save(path/"sample.jpg")
+        return
+
+
     # image_preview.short_description = 'Image preview'
     # image_preview.allow_tags = True
     # thumbnail_preview.short_description = 'Image thumbnail'
@@ -86,7 +98,6 @@ class SiteAdmin(admin.GISModelAdmin):
         else:
             queryset |= Site.objects.filter(raa_id__icontains=search_term)
         return queryset, use_distinct 
-
 
     @admin.display(description=_('Read at Fornsök'))
     def get_ksamsok_link(self, obj):
