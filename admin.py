@@ -76,6 +76,18 @@ class SiteAdmin(admin.GISModelAdmin):
     search_fields = ['raa_id', 'lamning_id']
     ordering = ('raa_id',)
 
+    def get_search_results(self, request, queryset, search_term):
+        queryset, use_distinct = super().get_search_results(request, queryset, search_term)
+        try:
+            queryset = Site.objects.filter(raa_id__exact=search_term)
+            print(queryset)
+        except ValueError:
+            pass
+        else:
+            queryset |= Site.objects.filter(raa_id__icontains=search_term)
+        return queryset, use_distinct 
+
+
     @admin.display(description=_('Read at Fornsök'))
     def get_ksamsok_link(self, obj):
 
