@@ -10,6 +10,8 @@ from django.contrib.admin import EmptyFieldListFilter
 from django.conf import settings
 from PIL import Image as ima
 import os
+import base64 
+from io import StringIO
 
 class SiteFilter(AutocompleteFilter):
     title = _('Site') # display title
@@ -60,19 +62,19 @@ class ImageModel(admin.ModelAdmin):
     list_per_page = 10
 
     def image_preview(self, obj):
-        return format_html(f'<img src="{settings.ORIGINAL_URL}/{obj.file}" height="300" />')
+        return format_html(f'<img src="{settings.IIIF_URL}/{obj.iiif_file}/full/,300/0/default.jpg" height="300" />')
 
     def thumbnail_preview(self, obj):
-        return format_html(f'<img src="{settings.ORIGINAL_URL}/{obj.file}" height="100" />')
+        return format_html(f'<img src="{settings.IIIF_URL}/{obj.iiif_file}/full/,300/0/default.jpg" height="100" />')
 
 
-    def conver_images(path, image):
-        im = image.file.path
+    def conver_images(self, obj):
+        im = obj.file.path
         im = ima.open(im)
         rgb_im = im.convert("RGB")
+        image_64_encode = base64.b64encode(rgb_im)
         # exporting the image
-        rgb_im.save(path/"sample.jpg")
-        return
+        return image_64_encode
 
 
     # image_preview.short_description = 'Image preview'
