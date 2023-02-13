@@ -62,10 +62,12 @@ class ImageModel(admin.ModelAdmin):
     list_per_page = 10
 
     def image_preview(self, obj):
-        return format_html(f'<img src="{settings.IIIF_URL}{obj.iiif_file}/full/,300/0/default.jpg" height="300" />')
+        # return format_html(f'<img src="{settings.IIIF_URL}{obj.iiif_file}/full/,300/0/default.jpg" height="300" />')
+        return format_html(f'<img src="{settings.ORIGINAL_URL}/{obj.file}" height="300" />')
 
     def thumbnail_preview(self, obj):
-        return format_html(f'<img src="{settings.IIIF_URL}{obj.iiif_file}/full/,300/0/default.jpg" height="100" />')
+        # return format_html(f'<img src="{settings.IIIF_URL}{obj.iiif_file}/full/,300/0/default.jpg" height="100" />')
+        return format_html(f'<img src="{settings.ORIGINAL_URL}/{obj.file}" height="300" />')
 
 
     def conver_images(self, obj):
