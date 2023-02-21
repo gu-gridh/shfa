@@ -62,12 +62,17 @@ class ImageModel(admin.ModelAdmin):
     list_per_page = 10
 
     def image_preview(self, obj):
-        return format_html(f'<img src="{settings.IIIF_URL}{obj.iiif_file}/full/full/0/default.jpg" height="300" />')
-        # return format_html(f'<img src="{settings.ORIGINAL_URL}/{obj.file}" height="300" />')
+        if 'tif' in  obj.file.path:
+            return format_html(f'<img src="{settings.IIIF_URL}{obj.iiif_file}/full/full/0/default.jpg" height="300" />')
+        else:
+            return format_html(f'<img src="{settings.ORIGINAL_URL}/{obj.file}" height="300" />')
+
 
     def thumbnail_preview(self, obj):
-        return format_html(f'<img src="{settings.IIIF_URL}{obj.iiif_file}/full/full/0/default.jpg" height="100" />')
-        # return format_html(f'<img src="{settings.ORIGINAL_URL}/{obj.file}" height="100" />')
+        if 'tif' in  obj.file.path:
+            return format_html(f'<img src="{settings.IIIF_URL}{obj.iiif_file}/full/full/0/default.jpg" height="100" />')
+        else:
+            return format_html(f'<img src="{settings.ORIGINAL_URL}/{obj.file}" height="100" />')
 
     # image_preview.short_description = 'Image preview'
     # image_preview.allow_tags = True
