@@ -9,17 +9,17 @@ class TIFFImageSerializer(DynamicDepthSerializer):
 
     class Meta:
         model = Image
-        fields = get_fields(Image, exclude=DEFAULT_FIELDS)
+        fields = get_fields(Image, exclude=DEFAULT_FIELDS)+['id']
 
 class SiteSerializer(DynamicDepthSerializer):
 
     class Meta:
         model = Site
-        fields = get_fields(Site, exclude=DEFAULT_FIELDS)
+        fields = get_fields(Site, exclude=DEFAULT_FIELDS)+['id']
 
 class SiteGeoSerializer(GeoFeatureModelSerializer):
 
     class Meta:
         model = Site
-        fields = get_fields(Site, exclude=DEFAULT_FIELDS)
+        fields = get_fields(Site, exclude=DEFAULT_FIELDS)+['id']
         geo_field = 'coordinates'
