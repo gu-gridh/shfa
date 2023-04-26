@@ -23,11 +23,13 @@ class IIIFImageViewSet(DynamicDepthViewSet):
 
 class SiteViewSet(DynamicDepthViewSet):
     
-    queryset = models.Site.objects.all()
+    # queryset = models.Site.objects.all()
     serializer_class = serializers.SiteSerializer
     filterset_fields = get_fields(models.Site, exclude=DEFAULT_FIELDS + ['coordinates'])
     search_fields = ['raa_id', 'lamning_id', 'ksamsok_id', 'placename']
 
+    images = models.Image.objects.all()
+    queryset = models.Site.objects.filter(id__in=list(images.values_list('site', flat=True)))
 
 class SiteGeoViewSet(GeoViewSet):
 
