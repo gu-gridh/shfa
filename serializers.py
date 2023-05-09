@@ -23,3 +23,29 @@ class SiteGeoSerializer(GeoFeatureModelSerializer):
         model = Site
         fields = ['id']+get_fields(Site, exclude=DEFAULT_FIELDS)
         geo_field = 'coordinates'
+
+
+class KeywordsSerializer(DynamicDepthSerializer):
+
+    class Meta:
+        model = KeywordTag
+        fields = ['id']+get_fields(KeywordTag, exclude=DEFAULT_FIELDS)
+
+class RockCarvingSerializer(DynamicDepthSerializer):
+
+    class Meta:
+        model = RockCarvingObject
+        fields = ['id']+get_fields(RockCarvingObject, exclude=DEFAULT_FIELDS)
+
+
+class InstitutionSerializer(DynamicDepthSerializer):
+
+    class Meta:
+        model = Institution
+        fields = ['id']+get_fields(Institution, exclude=DEFAULT_FIELDS)
+
+class DatingTagSerializer(DynamicDepthSerializer):
+
+    class Meta:
+        model = DatingTag
+        fields = ['id']+get_fields(DatingTag, exclude=DEFAULT_FIELDS)
