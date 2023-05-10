@@ -1,7 +1,7 @@
 from unittest.mock import DEFAULT
 from rest_framework import viewsets
 from . import models, serializers
-from django.db.models import Q
+from django.db.models import Q, Prefetch
 from diana.abstract.views import DynamicDepthViewSet, GeoViewSet
 from diana.abstract.models import get_fields, DEFAULT_FIELDS
 
@@ -82,17 +82,22 @@ class SearchDatinTag(DynamicDepthViewSet):
         queryset = models.DatingTag.objects.filter(text__contains=q)
         return queryset
     
-# # Add general search query
-# class SearchGeneral(DynamicDepthViewSet):
-#     def get_queryset(self):
-#         q = self.request.GET["q"]
-#         images = models.Image.objects.all()
-#         queryset = models.Site.objects.filter(Q(raa_id__contains=q) and Q(id__in=list(images.values_list('site', flat=True))))
-#         #                                       | Q(models.KeywordTag.objects.filter(text__contains=q))
-#         #                                       | Q(models.RockCarvingObject.objects.filter(name__contains=q))
-#         #                                       | Q(models.Institution.objects.filter(name__contains=q))
-#         #                                       | Q(models.DatingTag.objects.filter(text__contains=q))
-#         #                                       | Q(models.Image.objects.filter(type__in=q)))
-#         return queryset
+# Add general search query
+class SearchGeneral(DynamicDepthViewSet):
+    # serializer_class = serializers.KeywordsSerializer
+    # serializer_class = serializers.RockCarvingSerializer
+    serializer_class = serializers.TIFFImageSerializer
+
+    def get_queryset(self):
+        q = self.request.GET["q"]
+        queryset = models.Image.objects.filter( Q(carving_tags__text__in=q)
+                                               |Q(type__text__contains=q)
+                                               |Q(site__raa_id__contains=q)
+                                               |Q(keywords__text__contains=q)
+                                               |Q(dating_tags__text__contains=q)
+                                               |Q(institution__name__contains=q))
+        return queryset
     
+    filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
+
 # Add mixed search option
