@@ -15,8 +15,9 @@ router.register(rf'{endpoint}/search/site', views.SiteSearchViewSet, basename='s
 router.register(rf'{endpoint}/search/keywords', views.SearchKeywords, basename='keywords')
 router.register(rf'{endpoint}/search/carving', views.SearchRockCarving, basename='search rock carving')
 router.register(rf'{endpoint}/search/institution', views.SearchInstitution, basename='institution')
-router.register(rf'{endpoint}/search/dating', views.SearchDatinTag, basename='Dating Tag')
-router.register(rf'{endpoint}/search', views.SearchGeneral, basename='search')
+router.register(rf'{endpoint}/search/dating', views.SearchDatinTag, basename='dating Tag')
+router.register(rf'{endpoint}/search/advance', views.AdvancedSearch, basename='advanced search')
+router.register(rf'{endpoint}/search', views.GeneralSearch, basename='search')
 
 
 urlpatterns = [
