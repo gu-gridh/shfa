@@ -102,8 +102,6 @@ class GeneralSearch(DynamicDepthViewSet):
 
 # Add mixed search option
 class AdvancedSearch(DynamicDepthViewSet):
-    # serializer_class = serializers.KeywordsSerializer
-    # serializer_class = serializers.RockCarvingSerializer
     serializer_class = serializers.TIFFImageSerializer
 
     def get_queryset(self):
@@ -114,14 +112,37 @@ class AdvancedSearch(DynamicDepthViewSet):
         type = self.request.GET["type"]
         institution_name = self.request.GET["institution_name"]
 
-        queryset = models.Image.objects.filter( 
-                                                Q(carving_tags__text__in=carving_tag)
-                                               |Q(type__text__contains=type)
-                                               |Q(site__raa_id__contains=site_name)
-                                               |Q(keywords__text__contains=keyword)
-                                               |Q(dating_tags__text__contains=dating_tag)
-                                               |Q(institution__name__contains=institution_name)
-                                               )
+        ##########################################
+        query_array = []
+        if site_name is not None and site_name != "":
+            query_array.append(Q(site__raa_id__contains=site_name))
+        if keyword is not None and keyword != "":
+            query_array.append(Q(keywords__text__contains=keyword))
+        if carving_tag is not None and carving_tag != "":
+            query_array.append(Q(carving_tags__text__in=carving_tag))
+        if dating_tag is not None and dating_tag != "":
+            query_array.append(Q(dating_tags__text__contains=dating_tag))
+        if type is not None and type != "":
+            query_array.append(Q(type__text__contains=type))
+        if institution_name is not None and institution_name != "":
+            query_array.append(Q(institution__name__contains=institution_name))
+        if len(query_array)==0:
+            pass # User has not provided a single field, throw error
+        processed_query = query_array[0]
+        for index in range(1, len(query_array)):
+            processed_query = processed_query & query_array[index]
+        queryset = models.Image.objects.filter(processed_query)
+        ##########################################
+
+
+        # queryset = models.Image.objects.filter( 
+        #                                         Q(carving_tags__text__in=carving_tag)
+        #                                        |Q(type__text__contains=type)
+        #                                        |Q(site__raa_id__contains=site_name)
+        #                                        |Q(keywords__text__contains=keyword)
+        #                                        |Q(dating_tags__text__contains=dating_tag)
+        #                                        |Q(institution__name__contains=institution_name)
+        #                                        )
         return queryset
     
     filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
