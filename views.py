@@ -35,15 +35,16 @@ class SiteGeoViewSet(GeoViewSet):
 
     
 class SiteSearchViewSet(GeoViewSet):
-    
+    serializer_class = serializers.SiteGeoSerializer
+
     def get_queryset(self):
 
         q = self.request.GET["site_name"]
         images = models.Image.objects.all()
-        queryset = models.Site.objects.filter(Q(raa_id__contains=q) and Q (id__in=list(images.values_list('site', flat=True))))
+        queryset = models.Site.objects.filter(Q(raa_id__icontains=q) & Q (id__in=list(images.values_list('site', flat=True))))
+        print(queryset)
         return queryset
     
-    serializer_class = serializers.SiteGeoSerializer
     filterset_fields = get_fields(models.Site, exclude=DEFAULT_FIELDS + ['coordinates'])
     search_fields = ['raa_id', 'lamning_id', 'ksamsok_id', 'placename']
     bbox_filter_field = 'coordinates'
@@ -55,7 +56,7 @@ class SearchKeywords(DynamicDepthViewSet):
 
     def get_queryset(self):
         q = self.request.GET["keyword"]
-        queryset = models.KeywordTag.objects.filter(text__contains=q)
+        queryset = models.KeywordTag.objects.filter(text__icontains=q)
         return queryset
     
 class SearchRockCarving(DynamicDepthViewSet):
@@ -63,7 +64,7 @@ class SearchRockCarving(DynamicDepthViewSet):
 
     def get_queryset(self):
         q = self.request.GET["carving_tag"]
-        queryset = models.RockCarvingObject.objects.filter(name__contains=q)
+        queryset = models.RockCarvingObject.objects.filter(name__icontains=q)
         return queryset
     
 class SearchInstitution(DynamicDepthViewSet):
@@ -71,7 +72,7 @@ class SearchInstitution(DynamicDepthViewSet):
 
     def get_queryset(self):
         q = self.request.GET["institution_name"]
-        queryset = models.Institution.objects.filter(name__contains=q)
+        queryset = models.Institution.objects.filter(name__icontains=q)
         return queryset
     
 class SearchDatinTag(DynamicDepthViewSet):
@@ -79,7 +80,7 @@ class SearchDatinTag(DynamicDepthViewSet):
 
     def get_queryset(self):
         q = self.request.GET["dating_tag"]
-        queryset = models.DatingTag.objects.filter(text__contains=q)
+        queryset = models.DatingTag.objects.filter(text__icontains=q)
         return queryset
 
 class TypeSearchViewSet(DynamicDepthViewSet):
@@ -87,7 +88,7 @@ class TypeSearchViewSet(DynamicDepthViewSet):
 
     def get_queryset(self):
         q = self.request.GET["image_type"]
-        queryset = models.Image.objects.filter(type__text__contains=q)
+        queryset = models.Image.objects.filter(type__text__icontains=q)
         return queryset
     
     filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
@@ -99,11 +100,11 @@ class GeneralSearch(DynamicDepthViewSet):
     def get_queryset(self):
         q = self.request.GET["q"]
         queryset = models.Image.objects.filter( Q(carving_tags__text__in=q)
-                                               |Q(type__text__contains=q)
-                                               |Q(site__raa_id__contains=q)
-                                               |Q(keywords__text__contains=q)
-                                               |Q(dating_tags__text__contains=q)
-                                               |Q(institution__name__contains=q)).distinct()
+                                               |Q(type__text__icontains=q)
+                                               |Q(site__raa_id__icontains=q)
+                                               |Q(keywords__text__icontains=q)
+                                               |Q(dating_tags__text__icontains=q)
+                                               |Q(institution__name__icontains=q)).distinct()
         return queryset
     
     filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
@@ -123,17 +124,17 @@ class AdvancedSearch(DynamicDepthViewSet):
         ##########################################
         query_array = []
         if site_name is not None and site_name != "":
-            query_array.append(Q(site__raa_id__contains=site_name))
+            query_array.append(Q(site__raa_id__icontains=site_name))
         if keyword is not None and keyword != "":
-            query_array.append(Q(keywords__text__contains=keyword))
+            query_array.append(Q(keywords__text__icontains=keyword))
         if carving_tag is not None and carving_tag != "":
             query_array.append(Q(carving_tags__text__in=carving_tag))
         if dating_tag is not None and dating_tag != "":
-            query_array.append(Q(dating_tags__text__contains=dating_tag))
+            query_array.append(Q(dating_tags__text__icontains=dating_tag))
         if image_type is not None and image_type != "":
-            query_array.append(Q(type__text__contains=type))
+            query_array.append(Q(type__text__icontains=type))
         if institution_name is not None and institution_name != "":
-            query_array.append(Q(institution__name__contains=institution_name))
+            query_array.append(Q(institution__name__icontains=institution_name))
         if len(query_array)==0:
             pass # User has not provided a single field, throw error
         processed_query = query_array[0]
@@ -145,11 +146,11 @@ class AdvancedSearch(DynamicDepthViewSet):
 
         # queryset = models.Image.objects.filter( 
         #                                         Q(carving_tags__text__in=carving_tag)
-        #                                        |Q(type__text__contains=type)
-        #                                        |Q(site__raa_id__contains=site_name)
-        #                                        |Q(keywords__text__contains=keyword)
-        #                                        |Q(dating_tags__text__contains=dating_tag)
-        #                                        |Q(institution__name__contains=institution_name)
+        #                                        |Q(type__text__icontains=type)
+        #                                        |Q(site__raa_id__icontains=site_name)
+        #                                        |Q(keywords__text__icontains=keyword)
+        #                                        |Q(dating_tags__text__icontains=dating_tag)
+        #                                        |Q(institution__name__icontains=institution_name)
         #                                        )
         return queryset
     
