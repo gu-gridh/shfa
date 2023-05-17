@@ -12,6 +12,7 @@ router.register(rf'{endpoint}/image', views.IIIFImageViewSet, basename='image')
 router.register(rf'{endpoint}/geojson/site', views.SiteGeoViewSet, basename='site as geojson')
 # Searching for match objects
 router.register(rf'{endpoint}/search/site', views.SiteSearchViewSet, basename='site')
+router.register(rf'{endpoint}/search/type', views.TypeSearchViewSet, basename='site')
 router.register(rf'{endpoint}/search/keywords', views.SearchKeywords, basename='keywords')
 router.register(rf'{endpoint}/search/carving', views.SearchRockCarving, basename='search rock carving')
 router.register(rf'{endpoint}/search/institution', views.SearchInstitution, basename='institution')

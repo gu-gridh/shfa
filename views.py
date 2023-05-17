@@ -103,7 +103,7 @@ class GeneralSearch(DynamicDepthViewSet):
                                                |Q(site__raa_id__contains=q)
                                                |Q(keywords__text__contains=q)
                                                |Q(dating_tags__text__contains=q)
-                                               |Q(institution__name__contains=q))
+                                               |Q(institution__name__contains=q)).distinct()
         return queryset
     
     filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
