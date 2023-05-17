@@ -86,7 +86,7 @@ class TypeSearchViewSet(DynamicDepthViewSet):
     serializer_class = serializers.TIFFImageSerializer
 
     def get_queryset(self):
-        q = self.request.GET["q"]
+        q = self.request.GET["image_type"]
         queryset = models.Image.objects.filter(type__text__contains=q)
         return queryset
     
@@ -117,7 +117,7 @@ class AdvancedSearch(DynamicDepthViewSet):
         keyword = self.request.GET["keyword"]
         carving_tag = self.request.GET["carving_tag"]
         dating_tag = self.request.GET["dating_tag"]
-        type = self.request.GET["type"]
+        image_type = self.request.GET["image_type"]
         institution_name = self.request.GET["institution_name"]
 
         ##########################################
@@ -130,7 +130,7 @@ class AdvancedSearch(DynamicDepthViewSet):
             query_array.append(Q(carving_tags__text__in=carving_tag))
         if dating_tag is not None and dating_tag != "":
             query_array.append(Q(dating_tags__text__contains=dating_tag))
-        if type is not None and type != "":
+        if image_type is not None and image_type != "":
             query_array.append(Q(type__text__contains=type))
         if institution_name is not None and institution_name != "":
             query_array.append(Q(institution__name__contains=institution_name))
