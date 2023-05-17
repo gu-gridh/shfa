@@ -81,11 +81,19 @@ class SearchDatinTag(DynamicDepthViewSet):
         q = self.request.GET["dating_tag"]
         queryset = models.DatingTag.objects.filter(text__contains=q)
         return queryset
+
+class TypeSearchViewSet(DynamicDepthViewSet):
+    serializer_class = serializers.TIFFImageSerializer
+
+    def get_queryset(self):
+        q = self.request.GET["q"]
+        queryset = models.Image.objects.filter(type__text__contains=q)
+        return queryset
+    
+    filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
     
 # Add general search query
 class GeneralSearch(DynamicDepthViewSet):
-    # serializer_class = serializers.KeywordsSerializer
-    # serializer_class = serializers.RockCarvingSerializer
     serializer_class = serializers.TIFFImageSerializer
 
     def get_queryset(self):
