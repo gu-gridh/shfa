@@ -63,7 +63,7 @@ class SearchRockCarving(DynamicDepthViewSet):
     serializer_class = serializers.RockCarvingSerializer
 
     def get_queryset(self):
-        q = self.request.GET["carving_tag"]
+        q = self.request.GET["carving_object"]
         queryset = models.RockCarvingObject.objects.filter(name__icontains=q)
         return queryset
     
@@ -99,11 +99,11 @@ class GeneralSearch(DynamicDepthViewSet):
 
     def get_queryset(self):
         q = self.request.GET["q"]
-        queryset = models.Image.objects.filter( Q(carving_tags__text__in=q)
+        queryset = models.Image.objects.filter( Q(dating_tags__text__in=q)
                                                |Q(type__text__icontains=q)
                                                |Q(site__raa_id__icontains=q)
                                                |Q(keywords__text__icontains=q)
-                                               |Q(dating_tags__text__icontains=q)
+                                               |Q(rock_carving_object__name__icontains=q)
                                                |Q(institution__name__icontains=q)).distinct()
         return queryset
     
@@ -124,9 +124,9 @@ class AdvancedSearch(DynamicDepthViewSet):
             keyword = self.request.GET["keyword"]
             query_array.append(Q(keywords__text__icontains=keyword))
 
-        if ("carving_tag" in self.request.GET):
-            carving_tag = self.request.GET["carving_tag"]
-            query_array.append(Q(carving_tags__text__in=carving_tag))
+        if ("carving_object" in self.request.GET):
+            carving_object = self.request.GET["carving_object"]
+            query_array.append(Q(rock_carving_object__name__icontains=carving_object))
 
         if ("dating_tag" in self.request.GET):
             dating_tag = self.request.GET["dating_tag"]
