@@ -71,7 +71,7 @@ class SearchRockCarving(DynamicDepthViewSet):
     
 
 class SearchAuthor(DynamicDepthViewSet):
-    serializer_class = serializers.Author
+    serializer_class = serializers.AuthorSerializer
 
     def get_queryset(self):
         q = self.request.GET["auhtor_name"]
