@@ -15,6 +15,7 @@ router.register(rf'{endpoint}/search/site', views.SiteSearchViewSet, basename='s
 router.register(rf'{endpoint}/search/type', views.TypeSearchViewSet, basename='site')
 router.register(rf'{endpoint}/search/keywords', views.SearchKeywords, basename='keywords')
 router.register(rf'{endpoint}/search/carving', views.SearchRockCarving, basename='search rock carving')
+router.register(rf'{endpoint}/search/author', views.SearchAuthor, basename='search for image creator')
 router.register(rf'{endpoint}/search/institution', views.SearchInstitution, basename='institution')
 router.register(rf'{endpoint}/search/dating', views.SearchDatinTag, basename='dating Tag')
 router.register(rf'{endpoint}/search/advance', views.AdvancedSearch, basename='advanced search')
