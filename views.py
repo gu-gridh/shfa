@@ -69,6 +69,17 @@ class SearchRockCarving(DynamicDepthViewSet):
         queryset = models.RockCarvingObject.objects.filter(name__icontains=q)
         return queryset
     
+
+class SearchAuthor(DynamicDepthViewSet):
+    serializer_class = serializers.Author
+
+    def get_queryset(self):
+        q = self.request.GET["auhtor_name"]
+        images = models.Image.objects.all()
+        queryset = models.Author.objects.filter(Q(name__icontains=q) & Q (id__in=list(images.values_list('site', flat=True))))
+        return queryset
+    
+    
 class SearchInstitution(DynamicDepthViewSet):
     serializer_class = serializers.InstitutionSerializer
 
@@ -127,9 +138,9 @@ class AdvancedSearch(DynamicDepthViewSet):
             keyword = self.request.GET["keyword"]
             query_array.append(Q(keywords__text__icontains=keyword))
 
-        if ("carving_object" in self.request.GET):
-            carving_object = self.request.GET["carving_object"]
-            query_array.append(Q(rock_carving_object__name__icontains=carving_object))
+        if ("author_name" in self.request.GET):
+            author_name = self.request.GET["author_name"]
+            query_array.append(Q(author__name__icontains=author_name))
 
         if ("dating_tag" in self.request.GET):
             dating_tag = self.request.GET["dating_tag"]

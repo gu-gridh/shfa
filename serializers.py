@@ -37,6 +37,11 @@ class RockCarvingSerializer(DynamicDepthSerializer):
         model = RockCarvingObject
         fields = ['id']+get_fields(RockCarvingObject, exclude=DEFAULT_FIELDS)
 
+class AuthorSerializer(DynamicDepthSerializer):
+
+    class Meta:
+        model = Author
+        fields = ['id']+get_fields(Author, exclude=DEFAULT_FIELDS)
 
 class InstitutionSerializer(DynamicDepthSerializer):
 
