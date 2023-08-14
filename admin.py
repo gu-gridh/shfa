@@ -146,8 +146,8 @@ class InstitutionAdmin(admin.ModelAdmin):
 class ImageTypeTagAdmin(admin.ModelAdmin):
 
     readonly_fields = ['legacy_id']
-    list_display = ["text"]
-    search_fields = ["text"]
+    list_display = ["text", "order"]
+    search_fields = ["text", "order"]
 
 @admin.register(RockCarvingObject)
 class RockCarvingObjectAdmin(admin.ModelAdmin):
