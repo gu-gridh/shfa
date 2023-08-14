@@ -71,7 +71,7 @@ class DatingTag(abstract.AbstractTagModel):
 class ImageTypeTag(abstract.AbstractTagModel):
     
     legacy_id = models.PositiveBigIntegerField(null=True, blank=True, verbose_name=_("legacy id"))
-
+    order = models.IntegerField(null=True, blank=True, verbose_name=_("orders"), help_text=_("Types order"))
 
     class Meta:
         verbose_name = _("Type of image")
