@@ -76,7 +76,7 @@ class SearchAuthor(DynamicDepthViewSet):
     def get_queryset(self):
         q = self.request.GET["auhtor_name"]
         images = models.Image.objects.all()
-        queryset = models.Author.objects.filter(Q(name__icontains=q) & Q (id__in=list(images.values_list('site', flat=True))))
+        queryset = models.Author.objects.filter(Q(name__icontains=q) & Q (id__in=list(images.values_list('author', flat=True))))
         return queryset
     
     
