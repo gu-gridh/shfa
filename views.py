@@ -118,7 +118,7 @@ class GeneralSearch(DynamicDepthViewSet):
                                                |Q(site__raa_id__icontains=q)
                                                |Q(keywords__text__icontains=q)
                                                |Q(rock_carving_object__name__icontains=q)
-                                               |Q(institution__name__icontains=q)).distinct()
+                                               |Q(institution__name__icontains=q)).distinct().order_by('type__order')
         return queryset
     
     filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
@@ -160,7 +160,7 @@ class AdvancedSearch(DynamicDepthViewSet):
 
         for index in range(1, len(query_array)):
             processed_query = processed_query & query_array[index]
-        queryset = models.Image.objects.filter(processed_query)
+        queryset = models.Image.objects.filter(processed_query).order_by('type__order')
 
         return queryset
     
