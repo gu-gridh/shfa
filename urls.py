@@ -10,7 +10,7 @@ documentation = utils.build_app_api_documentation("shfa", endpoint)
 
 router.register(rf'{endpoint}/image', views.IIIFImageViewSet, basename='image')
 router.register(rf'{endpoint}/geojson/site', views.SiteGeoViewSet, basename='site as geojson')
-# Searching for match objects
+# urls for advanced search options 
 router.register(rf'{endpoint}/search/site', views.SiteSearchViewSet, basename='site')
 router.register(rf'{endpoint}/search/type', views.TypeSearchViewSet, basename='site')
 router.register(rf'{endpoint}/search/keywords', views.SearchKeywords, basename='keywords')
@@ -19,6 +19,7 @@ router.register(rf'{endpoint}/search/author', views.SearchAuthor, basename='sear
 router.register(rf'{endpoint}/search/institution', views.SearchInstitution, basename='institution')
 router.register(rf'{endpoint}/search/dating', views.SearchDatinTag, basename='dating Tag')
 router.register(rf'{endpoint}/search/advance', views.AdvancedSearch, basename='advanced search')
+# General search url
 router.register(rf'{endpoint}/search', views.GeneralSearch, basename='search')
 
 
