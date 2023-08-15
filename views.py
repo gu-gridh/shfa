@@ -16,9 +16,8 @@ class IIIFImageViewSet(DynamicDepthViewSet):
     count:
     Returns a count of the existing images after the application of any filter.
     """
-    
-    queryset = models.Image.objects.all()
     serializer_class = serializers.TIFFImageSerializer
+    queryset = models.Image.objects.all().order_by('type__order')
     filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
 class SiteGeoViewSet(GeoViewSet):
@@ -43,7 +42,9 @@ class SiteSearchViewSet(GeoViewSet):
         images = models.Image.objects.all()
         queryset = models.Site.objects.filter(Q (raa_id__icontains=q) |
                                               Q(lamning_id__icontains=q)  &
-                                              Q (id__in=list(images.values_list('site', flat=True))))
+                                              Q (id__in=list(images.values_list('site', flat=True))
+                                                ))
+
         print(queryset)
         return queryset
     
@@ -59,6 +60,7 @@ class SearchKeywords(DynamicDepthViewSet):
     def get_queryset(self):
         q = self.request.GET["keyword"]
         queryset = models.KeywordTag.objects.filter(text__icontains=q)
+
         return queryset
     
 class SearchRockCarving(DynamicDepthViewSet):
@@ -76,7 +78,9 @@ class SearchAuthor(DynamicDepthViewSet):
     def get_queryset(self):
         q = self.request.GET["auhtor_name"]
         images = models.Image.objects.all()
-        queryset = models.Author.objects.filter(Q(name__icontains=q) & Q (id__in=list(images.values_list('author', flat=True))))
+        queryset = models.Author.objects.filter(Q(name__icontains=q) & 
+                                                Q (id__in=list(images.values_list('author', flat=True))
+                                                   ))
         return queryset
     
     
@@ -86,6 +90,7 @@ class SearchInstitution(DynamicDepthViewSet):
     def get_queryset(self):
         q = self.request.GET["institution_name"]
         queryset = models.Institution.objects.filter(name__icontains=q)
+
         return queryset
     
 class SearchDatinTag(DynamicDepthViewSet):
