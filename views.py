@@ -20,6 +20,15 @@ class IIIFImageViewSet(DynamicDepthViewSet):
     queryset = models.Image.objects.all().order_by('type__order')
     filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
+
+class CompilationViewset(DynamicDepthViewSet):
+    serializer_class = serializers.CompilationSerializer
+    queryset = models.Compilation.objects.all()
+    filterset_fields = ['id']+get_fields(models.Compilation, exclude=DEFAULT_FIELDS + ['images__iiif_file', 'images__file'])
+
+
+
+
 class SiteGeoViewSet(GeoViewSet):
 
     # queryset = models.Site.objects.all()

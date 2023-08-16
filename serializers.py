@@ -54,3 +54,10 @@ class DatingTagSerializer(DynamicDepthSerializer):
     class Meta:
         model = DatingTag
         fields = ['id']+get_fields(DatingTag, exclude=DEFAULT_FIELDS)
+
+
+class CompilationSerializer(DynamicDepthSerializer):
+
+    class Meta:
+        model = Compilation
+        fields = ['id']+get_fields(Compilation, exclude=DEFAULT_FIELDS)
