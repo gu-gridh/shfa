@@ -68,7 +68,11 @@ class SearchKeywords(DynamicDepthViewSet):
 
     def get_queryset(self):
         q = self.request.GET["keyword"]
-        queryset = models.KeywordTag.objects.filter(text__icontains=q)
+        language = self.request.GET["language"]
+        if language == "sv" :        
+            queryset = models.KeywordTag.objects.filter(text__icontains=q)
+        else:
+            queryset = models.KeywordTag.objects.filter(english_translation__icontains=q)
 
         return queryset
     
@@ -87,9 +91,15 @@ class SearchAuthor(DynamicDepthViewSet):
     def get_queryset(self):
         q = self.request.GET["auhtor_name"]
         images = models.Image.objects.all()
-        queryset = models.Author.objects.filter(Q(name__icontains=q) & 
+        language = self.request.GET["language"]
+        if language == "sv" :
+            queryset = models.Author.objects.filter(Q(name__icontains=q) & 
                                                 Q (id__in=list(images.values_list('author', flat=True))
                                                    ))
+        else:
+            queryset = models.Author.objects.filter(Q(english_translation__icontains=q) & 
+                                    Q (id__in=list(images.values_list('author', flat=True))
+                                        ))
         return queryset
     
     
@@ -99,7 +109,6 @@ class SearchInstitution(DynamicDepthViewSet):
     def get_queryset(self):
         q = self.request.GET["institution_name"]
         queryset = models.Institution.objects.filter(name__icontains=q)
-
         return queryset
     
 class SearchDatinTag(DynamicDepthViewSet):
@@ -107,7 +116,11 @@ class SearchDatinTag(DynamicDepthViewSet):
 
     def get_queryset(self):
         q = self.request.GET["dating_tag"]
-        queryset = models.DatingTag.objects.filter(text__icontains=q)
+        language = self.request.GET["language"]
+        if language == "sv" :
+            queryset = models.DatingTag.objects.filter(text__icontains=q)
+        else:
+            queryset = models.DatingTag.objects.filter(english_translation__icontains=q)
         return queryset
 
 class TypeSearchViewSet(DynamicDepthViewSet):
@@ -115,7 +128,11 @@ class TypeSearchViewSet(DynamicDepthViewSet):
 
     def get_queryset(self):
         q = self.request.GET["image_type"]
-        queryset = models.Image.objects.filter(type__text__icontains=q)
+        language = self.request.GET["language"]
+        if language == "sv" :
+            queryset = models.Image.objects.filter(type__text__icontains=q)
+        else:
+            queryset = models.Image.objects.filter(type__english_translation__icontains=q)
         return queryset
     
     filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
