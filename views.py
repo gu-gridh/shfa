@@ -153,7 +153,7 @@ class AdvancedSearch(DynamicDepthViewSet):
             
         if ("keyword" in self.request.GET):
             keyword = self.request.GET["keyword"]
-            query_array.append(Q(keywords__text__icontains=keyword))
+            query_array.append(Q(keywords__text__icontains=keyword)|Q(keywords__text__icontains=keyword))
 
         if ("author_name" in self.request.GET):
             author_name = self.request.GET["author_name"]
@@ -161,11 +161,11 @@ class AdvancedSearch(DynamicDepthViewSet):
 
         if ("dating_tag" in self.request.GET):
             dating_tag = self.request.GET["dating_tag"]
-            query_array.append(Q(dating_tags__text__icontains=dating_tag))
+            query_array.append(Q(dating_tags__text__icontains=dating_tag)| Q(dating_tags__english_translation__icontains=dating_tag))
 
         if ("image_type" in self.request.GET):
             image_type = self.request.GET["image_type"]
-            query_array.append(Q(type__text__icontains=image_type))
+            query_array.append(Q(type__text__icontains=image_type) | Q(type__english_translation__icontains=image_type))
 
         if ("institution_name" in self.request.GET):
             institution_name = self.request.GET["institution_name"]
