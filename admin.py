@@ -146,8 +146,8 @@ class InstitutionAdmin(admin.ModelAdmin):
 class ImageTypeTagAdmin(admin.ModelAdmin):
 
     readonly_fields = ['legacy_id']
-    list_display = ["text", "order"]
-    search_fields = ["text", "order"]
+    list_display = ["text", "english_translation", "order"]
+    search_fields = ["text", "english_translation", "order"]
 
 @admin.register(RockCarvingObject)
 class RockCarvingObjectAdmin(admin.ModelAdmin):
@@ -160,18 +160,18 @@ class RockCarvingObjectAdmin(admin.ModelAdmin):
 class KeywordTagAdmin(admin.ModelAdmin):
 
     readonly_fields = ['legacy_id']
-    list_display = ["text"]
-    search_fields = ["text"]
+    list_display = ["text", "english_translation"]
+    search_fields = ["text", "english_translation"]
 
 @admin.register(DatingTag)
 class DatingTagAdmin(admin.ModelAdmin):
 
     readonly_fields = ['legacy_id']
-    list_display = ["text"]
-    search_fields = ["text"]
+    list_display = ["text", "english_translation"]
+    search_fields = ["text", "english_translation"]
 
 @admin.register(CarvingTag)
 class CarvingTagAdmin(admin.ModelAdmin):
 
-    list_display = ["text"]
-    search_fields = ["text"]
+    list_display = ["text", "english_translation"]
+    search_fields = ["text", "english_translation"]
