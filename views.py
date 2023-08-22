@@ -127,10 +127,13 @@ class GeneralSearch(DynamicDepthViewSet):
     def get_queryset(self):
         q = self.request.GET["q"]
         queryset = models.Image.objects.filter( Q(dating_tags__text__icontains=q)
+                                               |Q(dating_tags__english_translation__icontains=q)
                                                |Q(author__name__icontains=q)
                                                |Q(type__text__icontains=q)
+                                               |Q(type__english_translation__icontains=q)
                                                |Q(site__raa_id__icontains=q)
                                                |Q(keywords__text__icontains=q)
+                                               |Q(keywords__english_translation__icontains=q)
                                                |Q(rock_carving_object__name__icontains=q)
                                                |Q(institution__name__icontains=q)).distinct().order_by('type__order')
         return queryset
