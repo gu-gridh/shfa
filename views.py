@@ -129,6 +129,7 @@ class GeneralSearch(DynamicDepthViewSet):
         queryset = models.Image.objects.filter( Q(dating_tags__text__icontains=q)
                                                |Q(dating_tags__english_translation__icontains=q)
                                                |Q(author__name__icontains=q)
+                                               |Q(author__english_translation__icontains=q)
                                                |Q(type__text__icontains=q)
                                                |Q(type__english_translation__icontains=q)
                                                |Q(site__raa_id__icontains=q)
@@ -157,7 +158,7 @@ class AdvancedSearch(DynamicDepthViewSet):
 
         if ("author_name" in self.request.GET):
             author_name = self.request.GET["author_name"]
-            query_array.append(Q(author__name__icontains=author_name))
+            query_array.append(Q(author__name__icontains=author_name)| Q(author__english_translation__icontains=author_name))
 
         if ("dating_tag" in self.request.GET):
             dating_tag = self.request.GET["dating_tag"]
