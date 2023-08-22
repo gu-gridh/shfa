@@ -153,7 +153,7 @@ class AdvancedSearch(DynamicDepthViewSet):
             
         if ("keyword" in self.request.GET):
             keyword = self.request.GET["keyword"]
-            query_array.append(Q(keywords__text__icontains=keyword)|Q(keywords__text__icontains=keyword))
+            query_array.append(Q(keywords__text__icontains=keyword)|Q(keywords__english_translation__icontains=keyword))
 
         if ("author_name" in self.request.GET):
             author_name = self.request.GET["author_name"]
