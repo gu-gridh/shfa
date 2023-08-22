@@ -18,7 +18,7 @@ class CarvingTag(abstract.AbstractTagModel):
     pass
 
     legacy_id = models.PositiveBigIntegerField(null=True, blank=True, verbose_name=_("legacy id"))
-
+    english_translation = models.CharField(max_length=5000, null=True, blank=True, verbose_name=_('translation'), help_text=("English translation for tag"))
 
     class Meta:
         verbose_name = _("Type of carving")
@@ -35,7 +35,7 @@ class KeywordTag(abstract.AbstractTagModel):
     pass
 
     legacy_id = models.PositiveBigIntegerField(null=True, blank=True, verbose_name=_("legacy id"))
-
+    english_translation = models.CharField(max_length=5000, null=True, blank=True, verbose_name=_('translation'), help_text=("English translation for keyword"))
 
     class Meta:
         verbose_name = _("Image keyword")
@@ -56,6 +56,7 @@ class DatingTag(abstract.AbstractTagModel):
     legacy_id = models.PositiveBigIntegerField(null=True, blank=True, verbose_name=_("legacy id"))
     abbreviation = models.CharField(max_length=32, verbose_name=_("Abbreviation"), help_text=_("Common abbreviation of the dating estimation."))
     certainty = models.CharField(max_length=64, null=True, blank=True, verbose_name=_("Certainty of dating"), help_text=_("A free-form description of the certainty of the dating."))
+    english_translation = models.CharField(max_length=5000, null=True, blank=True, verbose_name=_('translation'), help_text=("English translation for tag"))
 
     class Meta:
         verbose_name = _("Dating")
@@ -72,6 +73,7 @@ class ImageTypeTag(abstract.AbstractTagModel):
     
     legacy_id = models.PositiveBigIntegerField(null=True, blank=True, verbose_name=_("legacy id"))
     order = models.IntegerField(null=True, blank=True, verbose_name=_("orders"), help_text=_("Types order"))
+    english_translation = models.CharField(max_length=5000, null=True, blank=True, verbose_name=_('translation'), help_text=("English translation for tag"))
 
     class Meta:
         verbose_name = _("Type of image")
