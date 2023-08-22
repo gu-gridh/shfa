@@ -122,8 +122,8 @@ class CompilationAdmin(admin.ModelAdmin):
 class AuthorAdmin(admin.ModelAdmin):
 
     readonly_fields = ['legacy_id']
-    list_display = ["name"]
-    search_fields = ["name"]
+    list_display = ["name", "english_translation"]
+    search_fields = ["name", "english_translation"]
     ordering = ('name',)
 
 @admin.register(Collection)

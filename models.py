@@ -109,7 +109,7 @@ class Author(abstract.AbstractBaseModel):
 
     name = models.CharField(max_length=256, unique=True, verbose_name=_("name"), help_text=_("Free-form name of the creator, photographer or author."))
     legacy_id = models.PositiveBigIntegerField(null=True, blank=True, verbose_name=_("legacy id"))
-
+    english_translation = models.CharField(max_length=5000, null=True, blank=True, verbose_name=_('translation'), help_text=("English translation for the author"))
 
     class Meta:
         verbose_name = _("Creator")
