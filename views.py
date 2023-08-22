@@ -1,9 +1,11 @@
 from unittest.mock import DEFAULT
 from rest_framework import viewsets
 from . import models, serializers
-from django.db.models import Q, Prefetch
+from django.db.models import Q, Count
 from diana.abstract.views import DynamicDepthViewSet, GeoViewSet
 from diana.abstract.models import get_fields, DEFAULT_FIELDS
+from functools import reduce
+import operator
 
 class IIIFImageViewSet(DynamicDepthViewSet):
     """
@@ -27,10 +29,7 @@ class CompilationViewset(DynamicDepthViewSet):
     filterset_fields = ['id']+get_fields(models.Compilation, exclude=DEFAULT_FIELDS + ['images__iiif_file', 'images__file'])
 
 
-
-
 class SiteGeoViewSet(GeoViewSet):
-
     # queryset = models.Site.objects.all()
 
     images = models.Image.objects.all()
@@ -54,7 +53,6 @@ class SiteSearchViewSet(GeoViewSet):
                                               Q (id__in=list(images.values_list('site', flat=True))
                                                 ))
 
-        print(queryset)
         return queryset
     
     filterset_fields = get_fields(models.Site, exclude=DEFAULT_FIELDS + ['coordinates'])
@@ -127,12 +125,14 @@ class GeneralSearch(DynamicDepthViewSet):
     def get_queryset(self):
         q = self.request.GET["q"]
         queryset = models.Image.objects.filter( Q(dating_tags__text__icontains=q)
-                                               |Q(author__name__icontains=q)
-                                               |Q(type__text__icontains=q)
-                                               |Q(site__raa_id__icontains=q)
-                                               |Q(keywords__text__icontains=q)
-                                               |Q(rock_carving_object__name__icontains=q)
-                                               |Q(institution__name__icontains=q)).distinct().order_by('type__order')
+                                                |Q(author__name__icontains=q)
+                                                |Q(type__text__icontains=q)
+                                                |Q(site__raa_id__icontains=q)
+                                                |Q(keywords__text__icontains=q)
+                                                |Q(rock_carving_object__name__icontains=q)
+                                                |Q(institution__name__icontains=q)
+                                                ).order_by('type__order')
+
         return queryset
     
     filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
@@ -150,19 +150,38 @@ class AdvancedSearch(DynamicDepthViewSet):
             
         if ("keyword" in self.request.GET):
             keyword = self.request.GET["keyword"]
-            query_array.append(Q(keywords__text__icontains=keyword))
+            keyword = keyword.split(',')
+            if len(keyword) == 1:
+                query_array.append(Q(keywords__text__icontains=keyword[0]))
+            else:
+                print(keyword)
+                query_array.append(reduce(operator.and_, (Q(keywords__text__icontains=(i)) for i in keyword)))
 
         if ("author_name" in self.request.GET):
             author_name = self.request.GET["author_name"]
-            query_array.append(Q(author__name__icontains=author_name))
+            author_name = author_name.split('and')
+
+            if len(author_name) == 1 :
+                query_array.append(Q(author__name__icontains=author_name[0]))
+            else :
+                query_array.append(reduce(operator.or_, (Q(author__name__icontains=i) for i in author_name)))
 
         if ("dating_tag" in self.request.GET):
             dating_tag = self.request.GET["dating_tag"]
-            query_array.append(Q(dating_tags__text__icontains=dating_tag))
+            dating_tag = dating_tag.split('and')
+            if len(dating_tag) == 1 :
+                query_array.append(Q(dating_tags__text__icontains=dating_tag))
+            else:
+                query_array.append(reduce(operator.or_, (Q(dating_tags__text__icontains=i) for i in dating_tag)))
 
         if ("image_type" in self.request.GET):
             image_type = self.request.GET["image_type"]
-            query_array.append(Q(type__text__icontains=image_type))
+            image_type = image_type.split('and')
+            if len(image_type) == 1:
+                query_array.append(Q(type__text__icontains=image_type))
+            else:
+                query_array.append(reduce(operator.or_, (Q(type__text__icontains=i) for i in image_type)))
+
 
         if ("institution_name" in self.request.GET):
             institution_name = self.request.GET["institution_name"]
@@ -170,10 +189,14 @@ class AdvancedSearch(DynamicDepthViewSet):
 
         if len(query_array)==0:
             pass # User has not provided a single field, throw error
-        processed_query = query_array[0]
+        processed_query = reduce(operator.and_, (Q(i) for i in query_array))
 
-        for index in range(1, len(query_array)):
-            processed_query = processed_query & query_array[index]
+        # processed_query = query_array[0]
+
+        # for index in range(1, len(query_array)):
+        #     processed_query = processed_query & query_array[index]
+
+        print(processed_query)
         queryset = models.Image.objects.filter(processed_query).order_by('type__order')
 
         return queryset
