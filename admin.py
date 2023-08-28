@@ -34,8 +34,6 @@ class KeywordFilter(AutocompleteFilter):
     field_name = 'keywords' # name of the foreign key field
 
 
-
-
 @admin.register(Image)
 class ImageModel(admin.ModelAdmin):
 
@@ -52,11 +50,12 @@ class ImageModel(admin.ModelAdmin):
         ('year', NumericRangeFilter), 
         ('site', EmptyFieldListFilter), 
         'type', 
+        'published',
         InstitutionFilter,
         CollectionFilter,
         AuthorFilter,
         SiteFilter,
-        KeywordFilter
+        KeywordFilter,
         ]
     
     list_per_page = 10
