@@ -9,7 +9,7 @@ class TIFFImageSerializer(DynamicDepthSerializer):
 
     class Meta:
         model = Image
-        fields = ['id']+get_fields(Image, exclude=DEFAULT_FIELDS)
+        fields = ['id']+get_fields(Image, exclude=['created_at', 'updated_at'])
 
 class SiteSerializer(DynamicDepthSerializer):
 

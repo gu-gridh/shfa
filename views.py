@@ -18,7 +18,7 @@ class IIIFImageViewSet(DynamicDepthViewSet):
     """
     serializer_class = serializers.TIFFImageSerializer
     queryset = models.Image.objects.all().order_by('type__order')
-    filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
+    filterset_fields = ['id']+get_fields(models.Image, exclude=['created_at', 'updated_at'] + ['iiif_file', 'file'])
 
 
 class CompilationViewset(DynamicDepthViewSet):
