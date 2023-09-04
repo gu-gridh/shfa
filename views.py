@@ -154,7 +154,7 @@ class GeneralSearch(DynamicDepthViewSet):
                                                |Q(keywords__english_translation__icontains=q)
                                                |Q(rock_carving_object__name__icontains=q)
                                                |Q(institution__name__icontains=q)
-                                               & Q(published=True)).distinct().order_by('type__order')
+                                               ).filter(published=True).distinct().order_by('type__order')
         return queryset
     
     filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
