@@ -17,7 +17,7 @@ class IIIFImageViewSet(DynamicDepthViewSet):
     Returns a count of the existing images after the application of any filter.
     """
     serializer_class = serializers.TIFFImageSerializer
-    queryset = models.Image.objects.all().order_by('type__order')
+    queryset = models.Image.objects.filter(published=True).order_by('type__order')
     filterset_fields = ['id']+get_fields(models.Image, exclude=['created_at', 'updated_at'] + ['iiif_file', 'file'])
 
 
