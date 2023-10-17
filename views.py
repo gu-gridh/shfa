@@ -23,24 +23,6 @@ class IIIFImageViewSet(DynamicDepthViewSet):
     queryset = models.Image.objects.filter(published=True).order_by('type__order')
     filterset_fields = ['id']+get_fields(models.Image, exclude=['created_at', 'updated_at'] + ['iiif_file', 'file'])
 
-
-class IIIFImageXMLViewSet(DynamicDepthViewSet):
-    """
-    retrieve:
-    Returns a single image instance.
-
-    list:
-    Returns a list of all the existing images in the database, paginated.
-
-    count:
-    Returns a count of the existing images after the application of any filter.
-    """
-    serializer_class = serializers.TIFFImageSerializer
-    queryset = models.Image.objects.filter(published=True).order_by('type__order')
-    filterset_fields = ['id']+get_fields(models.Image, exclude=['created_at', 'updated_at'] + ['iiif_file', 'file'])
-    parser_classes = (XMLParser,)
-    renderer_classes = (XMLRenderer,)
-
 class CompilationViewset(DynamicDepthViewSet):
     serializer_class = serializers.CompilationSerializer
     queryset = models.Compilation.objects.all()
@@ -219,3 +201,26 @@ class AdvancedSearch(DynamicDepthViewSet):
         return queryset
     
     filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
+
+
+class OAI_PMHView(DynamicDepthViewSet):
+    """
+    retrieve:
+    Returns a single image instance.
+
+    list:
+    Returns a list of all the existing images in the database, paginated.
+
+    count:
+    Returns a count of the existing images after the application of any filter.
+    """
+    serializer_class = serializers.TIFFImageSerializer
+    queryset = models.Image.objects.filter(published=True).order_by('type__order')
+    filterset_fields = ['id']+get_fields(models.Image, exclude=['created_at', 'updated_at'] + ['iiif_file', 'file'])
+    parser_classes = (XMLParser,)
+    renderer_classes = (XMLRenderer,)
+
+    def get_queryset(self):
+        verb = self.request.GET["verb"]
+
+        

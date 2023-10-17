@@ -25,6 +25,9 @@ router.register(rf'{endpoint}/search/advance', views.AdvancedSearch, basename='a
 # General search url
 router.register(rf'{endpoint}/search', views.GeneralSearch, basename='search')
 
+# add oai-pmh end points
+router.register(rf'{endpoint}/oai', views.OAI_PMHView, basename='OAI_PMH')
+
 
 urlpatterns = [
     path('', include(router.urls)),
