@@ -2,15 +2,13 @@ from django.urls import path, include
 from rest_framework import routers
 from . import views
 import diana.utils as utils
-
+from .views import oai
 
 router = routers.DefaultRouter()
 endpoint = utils.build_app_endpoint("shfa")
 documentation = utils.build_app_api_documentation("shfa", endpoint)
 
 router.register(rf'{endpoint}/image', views.IIIFImageViewSet, basename='image')
-router.register(rf'{endpoint}/bild/rdf', views.IIIFImageXMLViewSet, basename='bild')
-
 router.register(rf'{endpoint}/geojson/site', views.SiteGeoViewSet, basename='site as geojson')
 router.register(rf'{endpoint}/compilation', views.CompilationViewset, basename='compilation')
 # urls for advanced search options 
@@ -25,12 +23,12 @@ router.register(rf'{endpoint}/search/advance', views.AdvancedSearch, basename='a
 # General search url
 router.register(rf'{endpoint}/search', views.GeneralSearch, basename='search')
 
-# add oai-pmh end points
-router.register(rf'{endpoint}/oai', views.OAI_PMHView, basename='OAI_PMH')
-
 
 urlpatterns = [
     path('', include(router.urls)),
+    
+    # add oai-pmh end points
+    path(rf'{endpoint}/OAICat/', views.oai, name="oai"),
 
     # Automatically generated views
     *utils.get_model_urls('shfa', endpoint, 
