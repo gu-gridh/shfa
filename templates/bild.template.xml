@@ -6,8 +6,8 @@
   <Entity rdf:about="http://kulturarvsdata.se/{{institution.name}}/{{"bild"}}/{{data.legacy_id}}">
     <ksamsokVersion>0.99</ksamsokVersion>
     <buildDate>{% now "Y-m-d" %}</buildDate>
-    <createdDate>{{data.created_at}}</createdDate>
-    <lastChangedDate> {{data.updated_at}} </lastChangedDate>
+    <createdDate>{{data.created_at|date:"Y-m-d"}}</createdDate>
+    <lastChangedDate>{{data.updated_at|date:"Y-m-d"}}</lastChangedDate>
     <serviceOrganization>{{"shfa"}}</serviceOrganization>
     <serviceName>{{"shfabild"}}</serviceName>
     <url>{{"https://diana.dh.gu.se/api/shfa/image/"}}{{data.uuid}}</url>
