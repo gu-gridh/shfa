@@ -1,0 +1,6 @@
+{% extends "base.xml" %}
+{% block content %}
+
+    <error code="{{ error.code }}">{{ error.msg }}</error>
+
+{% endblock %}

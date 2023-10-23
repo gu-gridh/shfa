@@ -8,6 +8,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.views.decorators.csrf import csrf_exempt
 from .oai_pmh import *
+
+
 class IIIFImageViewSet(DynamicDepthViewSet):
     """
     retrieve:
@@ -202,43 +204,14 @@ class AdvancedSearch(DynamicDepthViewSet):
     
     filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
-
-class OAI_PMHView(APIView):
-    serializer_class = serializers.TIFFImageSerializer
-    # queryset = models.Image.objects.filter(published=True).order_by('type__order')
-    # parser_classes = (XMLParser,)
-    renderer_classes = [XMLRenderer, ]
-
-    def get(self, request):
-        queryset = models.Image.objects.all()
-        params = request.POST.copy() if request.method == "POST" else request.GET.copy()
-
-        if "verb" in params:
-            verb = params.pop("verb")[-1]
-            if verb == "GetRecord":
-                template = "bild.xml"
-                if "metadataPrefix" in params:
-                    metadata_prefix = params.pop("metadataPrefix")
-                    if len(metadata_prefix) == 1:
-                        metadata_prefix = metadata_prefix[0]
-                        if "identifier" in params:
-                            identifier = params.pop("identifier")[-1]
-                            queryset = models.Image.objects.filter(id=identifier)
-                            serializer_class = serializers.TIFFImageSerializer(queryset)
-        context = {'data': serializer_class}
-        return Response(serializer_class)
-
-    filterset_fields = ['id']+get_fields(models.Image, exclude=['iiif_file', 'file'])
-
-
 @csrf_exempt
 def oai(request):
-
     params = request.POST.copy() if request.method == "POST" else request.GET.copy()
     if "verb" in params:
         verb = params.pop("verb")[-1]
         if verb == "GetRecord":
             output = get_records(params, request)
-            
+        else:
+            output = generate_error("badVerb")
     return output
 
