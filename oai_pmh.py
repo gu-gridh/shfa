@@ -4,6 +4,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 def get_records(params, request):   
     template = "../templates/bild.template.xml"
+    error_output = None
     if "metadataPrefix" in params:
         metadata_prefix = params.pop("metadataPrefix")
         if len(metadata_prefix) == 1:
@@ -23,7 +24,7 @@ def get_records(params, request):
             metadata_prefix = None
     else:
         error_output = generate_error(request, "badArgument", "metadataPrefix")
-        
+
     template_output = output if not error_output else error_output
     return template_output
 
