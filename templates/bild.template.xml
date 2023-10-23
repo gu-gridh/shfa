@@ -5,7 +5,7 @@
 		xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#" xmlns:time="http://www.w3.org/2006/time#">
   <Entity rdf:about="http://kulturarvsdata.se/{{institution.name}}/{{"bild"}}/{{data.legacy_id}}">
     <ksamsokVersion>0.99</ksamsokVersion>
-    <buildDate>${BUILDDATE_YYYY-MM-DD}</buildDate>
+    <buildDate>{% now "Y-m-d" %}</buildDate>
     <createdDate>{{data.created_at}}</createdDate>
     <lastChangedDate> {{data.updated_at}} </lastChangedDate>
     <serviceOrganization>{{"shfa"}}</serviceOrganization>
