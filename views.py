@@ -220,9 +220,13 @@ def oai(request):
         verb = params.pop("verb")[-1]
         if verb == "GetRecord":
             output = get_records(params, request)
-        # elif verb == "Identify":
-        #     output = get_identify(request)
+        elif verb == "Identify":
+            output = get_identify(request)
+        # elif verb == "ListIdentifiers":
+        #     get_list_identifiers(request, params)
         else:
             output = generate_error(request, "badVerb")
+        
+
     return output
 
