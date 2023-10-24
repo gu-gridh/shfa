@@ -7,7 +7,7 @@ from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.views.decorators.csrf import csrf_exempt
-from .oai_pmh import *
+from .oai_cat import *
 
 
 class IIIFImageViewSet(DynamicDepthViewSet):
@@ -207,11 +207,22 @@ class AdvancedSearch(DynamicDepthViewSet):
 @csrf_exempt
 def oai(request):
     params = request.POST.copy() if request.method == "POST" else request.GET.copy()
+    verb = None
+    identifier = None
+    metadata_prefix = None
+    set_spec = None
+    from_timestamp = None
+    until_timestamp = None
+    resumption_token = None
+
+    
     if "verb" in params:
         verb = params.pop("verb")[-1]
         if verb == "GetRecord":
             output = get_records(params, request)
+        # elif verb == "Identify":
+        #     output = get_identify(request)
         else:
-            output = generate_error("badVerb")
+            output = generate_error(request, "badVerb")
     return output
 

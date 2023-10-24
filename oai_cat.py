@@ -83,6 +83,17 @@ def get_image_values(request, query, identifier, template):
     return xml_output
 
 
+def get_identify(request):
+    template = "../templates/identify.xml"
+    identify_output =  render(
+        request,
+        template_name=template, 
+        # context= {
+        #     'error':error_xml
+        #     },
+        content_type="text/xml")
+    return identify_output
+
 def generate_error(request, code, *args):
     template = "../templates/error.xml"
     error_xml = {}
