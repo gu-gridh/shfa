@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from . import models, serializers
 from django.views.decorators.csrf import csrf_exempt
+from datetime import datetime
 
 def get_records(params, request):   
     template = "../templates/bild.template.xml"
@@ -25,6 +26,7 @@ def get_records(params, request):
     else:
         error_output = generate_error(request, "badArgument", "metadataPrefix")
 
+    # check_bad_arguments(request, params)
     template_output = output if not error_output else error_output
     return template_output
 
@@ -93,6 +95,47 @@ def get_identify(request):
         #     },
         content_type="text/xml")
     return identify_output
+
+
+def check_bad_arguments(request, params, msg=None):
+    for k, v in params.copy().items():
+        error = generate_error(
+            request,
+            {   
+                "code": "badArgument",
+                "msg": f'The argument "{k}" (value="{v}") included in the request is '
+                + "not valid."
+                + (f" {msg}" if msg else ""),
+            }
+        )
+        params.pop(k)
+    
+
+def _check_timestamps(request, params, errors):
+    from_timestamp = None
+    until_timestamp = None
+
+    granularity = None
+    if "from" in params:
+        f = params.pop("from")[-1]
+        granularity = "%Y-%m-%dT%H:%M:%SZ %z" if "T" in f else "%Y-%m-%d %z"
+        try:
+            from_timestamp = datetime.strptime(f + " +0000", granularity)
+        except Exception:
+            errors = generate_error(request, "badArgument_valid", f, "from")
+
+    if "until" in params:
+        u = params.pop("until")[-1]
+        ugranularity = "%Y-%m-%dT%H:%M:%SZ %z" if "T" in u else "%Y-%m-%d %z"
+        if ugranularity == granularity or not granularity:
+            try:
+                until_timestamp = datetime.strptime(u + " +0000", granularity)
+            except Exception:
+                errors = generate_error(request, "badArgument_valid", u, "until")
+        else:
+            errors = generate_error(request,"badArgument_granularity")
+    return from_timestamp, until_timestamp
+
 
 def generate_error(request, code, *args):
     template = "../templates/error.xml"

@@ -208,13 +208,6 @@ class AdvancedSearch(DynamicDepthViewSet):
 def oai(request):
     params = request.POST.copy() if request.method == "POST" else request.GET.copy()
     verb = None
-    identifier = None
-    metadata_prefix = None
-    set_spec = None
-    from_timestamp = None
-    until_timestamp = None
-    resumption_token = None
-
     
     if "verb" in params:
         verb = params.pop("verb")[-1]
@@ -222,8 +215,6 @@ def oai(request):
             output = get_records(params, request)
         elif verb == "Identify":
             output = get_identify(request)
-        # elif verb == "ListIdentifiers":
-        #     get_list_identifiers(request, params)
         else:
             output = generate_error(request, "badVerb")
         

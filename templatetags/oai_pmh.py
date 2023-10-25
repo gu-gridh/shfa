@@ -105,43 +105,43 @@ def repository_name():
     return mark_safe(REPOSITORY_NAME)
 
 
-# @register.simple_tag
-# def resumption_token(
-#     paginator,
-#     page,
-#     metadata_prefix=None,
-#     set_spec=None,
-#     from_timestamp=None,
-#     until_timestamp=None,
-# ):
-#     """Get resumption token."""
-#     if paginator.num_pages > 0 and page.has_next():
-#         expiration_date = timezone.now() + timezone.timedelta(days=1)
-#         token = "".join("%02x" % i for i in urandom(16))
+@register.simple_tag
+def resumption_token(
+    paginator,
+    page,
+    metadata_prefix=None,
+    set_spec=None,
+    from_timestamp=None,
+    until_timestamp=None,
+):
+    """Get resumption token."""
+    if paginator.num_pages > 0 and page.has_next():
+        expiration_date = timezone.now() + timezone.timedelta(days=1)
+        token = "".join("%02x" % i for i in urandom(16))
 
-#         metadata_format = None
-#         if metadata_prefix:
-#             metadata_format = MetadataFormat.objects.get(prefix=metadata_prefix)
-#         set_spec = None
-#         if set_spec:
-#             set_spec = Set.objects.get(spec=set_spec)
+        metadata_format = None
+        if metadata_prefix:
+            metadata_format = 'oaicat'
+        set_spec = None
+        # if set_spec:
+        #     set_spec = Set.objects.get(spec=set_spec)
 
-#         ResumptionToken.objects.create(
-#             token=token,
-#             expiration_date=expiration_date,
-#             complete_list_size=paginator.count,
-#             cursor=page.end_index(),
-#             metadata_prefix=metadata_format,
-#             set_spec=set_spec,
-#             from_timestamp=from_timestamp,
-#             until_timestamp=until_timestamp,
-#         )
+        ResumptionToken = {
+            "token": token,
+            "expiration_date": expiration_date,
+            "complete_list_size": paginator.count,
+            "cursor": page.end_index(),
+            "metadata_prefix": metadata_format,
+            "set_spec": set_spec,
+            "from_timestamp": from_timestamp,
+            "until_timestamp": until_timestamp,
+        }
 
-#         return mark_safe(
-#             "<resumptionToken expirationDate="
-#             + f"\"{expiration_date.strftime('%Y-%m-%dT%H:%M:%SZ')}\" "
-#             + f'completeListSize="{paginator.count}" cursor="{page.end_index()}">'
-#             + f"{token}</resumptionToken>"
-#         )
-#     else:
-#         return ""
+        return mark_safe(
+            "<resumptionToken expirationDate="
+            + f"\"{expiration_date.strftime('%Y-%m-%dT%H:%M:%SZ')}\" "
+            + f'completeListSize="{paginator.count}" cursor="{page.end_index()}">'
+            + f"{token}</resumptionToken>"
+        )
+    else:
+        return ""
