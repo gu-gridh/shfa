@@ -12,6 +12,7 @@ NUM_PER_PAGE = 25
 def get_records(params, request):   
     template = "../templates/bild.template.xml"
     error_output = None
+    output = None
     if "metadataPrefix" in params:
         metadata_prefix = params.pop("metadataPrefix")
         if len(metadata_prefix) == 1:
@@ -152,10 +153,10 @@ def get_list_records(verb, request, params):
             ).exists():
                 errors_output = generate_error(request, "cannotDisseminateFormat", metadata_prefix)
             else:
-                images = get_all_images_info()
+                images = get_all_images_info(metadata_prefix)
                 header_list = models.Header.objects.filter(
                             metadata_formats__prefix=metadata_prefix)
-                
+
                 from_timestamp, until_timestamp = check_timestamps(request, params)
                 if from_timestamp:
                     header_list = header_list.filter(
@@ -190,12 +191,16 @@ def get_list_records(verb, request, params):
     )
     return xml_output
 
-def get_all_images_info():
+def get_all_images_info(metadata_prefix):
     images = models.Image.objects.all()
     id_list = list(images.values_list('id', flat=True))
     tmp = []
     for id in id_list:
         image_xml_output = get_image_values(images, id)
+        header_list = models.Header.objects.filter(
+                metadata_formats__prefix=metadata_prefix)
+        if not header_list :
+                    header_list = generate_header(id, metadata_prefix)
         tmp.append(image_xml_output)
     return tmp
 
