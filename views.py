@@ -10,27 +10,6 @@ from django.views.decorators.csrf import csrf_exempt
 from .oai_cat import *
 
 
-class IIIFImageViewSet(DynamicDepthViewSet):
-    """
-    retrieve:
-    Returns a single image instance.
-
-    list:
-    Returns a list of all the existing images in the database, paginated.
-
-    count:
-    Returns a count of the existing images after the application of any filter.
-    """
-    serializer_class = serializers.TIFFImageSerializer
-    queryset = models.Image.objects.filter(published=True).order_by('type__order')
-    filterset_fields = ['id']+get_fields(models.Image, exclude=['created_at', 'updated_at'] + ['iiif_file', 'file'])
-
-class CompilationViewset(DynamicDepthViewSet):
-    serializer_class = serializers.CompilationSerializer
-    queryset = models.Compilation.objects.all()
-    filterset_fields = ['id']+get_fields(models.Compilation, exclude=DEFAULT_FIELDS + ['images__iiif_file', 'images__file'])
-
-
 class SiteGeoViewSet(GeoViewSet):
 
     # queryset = models.Site.objects.all()
@@ -63,6 +42,27 @@ class SiteSearchViewSet(GeoViewSet):
     search_fields = ['raa_id', 'lamning_id', 'ksamsok_id', 'placename']
     bbox_filter_field = 'coordinates'
     bbox_filter_include_overlapping = True
+
+
+class IIIFImageViewSet(DynamicDepthViewSet):
+    """
+    retrieve:
+    Returns a single image instance.
+
+    list:
+    Returns a list of all the existing images in the database, paginated.
+
+    count:
+    Returns a count of the existing images after the application of any filter.
+    """
+    serializer_class = serializers.TIFFImageSerializer
+    queryset = models.Image.objects.filter(published=True).order_by('type__order')
+    filterset_fields = ['id']+get_fields(models.Image, exclude=['created_at', 'updated_at'] + ['iiif_file', 'file'])
+
+class CompilationViewset(DynamicDepthViewSet):
+    serializer_class = serializers.CompilationSerializer
+    queryset = models.Compilation.objects.all()
+    filterset_fields = ['id']+get_fields(models.Compilation, exclude=DEFAULT_FIELDS + ['images__iiif_file', 'images__file'])
 
 
 class SearchKeywords(DynamicDepthViewSet):
@@ -211,7 +211,7 @@ class AdvancedSearch(DynamicDepthViewSet):
 def oai(request):
     params = request.POST.copy() if request.method == "POST" else request.GET.copy()
     verb = None
-    
+
     if "verb" in params:
         verb = params.pop("verb")[-1]
         if verb == "GetRecord":
@@ -224,4 +224,3 @@ def oai(request):
             output = generate_error(request, "badVerb")
         
     return output
-

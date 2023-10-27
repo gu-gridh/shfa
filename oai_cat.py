@@ -132,6 +132,7 @@ def check_bad_arguments(request, params, msg=None):
 def get_list_records(verb, request, params):
     template  = "../templates/listrecords.xml"
     errors_output = None
+
     if "resumptionToken" in params:
         header_list = models.Header.objects.all()
         # Generate resumptionToken
@@ -205,12 +206,12 @@ def get_all_images_info(metadata_prefix):
     return tmp
 
 def generate_header(identifier, metadata):
-    id_identifier = models.Image.objects.filter(id=identifier).values_list('id', flat=True)
-    id_metadata= models.MetadataFormat.objects.filter(prefix=metadata).values_list('prefix', flat=True)
-    
-    models.Header.objects.create(
-        identifier=id_identifier[0],
-        metadata_formats=id_metadata[0]
+    id_identifier = models.Image.objects.get(id=identifier)
+    id_metadata= models.MetadataFormat.objects.get(prefix=metadata)
+    models.Header.objects.update_or_create(
+        name=str(id_identifier.id),
+        identifier=id_identifier,
+        metadata_formats=id_metadata
     )
     return
 
