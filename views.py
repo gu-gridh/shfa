@@ -204,6 +204,9 @@ class AdvancedSearch(DynamicDepthViewSet):
     
     filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
+
+# VIEW FOR OAI_CAT
+
 @csrf_exempt
 def oai(request):
     params = request.POST.copy() if request.method == "POST" else request.GET.copy()
@@ -215,9 +218,10 @@ def oai(request):
             output = get_records(params, request)
         elif verb == "Identify":
             output = get_identify(request)
+        elif verb == "ListRecords":
+            output = get_list_records(verb, request, params)
         else:
             output = generate_error(request, "badVerb")
         
-
     return output
 

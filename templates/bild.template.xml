@@ -84,7 +84,7 @@
         <parishName>Tanum</parishName> 
         <coordinates rdf:parseType="Literal">
             <gml:Point xmlns:gml="http://www.opengis.net/gml" srsName="SDO:4326">
-            <gml:coordinates cs="," decimal="." ts=" ">{{coordinates}}</gml:coordinates>
+            <gml:coordinates cs="," decimal="." ts=" "> {% for s in coordinates %}{% if not forloop.first %}{% if forloop.last %}, {% else %}, {% endif %}{% endif %}{{s}}{% endfor %}</gml:coordinates>
         </gml:Point>
     </coordinates>
 </Context>

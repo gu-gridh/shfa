@@ -257,3 +257,126 @@ class Compilation(abstract.AbstractBaseModel):
     
     def __repr__(self) -> str:
         return str(self)
+
+
+# Models For OAI_PMH
+
+class MetadataFormat(abstract.AbstractBaseModel):
+    """MetadataFormat Model."""
+
+    prefix = models.CharField(max_length=256, unique=True, verbose_name=_("Prefix"))
+    schema = models.URLField(max_length=2048, verbose_name=_("Schema"))
+    namespace = models.URLField(max_length=2048, verbose_name=_("Namespace"))
+
+    def __str__(self):
+        """Name."""
+        return self.prefix
+
+    class Meta:
+        """Meta."""
+
+        ordering = ("prefix",)
+        verbose_name = _("Metadata format")
+        verbose_name_plural = _("Metadata formats")
+
+
+class Set(abstract.AbstractBaseModel):
+    """Set Model."""
+
+    spec = models.TextField(unique=True, verbose_name=_("Spec"))
+    name = models.TextField(verbose_name=_("Name"))
+    description = models.TextField(blank=True, null=True, verbose_name=_("Description"))
+
+    def __str__(self):
+        """Name."""
+        return self.name
+
+    class Meta:
+        """Meta."""
+
+        ordering = ("name",)
+        verbose_name = _("Set")
+        verbose_name_plural = _("Sets")
+
+
+class Header(abstract.AbstractBaseModel):
+    """Header Model."""
+
+    identifier = models.ForeignKey(Image, models.CASCADE, unique=True, verbose_name=_("Identifier"))
+    timestamp = models.DateTimeField(auto_now=True, verbose_name=_("Timestamp"))
+    deleted = models.BooleanField(default=False, verbose_name=_("Deleted"))
+    metadata_formats = models.ForeignKey(
+        MetadataFormat,
+        models.CASCADE,
+        blank=True,
+        related_name="identifiers",
+        verbose_name=_("Metadata format"),
+    )
+    sets = models.ManyToManyField(
+        Set,
+        blank=True,
+        related_name="headers",
+        verbose_name=_("Set"),
+    )
+
+    def __str__(self):
+        """Name."""
+        return self.identifier
+
+    class Meta:
+        """Meta."""
+
+        ordering = ("identifier",)
+        verbose_name = _("Header")
+        verbose_name_plural = _("Headers")
+
+
+
+class ResumptionToken(abstract.AbstractBaseModel):
+    """ResumptionToken Model."""
+
+    expiration_date = models.DateTimeField(
+        verbose_name=_("Expiration date"),
+    )
+    complete_list_size = models.IntegerField(
+        default=0,
+        verbose_name=_("Complete list size"),
+    )
+    cursor = models.IntegerField(default=0, verbose_name=_("Cursor"))
+    token = models.TextField(unique=True, verbose_name=_("Token"))
+
+    from_timestamp = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name=_("From timestamp"),
+    )
+    until_timestamp = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name=_("Until timestamp"),
+    )
+    metadata_prefix = models.ForeignKey(
+        MetadataFormat,
+        models.CASCADE,
+        blank=True,
+        null=True,
+        verbose_name=_("Metadata prefix"),
+    )
+    set_spec = models.ForeignKey(
+        Set,
+        models.CASCADE,
+        blank=True,
+        null=True,
+        verbose_name=_("Set spec"),
+    )
+
+    def __str__(self):
+        """Name."""
+        return self.token
+
+    class Meta:
+        """Meta."""
+
+        ordering = ("expiration_date",)
+        verbose_name = _("Resumption token")
+        verbose_name_plural = _("Resumption tokens")
