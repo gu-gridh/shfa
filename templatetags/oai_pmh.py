@@ -21,6 +21,8 @@ from django.conf import settings
 from django.template import Library
 from django.utils import timezone
 from django.utils.safestring import mark_safe
+from ..models import MetadataFormat, ResumptionToken
+
 from html import escape
 from os import urandom
 register = Library()
@@ -77,7 +79,6 @@ def resumption_token(
     from_timestamp=None,
     until_timestamp=None,
 ):
-    
     """Get resumption token."""
     if paginator.num_pages > 0 :
         expiration_date = timezone.now() + timezone.timedelta(days=1)
@@ -85,17 +86,18 @@ def resumption_token(
 
         metadata_format = None
         if metadata_prefix:
-            metadata_format = 'ksamsok-rdf'
+            metadata_format = MetadataFormat.objects.get(prefix=metadata_prefix)
 
-        ResumptionToken = {
-            "token": token,
-            "expiration_date": expiration_date,
-            "complete_list_size": paginator.count,
-            "cursor": page.end_index(),
-            "metadata_prefix": metadata_format,
-            "from_timestamp": from_timestamp,
-            "until_timestamp": until_timestamp,
-        }
+
+        ResumptionToken.objects.create(
+            token=token,
+            expiration_date=expiration_date,
+            complete_list_size=paginator.count,
+            cursor=page.end_index(),
+            metadata_prefix=metadata_format,
+            from_timestamp=from_timestamp,
+            until_timestamp=until_timestamp,
+        )
 
         return mark_safe(
             "<resumptionToken expirationDate="
