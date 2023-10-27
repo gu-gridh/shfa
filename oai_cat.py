@@ -198,7 +198,7 @@ def get_all_images_info(metadata_prefix):
     for id in id_list:
         image_xml_output = get_image_values(images, id)
         header_list = models.Header.objects.filter(
-                metadata_formats__prefix=metadata_prefix)
+                identifier=id)
         if not header_list :
                     header_list = generate_header(id, metadata_prefix)
         tmp.append(image_xml_output)
