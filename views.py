@@ -211,7 +211,7 @@ class AdvancedSearch(DynamicDepthViewSet):
 def oai(request):
     params = request.POST.copy() if request.method == "POST" else request.GET.copy()
     verb = None
-    
+    output = None
     if "verb" in params:
         verb = params.pop("verb")[-1]
         if verb == "GetRecord":
