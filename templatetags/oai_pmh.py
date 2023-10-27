@@ -85,7 +85,7 @@ def resumption_token(
 
         metadata_format = None
         if metadata_prefix:
-            metadata_format = 'oai_dc'
+            metadata_format = 'ksamsok-rdf'
 
         ResumptionToken = {
             "token": token,
