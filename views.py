@@ -9,7 +9,6 @@ from rest_framework.response import Response
 from django.views.decorators.csrf import csrf_exempt
 from .oai_cat import *
 
-
 class SiteGeoViewSet(GeoViewSet):
 
     # queryset = models.Site.objects.all()
@@ -203,7 +202,6 @@ class AdvancedSearch(DynamicDepthViewSet):
         return queryset
     
     filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
-
 
 # VIEW FOR OAI_CAT
 

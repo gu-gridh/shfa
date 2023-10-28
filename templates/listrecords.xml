@@ -3,7 +3,7 @@
 
 {% block content %}
 <ListRecords>
-{% for image in images %}
+{% for header in headers %}
     <record>
         <header>
             <identifier>oai:shfa.dh.gu.se:objects/{{data.id}}</identifier>
