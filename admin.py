@@ -185,7 +185,7 @@ class SetAdmin(admin.ModelAdmin):
 
 @admin.register(Header)
 class HeaderAdmin(admin.ModelAdmin):
-    list_display =["identifier"]
+    list_display =["name"]
 
 @admin.register(ResumptionToken)
 class ResumptionTokenAdmin(admin.ModelAdmin):
