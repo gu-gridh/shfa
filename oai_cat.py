@@ -6,7 +6,7 @@ from django.core.paginator import Paginator, EmptyPage
 import xml.etree.ElementTree as ET
 from django.http import HttpResponse
 
-NUM_PER_PAGE = 10
+NUM_PER_PAGE = 1
 
 
 def get_records(params, request):   
