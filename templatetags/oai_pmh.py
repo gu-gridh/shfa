@@ -71,6 +71,10 @@ def list_request_attributes(
     return mark_safe(attributes)
 
 
+@register.simple_tag
+def get_image_tags(image):
+    tags = [keyword.text for keyword in image.keywords.all()]
+    return ", ".join(tags)
 
 @register.simple_tag
 def resumption_token(
@@ -101,9 +105,9 @@ def resumption_token(
 
         return mark_safe(
             "<resumptionToken expirationDate="
-            + f"\"{expiration_date.strftime('%Y-%m-%dT%H:%M:%SZ')}\" "
-            + f'completeListSize="{paginator.count}" cursor="{page.end_index()}">'
-            + f"{token}</resumptionToken>"
+            f"\"{expiration_date.strftime('%Y-%m-%dT%H:%M:%SZ')}\" "
+            f'completeListSize="{paginator.count}" cursor="{page.end_index()}">'
+            f"{token}</resumptionToken>"
         )
     else:
         return ""

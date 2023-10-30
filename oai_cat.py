@@ -9,7 +9,7 @@ from django.http import HttpResponse
 NUM_PER_PAGE = 1
 
 
-def get_records(params, request):   
+def get_records(params, request):
     template = "../templates/bild.template.xml"
     error_output = None
     output = None
@@ -20,31 +20,37 @@ def get_records(params, request):
             if not models.MetadataFormat.objects.filter(
                 prefix=metadata_prefix
             ).exists():
-                error_output = generate_error(request, "cannotDisseminateFormat", metadata_prefix)
+                error_output = generate_error(
+                    request, "cannotDisseminateFormat", metadata_prefix)
             if "identifier" in params:
                 identifier = params.pop("identifier")[-1]
                 try:
                     queryset = models.Image.objects.filter(id=identifier)
-                    header_list = models.Header.objects.filter(identifier=identifier)
-                    
-                    if not header_list :
-                        header_list = generate_header(identifier, metadata_prefix)
+                    header_list = models.Header.objects.filter(
+                        identifier=identifier)
+
+                    if not header_list:
+                        header_list = generate_header(
+                            identifier, metadata_prefix)
 
                     output = get_image_values(queryset, identifier)
-                except models.Image.DoesNotExist:                  
-                    error_output = generate_error(request, "idDoesNotExist", identifier)
+                except models.Image.DoesNotExist:
+                    error_output = generate_error(
+                        request, "idDoesNotExist", identifier)
             else:
-                error_output = generate_error(request, "badArgument", "identifier")
+                error_output = generate_error(
+                    request, "badArgument", "identifier")
         else:
-                    
-            error_output = generate_error(request, "badArgument_single", ";".join(metadata_prefix))     
+
+            error_output = generate_error(
+                request, "badArgument_single", ";".join(metadata_prefix))
             metadata_prefix = None
     else:
         error_output = generate_error(request, "badArgument", "metadataPrefix")
 
     # check_bad_arguments(request, params)
     template_output = template if not error_output else error_output
-    
+
     xml_output = render(
         request,
         template_name=template_output,
@@ -56,29 +62,28 @@ def get_records(params, request):
 
 def get_image_values(query, identifier):
     site = models.Site.objects.filter(
-                id__in=list(query.values_list('site', flat=True)
-                ))
+        id__in=list(query.values_list('site', flat=True)
+                    ))
     type = models.ImageTypeTag.objects.filter(
-                id__in=list(query.values_list('type', flat=True)
-                ))
+        id__in=list(query.values_list('type', flat=True)
+                    ))
     rock_carving_object = models.RockCarvingObject.objects.filter(
-                id__in=list(query.values_list('rock_carving_object', flat=True)
-                ))
+        id__in=list(query.values_list('rock_carving_object', flat=True)
+                    ))
     institution = models.Institution.objects.filter(
-                id__in=list(query.values_list('institution', flat=True)
-    ))
+        id__in=list(query.values_list('institution', flat=True)
+                    ))
     collection = models.Collection.objects.filter(
-                id__in=list(query.values_list('collection', flat=True))
+        id__in=list(query.values_list('collection', flat=True))
     )
     author = models.Author.objects.filter(
-                id__in=list(query.values_list('author', flat=True)
-    ))
+        id__in=list(query.values_list('author', flat=True)
+                    ))
     municipality = models.geography.LocalAdministrativeUnit.objects.filter(
-                id__in=list(site.values_list('municipality', flat=True)
-    ))
-    data =  models.Image.objects.get(id=identifier)
+        id__in=list(site.values_list('municipality', flat=True)
+                    ))
+    data = models.Image.objects.get(id=identifier)
     keywords = data.keywords.all()
-
 
     # data = queryset.values()[0]
     type = type.values()[0]
@@ -89,26 +94,26 @@ def get_image_values(query, identifier):
     author = author.values()[0]
     municipality = municipality.values()[0]
 
-    output =   {'data': data,
-                    'type': type,
-                    'site': site,
-                    'rock_carving_object' : rock_carving_object,
-                    'institution': institution,
-                    'collection': collection,
-                    'coordinates': site['coordinates'][0:2],
-                    'author': author,
-                    'municipality': municipality,
-                    'keywords': keywords
-                }
-           
+    output = {'data': data,
+              'type': type,
+              'site': site,
+              'rock_carving_object': rock_carving_object,
+              'institution': institution,
+              'collection': collection,
+              'coordinates': site['coordinates'][0:2],
+              'author': author,
+              'municipality': municipality,
+              'keywords': keywords
+              }
+
     return output
 
 
 def get_identify(request):
     template = "../templates/identify.xml"
-    identify_output =  render(
+    identify_output = render(
         request,
-        template_name=template, 
+        template_name=template,
         # context= {
         #     'error':error_xml
         #     },
@@ -120,7 +125,7 @@ def check_bad_arguments(request, params, msg=None):
     for k, v in params.copy().items():
         error = generate_error(
             request,
-            {   
+            {
                 "code": "badArgument",
                 "msg": f'The argument "{k}" (value="{v}") included in the request is '
                 + "not valid."
@@ -130,7 +135,7 @@ def check_bad_arguments(request, params, msg=None):
         params.pop(k)
 
 def get_list_records(verb, request, params):
-    template  = "../templates/listrecords.xml"
+    template = "../templates/listrecords.xml"
     errors_output = None
 
     if "resumptionToken" in params:
@@ -145,7 +150,7 @@ def get_list_records(verb, request, params):
             metadata_prefix,
             from_timestamp,
             until_timestamp,
-        ) =  _do_resumption_token(request, params, errors_output, header_list, image_list)
+        ) = _do_resumption_token(request, params, errors_output, header_list, image_list)
 
     elif "metadataPrefix" in params:
         metadata_prefix = params.pop("metadataPrefix")
@@ -154,44 +159,38 @@ def get_list_records(verb, request, params):
             if not models.MetadataFormat.objects.filter(
                 prefix=metadata_prefix
             ).exists():
-                errors_output = generate_error(request, "cannotDisseminateFormat", metadata_prefix)
+                errors_output = generate_error(
+                    request, "cannotDisseminateFormat", metadata_prefix)
             else:
-                images = get_all_images_info(metadata_prefix)
-                header_list = models.Header.objects.filter(
-                            metadata_formats__prefix=metadata_prefix)
+                from_timestamp, until_timestamp = check_timestamps(
+                    request, params)
+                
+                images_data = models.Image.objects
+                if from_timestamp is not None:
+                    images_data = images_data.filter(created_at__gte=from_timestamp)
+                if until_timestamp is not None:
+                    images_data = images_data.filter(updated_at__gte=until_timestamp)
 
-                from_timestamp, until_timestamp = check_timestamps(request, params)
-                if from_timestamp:
-                    header_list = header_list.filter(
-                            timestamp__gte=from_timestamp)
-                if until_timestamp:
-                        header_list = header_list.filter(
-                            timestamp__lte=until_timestamp)
+                paginator_images = Paginator(images_data.all(), NUM_PER_PAGE)
+                images = paginator_images.page(1)
 
-                if header_list.count() == 0 :
-                        errors = generate_error(request, "noRecordsMatch")
-                else:
-                    paginator = Paginator(header_list, NUM_PER_PAGE)
-                    paginator_images = Paginator(images, NUM_PER_PAGE)
-                    images = paginator_images.page(1)
-                    headers = paginator.page(1)
         else:
-                errors_output = generate_error(request, "badArgument_single", ";".join(metadata_prefix))
-                metadata_prefix = None
+            errors_output = generate_error(
+                request, "badArgument_single", ";".join(metadata_prefix))
+            metadata_prefix = None
     else:
-                errors_output = generate_error(request, "badArgument", "metadataPrefix")
-    
+        errors_output = generate_error(
+            request, "badArgument", "metadataPrefix")
+
     xml_output = render(
         request,
         template if not errors_output else errors_output,
-        context=
-        {'images':images,
-         'verb': verb,
-         'headers':headers,
-         'paginator': paginator,
-         'metadata_prefix': metadata_prefix,
-         'from_timestamp':from_timestamp,
-         'until_timestamp':until_timestamp},
+        context={'images': images,
+                 'verb': verb,
+                 'paginator': paginator_images,
+                 'metadata_prefix': metadata_prefix,
+                 'from_timestamp': from_timestamp,
+                 'until_timestamp': until_timestamp},
         content_type="text/xml",
     )
     return xml_output
@@ -203,38 +202,41 @@ def get_all_images_info(metadata_prefix):
     for id in id_list:
         image_xml_output = get_image_values(images, id)
         header_list = models.Header.objects.filter(
-                identifier=id)
-        if not header_list :
-                    header_list = generate_header(id, metadata_prefix)
+            identifier=id)
+        if not header_list:
+            header_list = generate_header(id, metadata_prefix)
         tmp.append(image_xml_output)
     return tmp
 
+
 def generate_header(identifier, metadata):
     id_identifier = models.Image.objects.get(id=identifier)
-    id_metadata= models.MetadataFormat.objects.get(prefix=metadata)
+    id_metadata = models.MetadataFormat.objects.get(prefix=metadata)
     models.Header.objects.update_or_create(
-        name=str(id_identifier.file.name),
+        name=id_identifier.file.name,
         identifier=id_identifier.id,
         metadata_formats=id_metadata
     )
     return
+
 
 def _do_resumption_token(request, params, errors, header_obj, image_objs):
     metadata_prefix = None
     from_timestamp = None
     until_timestamp = None
     resumption_token = None
-    
 
     if "resumptionToken" in params:
         resumption_token = params.pop("resumptionToken")[-1]
         try:
             rt = models.ResumptionToken.objects.get(token=resumption_token)
             if timezone.now() > rt.expiration_date:
-                errors = generate_error(request, "badResumptionToken_expired.", resumption_token)
+                errors = generate_error(
+                    request, "badResumptionToken_expired.", resumption_token)
             else:
                 if rt.metadata_prefix:
-                    objs = header_obj.filter(metadata_formats=rt.metadata_prefix)
+                    objs = header_obj.filter(
+                        metadata_formats=rt.metadata_prefix)
                     metadata_prefix = rt.metadata_prefix.prefix
                 if rt.from_timestamp:
                     objs = header_obj.filter(timestamp__gte=rt.from_timestamp)
@@ -252,7 +254,8 @@ def _do_resumption_token(request, params, errors, header_obj, image_objs):
                     images = image_paginator.page(rt.cursor / NUM_PER_PAGE + 1)
 
                 except EmptyPage:
-                    errors = generate_error(request, "badResumptionToken", resumption_token)
+                    errors = generate_error(
+                        request, "badResumptionToken", resumption_token)
 
         except models.ResumptionToken.DoesNotExist:
             paginator = Paginator(objs, NUM_PER_PAGE)
@@ -260,7 +263,8 @@ def _do_resumption_token(request, params, errors, header_obj, image_objs):
             image_paginator = Paginator(image_objs, NUM_PER_PAGE)
             page = paginator.page(1)
             images = image_paginator.page(1)
-            errors = generate_error(request, "badResumptionToken", resumption_token)
+            errors = generate_error(
+                request, "badResumptionToken", resumption_token)
 
         # check_bad_arguments(
         #     params,
@@ -268,11 +272,11 @@ def _do_resumption_token(request, params, errors, header_obj, image_objs):
         #     msg="The usage of resumptionToken allows no other arguments.",
         # )
     else:
-            image_objs = get_all_images_info('ksamsok-rdf')
-            paginator = Paginator(objs, NUM_PER_PAGE)
-            image_paginator = Paginator(image_objs, NUM_PER_PAGE)
-            page = paginator.page(1)
-            images = image_paginator.page(1)
+        image_objs = get_all_images_info('ksamsok-rdf')
+        paginator = Paginator(objs, NUM_PER_PAGE)
+        image_paginator = Paginator(image_objs, NUM_PER_PAGE)
+        page = paginator.page(1)
+        images = image_paginator.page(1)
 
     return (
         paginator,
@@ -305,9 +309,10 @@ def check_timestamps(request, params):
             try:
                 until_timestamp = datetime.strptime(u + " +0000", granularity)
             except Exception:
-                errors = generate_error(request, "badArgument_valid", u, "until")
+                errors = generate_error(
+                    request, "badArgument_valid", u, "until")
         else:
-            errors = generate_error(request,"badArgument_granularity")
+            errors = generate_error(request, "badArgument_granularity")
     return from_timestamp, until_timestamp
 
 
@@ -346,7 +351,8 @@ def generate_error(request, code, *args):
             "msg": f'The resumptionToken "{args[0]}" is expired.',
         }
     elif code == "badVerb" and len(args) == 0:
-        error_xml = {"code": "badVerb", "msg": "The request does not provide any verb."}
+        error_xml = {"code": "badVerb",
+                     "msg": "The request does not provide any verb."}
     elif code == "badVerb":
         error_xml = {
             "code": "badVerb",
@@ -386,12 +392,12 @@ def generate_error(request, code, *args):
             "msg": "This repository does not support sets.",
         }
 
-    error_output =  render(
+    error_output = render(
         request,
-        template, 
-        context= {
-            'error':error_xml
-            },
+        template,
+        context={
+            'error': error_xml
+        },
         content_type="text/xml")
-   
+
     return error_output
