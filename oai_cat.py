@@ -138,9 +138,9 @@ def get_list_records(verb, request, params):
         image_list = models.Image.objects.all()
         # Generate resumptionToken
         (
-            # paginator,
+            paginator_images,
             images,
-            headers,
+            # headers,
             resumption_token,
             metadata_prefix,
             from_timestamp,
@@ -188,10 +188,11 @@ def get_list_records(verb, request, params):
         {'images':images,
          'verb': verb,
         #  'headers':headers,
-        #  'paginator': paginator,
+         'paginator': paginator_images,
          'metadata_prefix': metadata_prefix,
-         'from_timestamp':from_timestamp,
-         'until_timestamp':until_timestamp},
+        #  'from_timestamp':from_timestamp,
+        #  'until_timestamp':until_timestamp
+         },
         content_type="text/xml",
     )
     return xml_output
@@ -275,7 +276,7 @@ def _do_resumption_token(request, params, errors, image_objs):
             images = image_paginator.page(1)
 
     return (
-        # paginator,
+        image_paginator,
         images,
         # page,
         resumption_token,

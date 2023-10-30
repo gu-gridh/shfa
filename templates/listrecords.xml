@@ -124,7 +124,6 @@
         </rdf:RDF>
     </record>
     {% endfor %}
-    {% resumption_token paginator headers metadata_prefix from_timestamp until_timestamp %}
-    <resumptionToken>{{resumption_token}}</resumptionToken>
+
 </ListRecords>
 {% endblock %}
