@@ -71,6 +71,7 @@ def list_request_attributes(
     return mark_safe(attributes)
 
 
+
 @register.simple_tag
 def resumption_token(
     paginator,
@@ -80,14 +81,13 @@ def resumption_token(
     until_timestamp=None,
 ):
     """Get resumption token."""
-    if paginator.num_pages > 0 :
+    if paginator.num_pages > 0 and page.has_next():
         expiration_date = timezone.now() + timezone.timedelta(days=1)
         token = "".join("%02x" % i for i in urandom(16))
 
         metadata_format = None
         if metadata_prefix:
             metadata_format = MetadataFormat.objects.get(prefix=metadata_prefix)
-
 
         ResumptionToken.objects.create(
             token=token,
