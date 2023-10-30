@@ -302,7 +302,7 @@ class Set(abstract.AbstractBaseModel):
 class Header(abstract.AbstractBaseModel):
     """Header Model."""
 
-    identifier = models.ForeignKey(Image, models.CASCADE, unique=True, verbose_name=_("Identifier"))
+    identifier = models.IntegerField(unique=True, verbose_name=_("Identifier"))
     name = models.CharField(max_length=256, blank=True, null=True)
     timestamp = models.DateTimeField(auto_now=True, verbose_name=_("Timestamp"))
     deleted = models.BooleanField(default=False, verbose_name=_("Deleted"))
