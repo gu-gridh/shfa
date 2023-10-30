@@ -134,18 +134,18 @@ def get_list_records(verb, request, params):
     errors_output = None
 
     if "resumptionToken" in params:
-        header_list = models.Header.objects.all()
+        # header_list = models.Header.objects.all()
         image_list = models.Image.objects.all()
         # Generate resumptionToken
         (
-            paginator,
+            # paginator,
             images,
             headers,
             resumption_token,
             metadata_prefix,
             from_timestamp,
             until_timestamp,
-        ) =  _do_resumption_token(request, params, errors_output, header_list, image_list)
+        ) =  _do_resumption_token(request, params, errors_output, image_list)
 
     elif "metadataPrefix" in params:
         metadata_prefix = params.pop("metadataPrefix")
@@ -157,24 +157,24 @@ def get_list_records(verb, request, params):
                 errors_output = generate_error(request, "cannotDisseminateFormat", metadata_prefix)
             else:
                 images = get_all_images_info(metadata_prefix)
-                header_list = models.Header.objects.filter(
-                            metadata_formats__prefix=metadata_prefix)
+                # header_list = models.Header.objects.filter(
+                #             metadata_formats__prefix=metadata_prefix)
 
-                from_timestamp, until_timestamp = check_timestamps(request, params)
-                if from_timestamp:
-                    header_list = header_list.filter(
-                            timestamp__gte=from_timestamp)
-                if until_timestamp:
-                        header_list = header_list.filter(
-                            timestamp__lte=until_timestamp)
+                # from_timestamp, until_timestamp = check_timestamps(request, params)
+                # if from_timestamp:
+                #     header_list = header_list.filter(
+                #             timestamp__gte=from_timestamp)
+                # if until_timestamp:
+                #         header_list = header_list.filter(
+                #             timestamp__lte=until_timestamp)
 
-                if header_list.count() == 0 :
+                if len(images) == 0 :
                         errors = generate_error(request, "noRecordsMatch")
                 else:
-                    paginator = Paginator(header_list, NUM_PER_PAGE)
+                    # paginator = Paginator(header_list, NUM_PER_PAGE)
                     paginator_images = Paginator(images, NUM_PER_PAGE)
                     images = paginator_images.page(1)
-                    headers = paginator.page(1)
+                    # headers = paginator.page(1)
         else:
                 errors_output = generate_error(request, "badArgument_single", ";".join(metadata_prefix))
                 metadata_prefix = None
@@ -187,8 +187,8 @@ def get_list_records(verb, request, params):
         context=
         {'images':images,
          'verb': verb,
-         'headers':headers,
-         'paginator': paginator,
+        #  'headers':headers,
+        #  'paginator': paginator,
          'metadata_prefix': metadata_prefix,
          'from_timestamp':from_timestamp,
          'until_timestamp':until_timestamp},
@@ -202,10 +202,10 @@ def get_all_images_info(metadata_prefix):
     tmp = []
     for id in id_list:
         image_xml_output = get_image_values(images, id)
-        header_list = models.Header.objects.filter(
-                identifier=id)
-        if not header_list :
-                    header_list = generate_header(id, metadata_prefix)
+        # header_list = models.Header.objects.filter(
+        #         identifier=id)
+        # if not header_list :
+        #             header_list = generate_header(id, metadata_prefix)
         tmp.append(image_xml_output)
     return tmp
 
@@ -219,7 +219,7 @@ def generate_header(identifier, metadata):
     )
     return
 
-def _do_resumption_token(request, params, errors, header_obj, image_objs):
+def _do_resumption_token(request, params, errors, image_objs):
     metadata_prefix = None
     from_timestamp = None
     until_timestamp = None
@@ -233,32 +233,32 @@ def _do_resumption_token(request, params, errors, header_obj, image_objs):
             if timezone.now() > rt.expiration_date:
                 errors = generate_error(request, "badResumptionToken_expired.", resumption_token)
             else:
-                if rt.metadata_prefix:
-                    objs = header_obj.filter(metadata_formats=rt.metadata_prefix)
-                    metadata_prefix = rt.metadata_prefix.prefix
-                if rt.from_timestamp:
-                    objs = header_obj.filter(timestamp__gte=rt.from_timestamp)
-                    from_timestamp = rt.from_timestamp
-                if rt.until_timestamp:
-                    objs = header_obj.filter(timestamp__gte=rt.until_timestamp)
-                    until_timestamp = rt.until_timestamp
+                # if rt.metadata_prefix:
+                #     objs = header_obj.filter(metadata_formats=rt.metadata_prefix)
+                #     metadata_prefix = rt.metadata_prefix.prefix
+                # if rt.from_timestamp:
+                #     objs = header_obj.filter(timestamp__gte=rt.from_timestamp)
+                #     from_timestamp = rt.from_timestamp
+                # if rt.until_timestamp:
+                #     objs = header_obj.filter(timestamp__gte=rt.until_timestamp)
+                #     until_timestamp = rt.until_timestamp
 
                 image_objs = get_all_images_info(metadata_prefix)
-                paginator = Paginator(objs, NUM_PER_PAGE)
+                # paginator = Paginator(objs, NUM_PER_PAGE)
                 image_paginator = Paginator(image_objs, NUM_PER_PAGE)
 
                 try:
-                    page = paginator.page(rt.cursor / NUM_PER_PAGE + 1)
+                    # page = paginator.page(rt.cursor / NUM_PER_PAGE + 1)
                     images = image_paginator.page(rt.cursor / NUM_PER_PAGE + 1)
 
                 except EmptyPage:
                     errors = generate_error(request, "badResumptionToken", resumption_token)
 
         except models.ResumptionToken.DoesNotExist:
-            paginator = Paginator(objs, NUM_PER_PAGE)
+            # paginator = Paginator(objs, NUM_PER_PAGE)
             image_objs = get_all_images_info('ksamsok-rdf')
             image_paginator = Paginator(image_objs, NUM_PER_PAGE)
-            page = paginator.page(1)
+            # page = paginator.page(1)
             images = image_paginator.page(1)
             errors = generate_error(request, "badResumptionToken", resumption_token)
 
@@ -269,15 +269,15 @@ def _do_resumption_token(request, params, errors, header_obj, image_objs):
         # )
     else:
             image_objs = get_all_images_info('ksamsok-rdf')
-            paginator = Paginator(objs, NUM_PER_PAGE)
+            # paginator = Paginator(objs, NUM_PER_PAGE)
             image_paginator = Paginator(image_objs, NUM_PER_PAGE)
-            page = paginator.page(1)
+            # page = paginator.page(1)
             images = image_paginator.page(1)
 
     return (
-        paginator,
+        # paginator,
         images,
-        page,
+        # page,
         resumption_token,
         metadata_prefix,
         from_timestamp,
