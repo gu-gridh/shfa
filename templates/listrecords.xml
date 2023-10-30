@@ -3,10 +3,10 @@
 
 {% block content %}
 <ListRecords>
-{% for header in headers %}
+{% for image in images %}
     <record>
         <header>
-            <identifier>oai:shfa.dh.gu.se:objects/{{data.id}}</identifier>
+            <identifier>oai:shfa.dh.gu.se:objects/{{image.data.id}}</identifier>
             <datestamp>{% now "Y-m-dTH:i:s" %}</datestamp>
         </header>
         <rdf:RDF xmlns="http://kulturarvsdata.se/ksamsok#" xmlns:foaf="http://xmlns.com/foaf/0.1/#"
@@ -16,35 +16,35 @@
         <Entity rdf:about="http://kulturarvsdata.se/{{"shfa"}}/{{"bild"}}/{{data.legacy_id}}">
             <ksamsokVersion>0.99</ksamsokVersion>
             <buildDate>{% now "Y-m-d" %}</buildDate>
-            <createdDate>{{data.created_at|date:"Y-m-d"}}</createdDate>
-            <lastChangedDate>{{data.updated_at|date:"Y-m-d"}}</lastChangedDate>
+            <createdDate>{{image.data.created_at|date:"Y-m-d"}}</createdDate>
+            <lastChangedDate>{{image.data.updated_at|date:"Y-m-d"}}</lastChangedDate>
             <serviceOrganization>{{"shfa"}}</serviceOrganization>
             <serviceName>{{"shfabild"}}</serviceName>
-            <url>https://shfa.dh.gu.se/search/iiif/{{data.uuid}}.tif/meta/{{data.id}}</url>
-            <thumbnail>{{"https://data.dh.gu.se/diana/static/"}}{{data.file}}</thumbnail>
+            <url>https://shfa.dh.gu.se/search/iiif/{{image.data.uuid}}.tif/meta/{{image.data.id}}</url>
+            <thumbnail>{{"https://data.dh.gu.se/diana/static/"}}{{image.data.file}}</thumbnail>
             <mediaType>{{"image/jpeg"}}</mediaType>
             <dataQuality rdf:resource="{{"http://kulturarvsdata.se/resurser/DataQuality#raw"}}" />
             <itemType rdf:resource="{{"http://kulturarvsdata.se/resurser/EntityType#photo"}}" />
-            <itemTitle>{{site.raa_id}}</itemTitle>
+            <itemTitle>{{image.site.raa_id}}</itemTitle>
             <itemLicense rdf:resource="http://kulturarvsdata.se/resurser/License#CC-BY"/>
             <itemLicenseUrl rdf:resource="http://creativecommons.org/publicdomain/zero/1.0/"/>
             <itemName rdf:nodeID="name001" />
-            <itemLabel>{{rock_carving_object.name}}</itemLabel>
-            <itemMotiveWord>{% for key in keywords %}{% if not forloop.first %}{% if forloop.last %}, {% else %}, {% endif %}{% endif %}{{key}}{% endfor %}</itemMotiveWord>
-            <itemTechnique>{{type.text}}</itemTechnique>
+            <itemLabel>{{image.rock_carving_object.name}}</itemLabel>
+            <itemMotiveWord>{% for key in image.keywords %}{% if not forloop.first %}{% if forloop.last %}, {% else %}, {% endif %}{% endif %}{{key}}{% endfor %}</itemMotiveWord>
+            <itemTechnique>{{image.type.text}}</itemTechnique>
             <itemNumber rdf:nodeID="num001"/>
             <context rdf:nodeID="ctx001" />
-            <visualizes>http://kulturarvsdata.se/raa/lamning/{{site.ksamsok_id}}</visualizes>
+            <visualizes>http://kulturarvsdata.se/raa/lamning/{{image.site.ksamsok_id}}</visualizes>
             <image rdf:nodeID="im001" />
             <presentation rdf:parseType="Literal" xmlns:pres="http://kulturarvsdata.se/presentation#">
             <pres:item>
                 <pres:version>0.99</pres:version>
-                <pres:entityUri>https://shfa.dh.gu.se/search/iiif/{{data.uuid}}.tif/meta/{{data.id}}</pres:entityUri>
-                <pres:type>{{type.text}}</pres:type>
-                <pres:id>{{data.legacy_id}}</pres:id>
-                <pres:idLabel>{{site.lamning_id}}</pres:idLabel>
-                <pres:itemLabel>{{rock_carving_object.name}}</pres:itemLabel>
-                <pres:description> Årtal: {{data.year}}, Institution: {{institution.name}}, Samling: {{collection.name}}</pres:description>        
+                <pres:entityUri>https://shfa.dh.gu.se/search/iiif/{{image.data.uuid}}.tif/meta/{{image.data.id}}</pres:entityUri>
+                <pres:type>{{image.type.text}}</pres:type>
+                <pres:id>{{image.data.legacy_id}}</pres:id>
+                <pres:idLabel>{{image.site.lamning_id}}</pres:idLabel>
+                <pres:itemLabel>{{image.rock_carving_object.name}}</pres:itemLabel>
+                <pres:description> Årtal: {{image.data.year}}, Institution: {{image.institution.name}}, Samling: {{image.collection.name}}</pres:description>        
                 <pres:context>
                 <pres:event>-</pres:event>
                 <pres:placeLabel>${placeLabel}</pres:placeLabel>
@@ -54,21 +54,21 @@
                 <georss:where xmlns:georss="http://www.georss.org/georss">
                 <gml:Point xmlns:gml="http://www.opengis.net/gml" srsName="SDO:4326">
                     <gml:coordinates cs="," decimal="." ts=" ">
-                    {% for s in coordinates %}{% if not forloop.first %}{% if forloop.last %}, {% else %}, {% endif %}{% endif %}{{s}}{% endfor %}</gml:coordinates> 
+                    {% for s in image.coordinates %}{% if not forloop.first %}{% if forloop.last %}, {% else %}, {% endif %}{% endif %}{{s}}{% endfor %}</gml:coordinates> 
                     </gml:Point>
                     </georss:where>
                 <pres:image>
-                <pres:src type="thumbnail">{{"https://data.dh.gu.se/diana/static/"}}{{data.file}}</pres:src>
-                <pres:src type="lowres">{{"https://data.dh.gu.se/diana/static/"}}{{data.file}}</pres:src>
-                <pres:src type="highres">{{"https://img.dh.gu.se/diana/static/"}}{{data.iiif_file}}/full/full/0/default.jpg</pres:src>
-                <pres:byline>{{author.name}}</pres:byline>
+                <pres:src type="thumbnail">{{"https://data.dh.gu.se/diana/static/"}}{{image.data.file}}</pres:src>
+                <pres:src type="lowres">{{"https://data.dh.gu.se/diana/static/"}}{{image.data.file}}</pres:src>
+                <pres:src type="highres">{{"https://img.dh.gu.se/diana/static/"}}{{image.data.iiif_file}}/full/full/0/default.jpg</pres:src>
+                <pres:byline>{{image.author.name}}</pres:byline>
                 <pres:copyright>{{"SHFA"}}</pres:copyright>
                 <pres:mediaLicense>http://kulturarvsdata.se/resurser/license#by</pres:mediaLicense>
                 </pres:image>
                 <pres:representations>
-                <pres:representation format="HTML">http://kulturarvsdata.se/shfa/bild/html/{{data.legacy_id}}</pres:representation>
-                <pres:representation format="XML">http://kulturarvsdata.se/shfa/bild/xml/{{data.legacy_id}}</pres:representation>
-                <pres:representation format="RDF">http://kulturarvsdata.se/shfa/bild/rdf/{{data.legacy_id}}</pres:representation>
+                <pres:representation format="HTML">http://kulturarvsdata.se/shfa/bild/html/{{image.data.legacy_id}}</pres:representation>
+                <pres:representation format="XML">http://kulturarvsdata.se/shfa/bild/xml/{{image.data.legacy_id}}</pres:representation>
+                <pres:representation format="RDF">http://kulturarvsdata.se/shfa/bild/rdf/{{image.data.legacy_id}}</pres:representation>
                 </pres:representations>
                 <pres:organization>Svenskt HällristningsForskningsarkiv</pres:organization>
                 <pres:organizationShort>SHFA</pres:organizationShort>
@@ -90,35 +90,35 @@
                 <countryName>Sverige</countryName>
                 <countyName>Västra Götaland</countyName>
                 <provinceName>Bohuslän</provinceName> 
-                <municipalityName>{{municipality.superregion_id}}</municipalityName> 
+                <municipalityName>{{image.municipality.superregion_id}}</municipalityName> 
                 <parishName>Tanum</parishName> 
                 <coordinates rdf:parseType="Literal">
                     <gml:Point xmlns:gml="http://www.opengis.net/gml" srsName="SDO:4326">
-                    <gml:coordinates cs="," decimal="." ts=" "> {% for s in coordinates %}{% if not forloop.first %}{% if forloop.last %}, {% else %}, {% endif %}{% endif %}{{s}}{% endfor %}</gml:coordinates>
+                    <gml:coordinates cs="," decimal="." ts=" "> {% for s in image.coordinates %}{% if not forloop.first %}{% if forloop.last %}, {% else %}, {% endif %}{% endif %}{{s}}{% endfor %}</gml:coordinates>
                 </gml:Point>
             </coordinates>
         </Context>
         <Image rdf:nodeID="im001">
             <mediaType>image/jpeg</mediaType>
-            <thumbnailSource>{{"https://data.dh.gu.se/diana/static/"}}{{data.file}}</thumbnailSource>
-            <lowresSource>{{"https://data.dh.gu.se/diana/static/"}}{{data.file}}&amp;Bildtyp=v&amp;maxWidth=550</lowresSource>
-            <highresSource>{{"https://img.dh.gu.se/diana/static/"}}{{data.iiif_file}}/full/full/0/default.jpg</highresSource>
-            <byline>{{author.name}}</byline>
-            <mediaMotiveWord>{% for key in keywords %}{% if not forloop.first %}{% if forloop.last %}, {% else %}, {% endif %}{% endif %}{{key}}{% endfor %}</mediaMotiveWord>
+            <thumbnailSource>{{"https://data.dh.gu.se/diana/static/"}}{{image.data.file}}</thumbnailSource>
+            <lowresSource>{{"https://data.dh.gu.se/diana/static/"}}{{image.data.file}}</lowresSource>
+            <highresSource>{{"https://img.dh.gu.se/diana/static/"}}{image.{data.iiif_file}}/full/full/0/default.jpg</highresSource>
+            <byline>{{image.author.name}}</byline>
+            <mediaMotiveWord>{% for key in image.keywords %}{% if not forloop.first %}{% if forloop.last %}, {% else %}, {% endif %}{% endif %}{{key}}{% endfor %}</mediaMotiveWord>
             <copyright>SHFA</copyright>
             <mediaLicense rdf:resource="http://kulturarvsdata.se/resurser/License#by-nc-nd"/>
             <mediaLicenseUrl rdf:resource="https://creativecommons.org/licenses/by/4.0/"/>
         </Image>
         <ItemNumber rdf:nodeID="num001">
             <type>RAÄ-nummer</type>
-            <number>{{site.raa_id}}</number>
+            <number>{{image.site.raa_id}}</number>
         </ItemNumber>
         <ItemNumber rdf:nodeID="num002">
             <type>Lämningsnummer</type>
-            <number>{{site.lamnings_id}}</number>
+            <number>{{image.site.lamnings_id}}</number>
         </ItemNumber>
         <ItemName rdf:nodeID="name001">
-            <type>{% for key in keywords %}{% if not forloop.first %}{% if forloop.last %}, {% else %}, {% endif %}{% endif %}{{key}}{% endfor %}</type>
+            <type>{% for key in image.keywords %}{% if not forloop.first %}{% if forloop.last %}, {% else %}, {% endif %}{% endif %}{{key}}{% endfor %}</type>
             <name>hällristning</name>
         </ItemName>
         </rdf:RDF>

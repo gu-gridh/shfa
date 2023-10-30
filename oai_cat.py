@@ -170,6 +170,8 @@ def get_list_records(verb, request, params):
                         errors = generate_error(request, "noRecordsMatch")
                 else:
                     paginator = Paginator(header_list, NUM_PER_PAGE)
+                    paginator_images = Paginator(images, NUM_PER_PAGE)
+                    images = paginator_images.page(1)
                     headers = paginator.page(1)
         else:
                 errors_output = generate_error(request, "badArgument_single", ";".join(metadata_prefix))
@@ -227,9 +229,6 @@ def _do_resumption_token(request, params, errors, objs):
             if timezone.now() > rt.expiration_date:
                 errors = generate_error(request, "badResumptionToken_expired.", resumption_token)
             else:
-                if rt.set_spec:
-                    objs = objs.filter(sets=rt.set_spec)
-                    set_spec = rt.set_spec.spec
                 if rt.metadata_prefix:
                     objs = objs.filter(metadata_formats=rt.metadata_prefix)
                     metadata_prefix = rt.metadata_prefix.prefix
@@ -264,7 +263,6 @@ def _do_resumption_token(request, params, errors, objs):
         paginator,
         page,
         resumption_token,
-        set_spec,
         metadata_prefix,
         from_timestamp,
         until_timestamp,
