@@ -218,6 +218,8 @@ def oai(request):
             output = get_identify(request)
         elif verb == "ListRecords":
             output = get_list_records(verb, request, params)
+        elif verb == "ListMetadataFormats":
+            output = get_list_metadata(request, params)
         else:
             output = generate_error(request, "badVerb")
         

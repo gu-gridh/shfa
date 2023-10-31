@@ -122,6 +122,29 @@ def get_list_records(verb, request, params):
     return xml_output
 
 
+def get_list_metadata(request, params):
+    template = '../templates/listmetadataformats.xml'
+    metadataformats = models.MetadataFormat.objects.all()
+    errors = None
+    if "identifier" in params:
+        identifier = params.pop("identifier")[-1]
+        if models.Image.objects.filter(identifier=identifier).exists():
+            metadataformats = models.MetadataFormat.objects.filter(prefix='ksamsok-rdf')
+        else:
+            errors = generate_error(request, "idDoesNotExist", identifier)
+    if metadataformats.count() == 0:
+        errors = generate_error(request, "noMetadataFormats")
+
+    xml_output = render(
+        request,
+        template if not errors else errors,
+        context={'metadataformats': metadataformats},
+        content_type="text/xml",
+    )
+    return xml_output
+
+
+
 def _do_resumption_token(request, params, errors):
     metadata_prefix = None
     from_timestamp = None
