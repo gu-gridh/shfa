@@ -6,7 +6,7 @@ from django.core.paginator import Paginator, EmptyPage
 import xml.etree.ElementTree as ET
 from django.http import HttpResponse
 
-NUM_PER_PAGE = 1
+NUM_PER_PAGE = 25
 
 
 def get_records(params, request):
@@ -139,18 +139,15 @@ def get_list_records(verb, request, params):
     errors_output = None
 
     if "resumptionToken" in params:
-        header_list = models.Header.objects.all()
-        image_list = models.Image.objects.all()
         # Generate resumptionToken
         (
-            paginator,
+            paginator_images,
             images,
-            headers,
             resumption_token,
             metadata_prefix,
             from_timestamp,
             until_timestamp,
-        ) = _do_resumption_token(request, params, errors_output, header_list, image_list)
+        ) = _do_resumption_token(request, params, errors_output)
 
     elif "metadataPrefix" in params:
         metadata_prefix = params.pop("metadataPrefix")
@@ -220,7 +217,7 @@ def generate_header(identifier, metadata):
     return
 
 
-def _do_resumption_token(request, params, errors, header_obj, image_objs):
+def _do_resumption_token(request, params, errors):
     metadata_prefix = None
     from_timestamp = None
     until_timestamp = None
@@ -234,35 +231,24 @@ def _do_resumption_token(request, params, errors, header_obj, image_objs):
                 errors = generate_error(
                     request, "badResumptionToken_expired.", resumption_token)
             else:
-                if rt.metadata_prefix:
-                    objs = header_obj.filter(
-                        metadata_formats=rt.metadata_prefix)
-                    metadata_prefix = rt.metadata_prefix.prefix
-                if rt.from_timestamp:
-                    objs = header_obj.filter(timestamp__gte=rt.from_timestamp)
-                    from_timestamp = rt.from_timestamp
-                if rt.until_timestamp:
-                    objs = header_obj.filter(timestamp__gte=rt.until_timestamp)
-                    until_timestamp = rt.until_timestamp
-
-                image_objs = get_all_images_info(metadata_prefix)
-                paginator = Paginator(objs, NUM_PER_PAGE)
-                image_paginator = Paginator(image_objs, NUM_PER_PAGE)
+                images_data = models.Image.objects
+                if from_timestamp is not None:
+                    images_data = images_data.filter(created_at__gte=from_timestamp)
+                if until_timestamp is not None:
+                    images_data = images_data.filter(updated_at__gte=until_timestamp)
 
                 try:
-                    page = paginator.page(rt.cursor / NUM_PER_PAGE + 1)
-                    images = image_paginator.page(rt.cursor / NUM_PER_PAGE + 1)
+                    paginator = Paginator(images_data.all(), NUM_PER_PAGE)
+                    images = paginator.page(rt.cursor / NUM_PER_PAGE + 1)
 
                 except EmptyPage:
                     errors = generate_error(
                         request, "badResumptionToken", resumption_token)
 
         except models.ResumptionToken.DoesNotExist:
-            paginator = Paginator(objs, NUM_PER_PAGE)
-            image_objs = get_all_images_info('ksamsok-rdf')
-            image_paginator = Paginator(image_objs, NUM_PER_PAGE)
-            page = paginator.page(1)
-            images = image_paginator.page(1)
+            images_data = models.Image.objects
+            paginator = Paginator(images_data, NUM_PER_PAGE)
+            images = paginator.page(1)
             errors = generate_error(
                 request, "badResumptionToken", resumption_token)
 
@@ -272,16 +258,14 @@ def _do_resumption_token(request, params, errors, header_obj, image_objs):
         #     msg="The usage of resumptionToken allows no other arguments.",
         # )
     else:
-        image_objs = get_all_images_info('ksamsok-rdf')
-        paginator = Paginator(objs, NUM_PER_PAGE)
-        image_paginator = Paginator(image_objs, NUM_PER_PAGE)
-        page = paginator.page(1)
-        images = image_paginator.page(1)
+        images_data = models.Image.objects
+        paginator = Paginator(images_data, NUM_PER_PAGE)
+        images = paginator.page(1)
+        
 
     return (
         paginator,
         images,
-        page,
         resumption_token,
         metadata_prefix,
         from_timestamp,
