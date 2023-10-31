@@ -3,8 +3,6 @@ from . import models
 from django.utils import timezone
 from datetime import datetime
 from django.core.paginator import Paginator, EmptyPage
-import xml.etree.ElementTree as ET
-from django.http import HttpResponse
 
 NUM_PER_PAGE = 25
 
@@ -25,15 +23,8 @@ def get_records(params, request):
             if "identifier" in params:
                 identifier = params.pop("identifier")[-1]
                 try:
-                    queryset = models.Image.objects.filter(id=identifier)
-                    header_list = models.Header.objects.filter(
-                        identifier=identifier)
+                    output = models.Image.objects.get(id=identifier)
 
-                    if not header_list:
-                        header_list = generate_header(
-                            identifier, metadata_prefix)
-
-                    output = get_image_values(queryset, identifier)
                 except models.Image.DoesNotExist:
                     error_output = generate_error(
                         request, "idDoesNotExist", identifier)
@@ -54,59 +45,10 @@ def get_records(params, request):
     xml_output = render(
         request,
         template_name=template_output,
-        context=output,
+        context={'data': output},
         content_type="text/xml"
     )
     return xml_output
-
-
-def get_image_values(query, identifier):
-    site = models.Site.objects.filter(
-        id__in=list(query.values_list('site', flat=True)
-                    ))
-    type = models.ImageTypeTag.objects.filter(
-        id__in=list(query.values_list('type', flat=True)
-                    ))
-    rock_carving_object = models.RockCarvingObject.objects.filter(
-        id__in=list(query.values_list('rock_carving_object', flat=True)
-                    ))
-    institution = models.Institution.objects.filter(
-        id__in=list(query.values_list('institution', flat=True)
-                    ))
-    collection = models.Collection.objects.filter(
-        id__in=list(query.values_list('collection', flat=True))
-    )
-    author = models.Author.objects.filter(
-        id__in=list(query.values_list('author', flat=True)
-                    ))
-    municipality = models.geography.LocalAdministrativeUnit.objects.filter(
-        id__in=list(site.values_list('municipality', flat=True)
-                    ))
-    data = models.Image.objects.get(id=identifier)
-    keywords = data.keywords.all()
-
-    # data = queryset.values()[0]
-    type = type.values()[0]
-    site = site.values()[0]
-    institution = institution.values()[0]
-    rock_carving_object = rock_carving_object.values()[0]
-    collection = collection.values()[0]
-    author = author.values()[0]
-    municipality = municipality.values()[0]
-
-    output = {'data': data,
-              'type': type,
-              'site': site,
-              'rock_carving_object': rock_carving_object,
-              'institution': institution,
-              'collection': collection,
-              'coordinates': site['coordinates'][0:2],
-              'author': author,
-              'municipality': municipality,
-              'keywords': keywords
-              }
-
-    return output
 
 
 def get_identify(request):
@@ -120,19 +62,6 @@ def get_identify(request):
         content_type="text/xml")
     return identify_output
 
-
-def check_bad_arguments(request, params, msg=None):
-    for k, v in params.copy().items():
-        error = generate_error(
-            request,
-            {
-                "code": "badArgument",
-                "msg": f'The argument "{k}" (value="{v}") included in the request is '
-                + "not valid."
-                + (f" {msg}" if msg else ""),
-            }
-        )
-        params.pop(k)
 
 def get_list_records(verb, request, params):
     template = "../templates/listrecords.xml"
@@ -191,30 +120,6 @@ def get_list_records(verb, request, params):
         content_type="text/xml",
     )
     return xml_output
-
-def get_all_images_info(metadata_prefix):
-    images = models.Image.objects.all()
-    id_list = list(images.values_list('id', flat=True))
-    tmp = []
-    for id in id_list:
-        image_xml_output = get_image_values(images, id)
-        header_list = models.Header.objects.filter(
-            identifier=id)
-        if not header_list:
-            header_list = generate_header(id, metadata_prefix)
-        tmp.append(image_xml_output)
-    return tmp
-
-
-def generate_header(identifier, metadata):
-    id_identifier = models.Image.objects.get(id=identifier)
-    id_metadata = models.MetadataFormat.objects.get(prefix=metadata)
-    models.Header.objects.update_or_create(
-        name=id_identifier.file.name,
-        identifier=id_identifier.id,
-        metadata_formats=id_metadata
-    )
-    return
 
 
 def _do_resumption_token(request, params, errors):
@@ -299,6 +204,19 @@ def check_timestamps(request, params):
             errors = generate_error(request, "badArgument_granularity")
     return from_timestamp, until_timestamp
 
+
+def check_bad_arguments(request, params, msg=None):
+    for k, v in params.copy().items():
+        error = generate_error(
+            request,
+            {
+                "code": "badArgument",
+                "msg": f'The argument "{k}" (value="{v}") included in the request is '
+                + "not valid."
+                + (f" {msg}" if msg else ""),
+            }
+        )
+        params.pop(k)
 
 def generate_error(request, code, *args):
     template = "../templates/error.xml"

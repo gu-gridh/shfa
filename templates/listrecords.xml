@@ -115,7 +115,7 @@
         </ItemNumber>
         <ItemNumber rdf:nodeID="num002">
             <type>Lämningsnummer</type>
-            <number>{{image.site.lamnings_id}}</number>
+            <number>{{image.site.lamning_id}}</number>
         </ItemNumber>
         <ItemName rdf:nodeID="name001">
             <type>{% get_image_tags image %}</type>

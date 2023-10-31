@@ -179,14 +179,6 @@ class CarvingTagAdmin(admin.ModelAdmin):
 class MetadataFormatAdmin(admin.ModelAdmin):
     list_display = ["prefix"]
 
-@admin.register(Set)
-class SetAdmin(admin.ModelAdmin):
-    list_display = ["spec", "name"]
-
-@admin.register(Header)
-class HeaderAdmin(admin.ModelAdmin):
-    list_display =["name"]
-
 @admin.register(ResumptionToken)
 class ResumptionTokenAdmin(admin.ModelAdmin):
     list_display=["token"]

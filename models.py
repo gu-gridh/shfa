@@ -280,59 +280,6 @@ class MetadataFormat(abstract.AbstractBaseModel):
         verbose_name_plural = _("Metadata formats")
 
 
-class Set(abstract.AbstractBaseModel):
-    """Set Model."""
-
-    spec = models.TextField(unique=True, verbose_name=_("Spec"))
-    name = models.TextField(verbose_name=_("Name"))
-    description = models.TextField(blank=True, null=True, verbose_name=_("Description"))
-
-    def __str__(self):
-        """Name."""
-        return self.name
-
-    class Meta:
-        """Meta."""
-
-        ordering = ("name",)
-        verbose_name = _("Set")
-        verbose_name_plural = _("Sets")
-
-
-class Header(abstract.AbstractBaseModel):
-    """Header Model."""
-
-    identifier = models.IntegerField(unique=True, verbose_name=_("Identifier"))
-    name = models.CharField(max_length=256, blank=True, null=True)
-    timestamp = models.DateTimeField(auto_now=True, verbose_name=_("Timestamp"))
-    deleted = models.BooleanField(default=False, verbose_name=_("Deleted"))
-    metadata_formats = models.ForeignKey(
-        MetadataFormat,
-        models.CASCADE,
-        blank=True,
-        related_name="identifiers",
-        verbose_name=_("Metadata format"),
-    )
-    sets = models.ManyToManyField(
-        Set,
-        blank=True,
-        related_name="headers",
-        verbose_name=_("Set"),
-    )
-
-    def __str__(self):
-        """Name."""
-        return self.name
-
-    class Meta:
-        """Meta."""
-
-        ordering = ("identifier",)
-        verbose_name = _("Header")
-        verbose_name_plural = _("Headers")
-
-
-
 class ResumptionToken(abstract.AbstractBaseModel):
     """ResumptionToken Model."""
 
@@ -362,13 +309,6 @@ class ResumptionToken(abstract.AbstractBaseModel):
         blank=True,
         null=True,
         verbose_name=_("Metadata prefix"),
-    )
-    set_spec = models.ForeignKey(
-        Set,
-        models.CASCADE,
-        blank=True,
-        null=True,
-        verbose_name=_("Set spec"),
     )
 
     def __str__(self):
