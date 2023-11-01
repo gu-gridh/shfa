@@ -9,8 +9,9 @@ NUM_PER_PAGE = 25
 
 def get_records(params, request):
     template = "../templates/bild.template.xml"
-    error_output = None
-    output = None
+    error_template = "../templates/error.xml"
+    errors = []
+    
     if "metadataPrefix" in params:
         metadata_prefix = params.pop("metadataPrefix")
         if len(metadata_prefix) == 1:
@@ -18,36 +19,44 @@ def get_records(params, request):
             if not models.MetadataFormat.objects.filter(
                 prefix=metadata_prefix
             ).exists():
-                error_output = generate_error(
-                    request, "cannotDisseminateFormat", metadata_prefix)
+                errors.append(_error(
+                    "cannotDisseminateFormat", metadata_prefix))
+               
             if "identifier" in params:
                 identifier = params.pop("identifier")[-1]
                 try:
                     output = models.Image.objects.get(id=identifier)
 
                 except models.Image.DoesNotExist:
-                    error_output = generate_error(
-                        request, "idDoesNotExist", identifier)
+                    errors.append(_error(
+                        "idDoesNotExist", identifier))
             else:
-                error_output = generate_error(
-                    request, "badArgument", "identifier")
+                errors.append(_error(
+                    "badArgument", "identifier"))
         else:
 
-            error_output = generate_error(
-                request, "badArgument_single", ";".join(metadata_prefix))
+            errors.append(_error(
+                "badArgument_single", ";".join(metadata_prefix)))
             metadata_prefix = None
     else:
-        error_output = generate_error(request, "badArgument", "metadataPrefix")
+        errors.append(_error("badArgument", "metadataPrefix"))
 
-    # check_bad_arguments(request, params)
-    template_output = template if not error_output else error_output
+    _check_bad_arguments(errors, params)
 
-    xml_output = render(
-        request,
-        template_name=template_output,
-        context={'data': output},
-        content_type="text/xml"
-    )
+    if errors:
+        xml_output = render(
+            request,
+            template_name=error_template,
+            context={'errors': errors},
+            content_type='text/xml'
+        )
+    else:
+        xml_output = render(
+            request,
+            template_name=template,
+            context={'data': output},
+            content_type="text/xml"
+        )
     return xml_output
 
 
@@ -65,7 +74,8 @@ def get_identify(request):
 
 def get_list_records(verb, request, params):
     template = "../templates/listrecords.xml"
-    errors_output = None
+    error_template = "../templates/error.xml"
+    errors = []
 
     if "resumptionToken" in params:
         # Generate resumptionToken
@@ -76,7 +86,7 @@ def get_list_records(verb, request, params):
             metadata_prefix,
             from_timestamp,
             until_timestamp,
-        ) = _do_resumption_token(request, params, errors_output)
+        ) = _do_resumption_token(params, errors)
 
     elif "metadataPrefix" in params:
         metadata_prefix = params.pop("metadataPrefix")
@@ -85,11 +95,11 @@ def get_list_records(verb, request, params):
             if not models.MetadataFormat.objects.filter(
                 prefix=metadata_prefix
             ).exists():
-                errors_output = generate_error(
-                    request, "cannotDisseminateFormat", metadata_prefix)
+                errors.append(_error(
+                    "cannotDisseminateFormat", metadata_prefix))
             else:
-                from_timestamp, until_timestamp = check_timestamps(
-                    request, params)
+                from_timestamp, until_timestamp = _check_timestamps(
+                    errors, params)
                 
                 images_data = models.Image.objects
                 if from_timestamp is not None:
@@ -101,51 +111,69 @@ def get_list_records(verb, request, params):
                 images = paginator_images.page(1)
 
         else:
-            errors_output = generate_error(
-                request, "badArgument_single", ";".join(metadata_prefix))
+            errors.append(_error(
+                "badArgument_single", ";".join(metadata_prefix)))
             metadata_prefix = None
     else:
-        errors_output = generate_error(
-            request, "badArgument", "metadataPrefix")
+        errors.append(_error(
+            "badArgument", "metadataPrefix"))
 
-    xml_output = render(
-        request,
-        template if not errors_output else errors_output,
-        context={'images': images,
-                 'verb': verb,
-                 'paginator': paginator_images,
-                 'metadata_prefix': metadata_prefix,
-                 'from_timestamp': from_timestamp,
-                 'until_timestamp': until_timestamp},
-        content_type="text/xml",
+    if errors:
+        xml_output = render(
+            request,
+            template_name=error_template,
+            context={'errors': errors},
+            content_type='text/xml'
+        )
+    else:
+        xml_output = render(
+            request,
+            template,
+            context={'images': images,
+                    'verb': verb,
+                    'paginator': paginator_images,
+                    'metadata_prefix': metadata_prefix,
+                    'from_timestamp': from_timestamp,
+                    'until_timestamp': until_timestamp},
+            content_type="text/xml",
     )
     return xml_output
 
 
 def get_list_metadata(request, params):
     template = '../templates/listmetadataformats.xml'
+    error_template = "../templates/error.xml"
+    errors = []
+
     metadataformats = models.MetadataFormat.objects.all()
-    errors = None
     if "identifier" in params:
         identifier = params.pop("identifier")[-1]
         if models.Image.objects.filter(identifier=identifier).exists():
             metadataformats = models.MetadataFormat.objects.filter(prefix='ksamsok-rdf')
         else:
-            errors = generate_error(request, "idDoesNotExist", identifier)
+            errors.append(_error("idDoesNotExist", identifier))
     if metadataformats.count() == 0:
-        errors = generate_error(request, "noMetadataFormats")
+        errors.append(_error("noMetadataFormats"))
 
-    xml_output = render(
-        request,
-        template if not errors else errors,
-        context={'metadataformats': metadataformats},
-        content_type="text/xml",
-    )
+    if errors:
+        xml_output = render(
+            request,
+            template_name=error_template,
+            context={'errors': errors},
+            content_type='text/xml'
+        )
+    else:
+        xml_output = render(
+            request,
+            template if not errors else errors,
+            context={'metadataformats': metadataformats},
+            content_type="text/xml",
+        )
     return xml_output
 
 
 
-def _do_resumption_token(request, params, errors):
+def _do_resumption_token(params, errors):
     metadata_prefix = None
     from_timestamp = None
     until_timestamp = None
@@ -156,8 +184,8 @@ def _do_resumption_token(request, params, errors):
         try:
             rt = models.ResumptionToken.objects.get(token=resumption_token)
             if timezone.now() > rt.expiration_date:
-                errors = generate_error(
-                    request, "badResumptionToken_expired.", resumption_token)
+                errors.append(_error(
+                    "badResumptionToken_expired.", resumption_token))
             else:
                 images_data = models.Image.objects
                 if from_timestamp is not None:
@@ -170,15 +198,15 @@ def _do_resumption_token(request, params, errors):
                     images = paginator.page(rt.cursor / NUM_PER_PAGE + 1)
 
                 except EmptyPage:
-                    errors = generate_error(
-                        request, "badResumptionToken", resumption_token)
+                    errors.append(_error(
+                        "badResumptionToken", resumption_token))
 
         except models.ResumptionToken.DoesNotExist:
             images_data = models.Image.objects
             paginator = Paginator(images_data, NUM_PER_PAGE)
             images = paginator.page(1)
-            errors = generate_error(
-                request, "badResumptionToken", resumption_token)
+            errors.append(_error(
+                "badResumptionToken", resumption_token))
 
         # check_bad_arguments(
         #     params,
@@ -201,18 +229,18 @@ def _do_resumption_token(request, params, errors):
     )
 
 
-def check_timestamps(request, params):
+def _check_timestamps(errors, params):
     from_timestamp = None
     until_timestamp = None
-
     granularity = None
+
     if "from" in params:
         f = params.pop("from")[-1]
         granularity = "%Y-%m-%dT%H:%M:%SZ %z" if "T" in f else "%Y-%m-%d %z"
         try:
             from_timestamp = datetime.strptime(f + " +0000", granularity)
         except Exception:
-            errors = generate_error(request, "badArgument_valid", f, "from")
+            errors.append(_error("badArgument_valid", f, "from"))
 
     if "until" in params:
         u = params.pop("until")[-1]
@@ -221,108 +249,109 @@ def check_timestamps(request, params):
             try:
                 until_timestamp = datetime.strptime(u + " +0000", granularity)
             except Exception:
-                errors = generate_error(
-                    request, "badArgument_valid", u, "until")
+                errors.append(_error(
+                    "badArgument_valid", u, "until"))
         else:
-            errors = generate_error(request, "badArgument_granularity")
+            errors.append(_error("badArgument_granularity"))
     return from_timestamp, until_timestamp
 
 
-def check_bad_arguments(request, params, msg=None):
+def _check_bad_arguments(errors, params, msg=None):
     for k, v in params.copy().items():
-        error = generate_error(
-            request,
+        errors.append(_error(
             {
                 "code": "badArgument",
                 "msg": f'The argument "{k}" (value="{v}") included in the request is '
                 + "not valid."
                 + (f" {msg}" if msg else ""),
             }
-        )
+        ))
         params.pop(k)
 
-def generate_error(request, code, *args):
-    template = "../templates/error.xml"
-    error_xml = {}
+
+def verb_error(request):
+    error_template = "../templates/error.xml"
+    errors = []
+    
+    errors.append(_error("badVerb"))
+    xml_output = render(
+        request,
+        template_name=error_template,
+        context={'errors': errors},
+        content_type='text/xml'
+        )
+    return xml_output
+
+def _error(code, *args):
     if code == "badArgument":
-        error_xml = {
+        return {
             "code": "badArgument",
             "msg": f'The required argument "{args[0]}" is missing in the request.',
         }
     elif code == "badArgument_granularity":
-        error_xml = {
+        return {
             "code": "badArgument",
             "msg": 'The granularity of the arguments "from" and "until" do not match.',
         }
     elif code == "badArgument_single":
-        error_xml = {
+        return {
             "code": "badArgument",
             "msg": "Only a single metadataPrefix argument is allowed, got "
             + f'"{args[0]}".',
         }
     elif code == "badArgument_valid":
-        error_xml = {
+        return {
             "code": "badArgument",
             "msg": f'The value "{args[0]}" of the argument "{args[1]}" is not valid.',
         }
     elif code == "badResumptionToken":
-        error_xml = {
+        return {
             "code": "badResumptionToken",
             "msg": f'The resumptionToken "{args[0]}" is invalid.',
         }
     elif code == "badResumptionToken_expired":
-        error_xml = {
+        return {
             "code": "badResumptionToken",
             "msg": f'The resumptionToken "{args[0]}" is expired.',
         }
     elif code == "badVerb" and len(args) == 0:
-        error_xml = {"code": "badVerb",
-                     "msg": "The request does not provide any verb."}
+        return {"code": "badVerb", "msg": "The request does not provide any verb."}
     elif code == "badVerb":
-        error_xml = {
+        return {
             "code": "badVerb",
             "msg": f'The verb "{args[0]}" provided in the request is illegal.',
         }
     elif code == "cannotDisseminateFormat":
-        error_xml = {
+        return {
             "code": "cannotDisseminateFormat",
             "msg": f'The value of the metadataPrefix argument "{args[0]}" is not '
             + " supported.",
         }
     elif code == "idDoesNotExist":
-        error_xml = {
+        return {
             "code": "idDoesNotExist",
             "msg": f'A record with the identifier "{args[0]}" does not exist.',
         }
     elif code == "noMetadataFormats" and len(args) == 0:
-        error_xml = {
+        return {
             "code": "noMetadataFormats",
             "msg": "There are no metadata formats available.",
         }
     elif code == "noMetadataFormats":
-        error_xml = {
+        return {
             "code": "noMetadataFormats",
             "msg": "There are no metadata formats available for the record with "
             + f'identifier "{args[0]}".',
         }
     elif code == "noRecordsMatch":
-        error_xml = {
+        return {
             "code": "noRecordsMatch",
             "msg": "The combination of the values of the from, until, and set "
             + "arguments results in an empty list.",
         }
     elif code == "noSetHierarchy":
-        error_xml = {
+        return {
             "code": "noSetHierarchy",
             "msg": "This repository does not support sets.",
         }
 
-    error_output = render(
-        request,
-        template,
-        context={
-            'error': error_xml
-        },
-        content_type="text/xml")
-
-    return error_output

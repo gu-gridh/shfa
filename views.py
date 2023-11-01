@@ -221,6 +221,6 @@ def oai(request):
         elif verb == "ListMetadataFormats":
             output = get_list_metadata(request, params)
         else:
-            output = generate_error(request, "badVerb")
+            output = verb_error(request)
         
     return output
