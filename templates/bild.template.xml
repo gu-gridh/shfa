@@ -45,7 +45,7 @@
         <georss:where xmlns:georss="http://www.georss.org/georss">
           <gml:Point xmlns:gml="http://www.opengis.net/gml" srsName="SDO:4326">
             <gml:coordinates cs="," decimal="." ts=" ">
-            {% for s in data.coordinates %}{% if not forloop.first %}{% if forloop.last %}, {% else %}, {% endif %}{% endif %}{{s}}{% endfor %}</gml:coordinates> 
+            {% for s in data.site.coordinates %}{% if not forloop.first %}{% if forloop.last %}, {% else %}, {% endif %}{% endif %}{{s}}{% endfor %}</gml:coordinates> 
               </gml:Point>
             </georss:where>
         <pres:image>
@@ -79,13 +79,13 @@
         <geoF:municipality rdf:resource="http://kulturarvsdata.se/resurser/aukt/geo/municipality#1435"/> 
         <geoF:parish rdf:resource="http://kulturarvsdata.se/resurser/aukt/geo/parish#1606"/> 
         <countryName>Sverige</countryName>
-        <countyName>Västra Götaland</countyName>
-        <provinceName>Bohuslän</provinceName> 
-        <municipalityName>{{data.municipality.superregion_id}}</municipalityName> 
-        <parishName>Tanum</parishName> 
+        <countyName>{{data.site.municipalit}}</countyName>
+        <provinceName>{{data.site.province}}</provinceName> 
+        <municipalityName>{{data.site.municipality}}</municipalityName> 
+        <parishName>{{data.site.parish}}</parishName> 
         <coordinates rdf:parseType="Literal">
             <gml:Point xmlns:gml="http://www.opengis.net/gml" srsName="SDO:4326">
-            <gml:coordinates cs="," decimal="." ts=" "> {% for s in data.coordinates %}{% if not forloop.first %}{% if forloop.last %}, {% else %}, {% endif %}{% endif %}{{s}}{% endfor %}</gml:coordinates>
+            <gml:coordinates cs="," decimal="." ts=" "> {% for s in data.site.coordinates %}{% if not forloop.first %}{% if forloop.last %}, {% else %}, {% endif %}{% endif %}{{s}}{% endfor %}</gml:coordinates>
         </gml:Point>
     </coordinates>
 </Context>

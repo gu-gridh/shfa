@@ -88,10 +88,10 @@
                 <geoF:municipality rdf:resource="http://kulturarvsdata.se/resurser/aukt/geo/municipality#1435"/> 
                 <geoF:parish rdf:resource="http://kulturarvsdata.se/resurser/aukt/geo/parish#1606"/> 
                 <countryName>Sverige</countryName>
-                <countyName>Västra Götaland</countyName>
-                <provinceName>Bohuslän</provinceName> 
-                <municipalityName>{{image.municipality.superregion_id}}</municipalityName> 
-                <parishName>Tanum</parishName> 
+                <countyName>{{image.site.municipalit}}y</countyName>
+                <provinceName>{{image.site.province}}</provinceName> 
+                <municipalityName>{{image.site.municipalit}}</municipalityName> 
+                <parishName>{{image.site.parish}}</parishName> 
                 <coordinates rdf:parseType="Literal">
                     <gml:Point xmlns:gml="http://www.opengis.net/gml" srsName="SDO:4326">
                     <gml:coordinates cs="," decimal="." ts=" "> {% for s in image.site.coordinates %}{% if not forloop.first %}{% if forloop.last %}, {% else %}, {% endif %}{% endif %}{{s}}{% endfor %}</gml:coordinates>
