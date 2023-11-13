@@ -88,9 +88,9 @@
                 <geoF:municipality rdf:resource="http://kulturarvsdata.se/resurser/aukt/geo/municipality#1435"/> 
                 <geoF:parish rdf:resource="http://kulturarvsdata.se/resurser/aukt/geo/parish#1606"/> 
                 <countryName>Sverige</countryName>
-                <countyName>{{image.site.municipalit}}y</countyName>
+                <countyName>{{image.site.municipality}}</countyName>
                 <provinceName>{{image.site.province}}</provinceName> 
-                <municipalityName>{{image.site.municipalit}}</municipalityName> 
+                <municipalityName>{{image.site.municipality}}</municipalityName> 
                 <parishName>{{image.site.parish}}</parishName> 
                 <coordinates rdf:parseType="Literal">
                     <gml:Point xmlns:gml="http://www.opengis.net/gml" srsName="SDO:4326">
