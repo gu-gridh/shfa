@@ -132,9 +132,9 @@ class TypeSearchViewSet(DynamicDepthViewSet):
         q = self.request.GET["image_type"]
         language = self.request.GET["language"]
         if language == "sv" :
-            queryset = models.Image.objects.filter(type__text__icontains=q)
+            queryset = models.ImageTypeTag.objects.filter(text__icontains=q)
         else:
-            queryset = models.Image.objects.filter(type__english_translation__icontains=q)
+            queryset = models.ImageTypeTag.objects.filter(english_translation__icontains=q)
         return queryset
     
     filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
