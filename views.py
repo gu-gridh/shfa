@@ -137,7 +137,6 @@ class TypeSearchViewSet(DynamicDepthViewSet):
             queryset = models.ImageTypeTag.objects.filter(english_translation__icontains=q)
         return queryset
     
-    filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
     
 # Add general search query
 class GeneralSearch(DynamicDepthViewSet):
