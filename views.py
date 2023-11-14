@@ -72,9 +72,9 @@ class SearchKeywords(DynamicDepthViewSet):
         q = self.request.GET["keyword"]
         language = self.request.GET["language"]
         if language == "sv" :        
-            queryset = models.KeywordTag.objects.filter(text__icontains=q)
+            queryset = models.KeywordTag.objects.filter(text__icontains=q).order_by('text')
         else:
-            queryset = models.KeywordTag.objects.filter(english_translation__icontains=q)
+            queryset = models.KeywordTag.objects.filter(english_translation__icontains=q).order_by('text')
 
         return queryset
     
@@ -83,7 +83,7 @@ class SearchRockCarving(DynamicDepthViewSet):
 
     def get_queryset(self):
         q = self.request.GET["carving_object"]
-        queryset = models.RockCarvingObject.objects.filter(name__icontains=q)
+        queryset = models.RockCarvingObject.objects.filter(name__icontains=q).order_by('name')
         return queryset
     
 
@@ -97,11 +97,11 @@ class SearchAuthor(DynamicDepthViewSet):
         if language == "sv" :
             queryset = models.Author.objects.filter(Q(name__icontains=q) & 
                                                 Q (id__in=list(images.values_list('author', flat=True))
-                                                   ))
+                                                   )).order_by('name')
         else:
             queryset = models.Author.objects.filter(Q(english_translation__icontains=q) & 
                                     Q (id__in=list(images.values_list('author', flat=True))
-                                        ))
+                                        )).order_by('name')
         return queryset
     
     
@@ -110,7 +110,7 @@ class SearchInstitution(DynamicDepthViewSet):
 
     def get_queryset(self):
         q = self.request.GET["institution_name"]
-        queryset = models.Institution.objects.filter(name__icontains=q)
+        queryset = models.Institution.objects.filter(name__icontains=q).order_by('name')
         return queryset
     
 class SearchDatinTag(DynamicDepthViewSet):
@@ -120,9 +120,9 @@ class SearchDatinTag(DynamicDepthViewSet):
         q = self.request.GET["dating_tag"]
         language = self.request.GET["language"]
         if language == "sv" :
-            queryset = models.DatingTag.objects.filter(text__icontains=q)
+            queryset = models.DatingTag.objects.filter(text__icontains=q).order_by('text')
         else:
-            queryset = models.DatingTag.objects.filter(english_translation__icontains=q)
+            queryset = models.DatingTag.objects.filter(english_translation__icontains=q).order_by('text')
         return queryset
 
 class TypeSearchViewSet(DynamicDepthViewSet):
@@ -132,9 +132,9 @@ class TypeSearchViewSet(DynamicDepthViewSet):
         q = self.request.GET["image_type"]
         language = self.request.GET["language"]
         if language == "sv" :
-            queryset = models.ImageTypeTag.objects.filter(text__icontains=q)
+            queryset = models.ImageTypeTag.objects.filter(text__icontains=q).order_by('text')
         else:
-            queryset = models.ImageTypeTag.objects.filter(english_translation__icontains=q)
+            queryset = models.ImageTypeTag.objects.filter(english_translation__icontains=q).order_by('text')
         return queryset
     
     
@@ -151,6 +151,7 @@ class GeneralSearch(DynamicDepthViewSet):
                                                |Q(type__text__icontains=q)
                                                |Q(type__english_translation__icontains=q)
                                                |Q(site__raa_id__icontains=q)
+                                               |Q(site__lamning_id__icontains=q)
                                                |Q(keywords__text__icontains=q)
                                                |Q(keywords__english_translation__icontains=q)
                                                |Q(rock_carving_object__name__icontains=q)
