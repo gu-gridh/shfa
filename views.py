@@ -58,6 +58,7 @@ class IIIFImageViewSet(DynamicDepthViewSet):
     queryset = models.Image.objects.filter(published=True).order_by('type__order')
     filterset_fields = ['id']+get_fields(models.Image, exclude=['created_at', 'updated_at'] + ['iiif_file', 'file'])
 
+
 class CompilationViewset(DynamicDepthViewSet):
     serializer_class = serializers.CompilationSerializer
     queryset = models.Compilation.objects.all()
@@ -125,7 +126,7 @@ class SearchDatinTag(DynamicDepthViewSet):
         return queryset
 
 class TypeSearchViewSet(DynamicDepthViewSet):
-    serializer_class = serializers.TIFFImageSerializer
+    serializer_class = serializers.ImageTypeSerializer
 
     def get_queryset(self):
         q = self.request.GET["image_type"]

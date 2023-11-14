@@ -61,3 +61,10 @@ class CompilationSerializer(DynamicDepthSerializer):
     class Meta:
         model = Compilation
         fields = ['id']+get_fields(Compilation, exclude=DEFAULT_FIELDS)
+
+
+class ImageTypeSerializer(DynamicDepthSerializer):
+
+    class Meta:
+        model = ImageTypeTag
+        fields = ['id']+get_fields(ImageTypeTag, exclude=DEFAULT_FIELDS)
