@@ -11,11 +11,12 @@ from .oai_cat import *
 
 class SiteGeoViewSet(GeoViewSet):
 
-    # queryset = models.Site.objects.all()
-
-    images = models.Image.objects.all()
-    queryset = models.Site.objects.filter(id__in=list(images.values_list('site', flat=True)))
     serializer_class = serializers.SiteGeoSerializer
+    images = models.Image.objects.all()
+    queryset = models.Site.objects.filter(
+                                    id__in=list(images.values_list('site', flat=True))
+                                    ).order_by('raa_id', 'lamning_id','placename')
+
     filterset_fields = get_fields(models.Site, exclude=DEFAULT_FIELDS + ['coordinates'])
     search_fields = ['raa_id', 'lamning_id', 'ksamsok_id', 'placename']
     bbox_filter_field = 'coordinates'
@@ -29,12 +30,12 @@ class SiteSearchViewSet(GeoViewSet):
 
         q = self.request.GET["site_name"]
         images = models.Image.objects.all()
-        queryset = models.Site.objects.filter(Q (raa_id__icontains=q) |
-                                              Q(lamning_id__icontains=q)  &
-                                              Q (id__in=list(images.values_list('site', flat=True))
-                                                ))
+        queryset = models.Site.objects.filter(Q
+                                              (Q(raa_id__icontains=q)|Q(lamning_id__icontains=q)) 
+                                              &Q
+                                              (id__in=list(images.values_list('site', flat=True)))
+                                                ).order_by('raa_id', 'lamning_id','placename')
 
-        print(queryset)
         return queryset
     
     filterset_fields = get_fields(models.Site, exclude=DEFAULT_FIELDS + ['coordinates'])
