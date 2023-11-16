@@ -8,7 +8,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.views.decorators.csrf import csrf_exempt
 from .oai_cat import *
-from django.contrib.gis.geos import  GEOSGeometry, fromstr
+from django.contrib.gis.geos import Point, Polygon
+from django.contrib.gis.geos import GEOSGeometry
+from django.contrib.gis.gdal.envelope import Envelope 
 
 class SiteGeoViewSet(GeoViewSet):
 
@@ -63,22 +65,18 @@ class IIIFImageViewSet(DynamicDepthViewSet):
 
 
 class SearchBoundingBoxImageViewSet(DynamicDepthViewSet):
-    """
-    retrieve:
-    Returns a single image instance.
-
-    list:
-    Returns a list of all the existing images in the database, paginated.
-
-    count:
-    Returns a count of the existing images after the application of any filter.
-    """
     serializer_class = serializers.TIFFImageSerializer
 
     def get_queryset(self):
-        # in_bbox=11.260598754882812,58.689570194769814,11.439401245117187,58.77040585171925
         box = self.request.GET["in_bbox"]
-        sites = models.Site.objects.filter(coordinates__icontains=box)
+        box = box.strip().split(',')
+        bbox_coords =  [
+            float(box[0]), float(box[1]),
+            float(box[2]), float(box[3]),
+        ]
+        bounding_box =  Polygon.from_bbox((bbox_coords))
+        bounding_box =  Envelope((bbox_coords))
+        sites = models.Site.objects.filter(coordinates__intersects=bounding_box.wkt)
         queryset = models.Image.objects.filter(Q(site_id__in=sites)
                                                &Q(published=True)).order_by('type__order')
         return queryset
