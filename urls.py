@@ -13,6 +13,7 @@ router.register(rf'{endpoint}/geojson/site', views.SiteGeoViewSet, basename='sit
 router.register(rf'{endpoint}/compilation', views.CompilationViewset, basename='compilation')
 # urls for advanced search options 
 router.register(rf'{endpoint}/search/site', views.SiteSearchViewSet, basename='site')
+router.register(rf'{endpoint}/search/image', views.SearchBoundingBoxImageViewSet, basename='bounding box image')
 router.register(rf'{endpoint}/search/type', views.TypeSearchViewSet, basename='site')
 router.register(rf'{endpoint}/search/keywords', views.SearchKeywords, basename='keywords')
 router.register(rf'{endpoint}/search/carving', views.SearchRockCarving, basename='search rock carving')

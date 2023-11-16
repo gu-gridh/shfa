@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.views.decorators.csrf import csrf_exempt
 from .oai_cat import *
+from django.contrib.gis.geos import  GEOSGeometry, fromstr
 
 class SiteGeoViewSet(GeoViewSet):
 
@@ -44,6 +45,7 @@ class SiteSearchViewSet(GeoViewSet):
     bbox_filter_include_overlapping = True
 
 
+
 class IIIFImageViewSet(DynamicDepthViewSet):
     """
     retrieve:
@@ -57,6 +59,30 @@ class IIIFImageViewSet(DynamicDepthViewSet):
     """
     serializer_class = serializers.TIFFImageSerializer
     queryset = models.Image.objects.filter(published=True).order_by('type__order')
+    filterset_fields = ['id']+get_fields(models.Image, exclude=['created_at', 'updated_at'] + ['iiif_file', 'file'])
+
+
+class SearchBoundingBoxImageViewSet(DynamicDepthViewSet):
+    """
+    retrieve:
+    Returns a single image instance.
+
+    list:
+    Returns a list of all the existing images in the database, paginated.
+
+    count:
+    Returns a count of the existing images after the application of any filter.
+    """
+    serializer_class = serializers.TIFFImageSerializer
+
+    def get_queryset(self):
+        # in_bbox=11.260598754882812,58.689570194769814,11.439401245117187,58.77040585171925
+        box = self.request.GET["in_bbox"]
+        sites = models.Site.objects.filter(coordinates__icontains=box)
+        queryset = models.Image.objects.filter(Q(site_id__in=sites)
+                                               &Q(published=True)).order_by('type__order')
+        return queryset
+    
     filterset_fields = ['id']+get_fields(models.Image, exclude=['created_at', 'updated_at'] + ['iiif_file', 'file'])
 
 
