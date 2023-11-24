@@ -48,7 +48,7 @@
                     <pres:description> Årtal: {{image.year}}, Institution: {{image.institution.name}}, Samling: {{image.collection.name}}</pres:description>        
                     <pres:context>
                     <pres:event>-</pres:event>
-                    <pres:placeLabel>Län:{{data.site.province}}, Kommun:{{data.site.municipalit}}, Socken:{{data.site.parish}}</pres:placeLabel>
+                    <pres:placeLabel>Län:{{image.site.province}}, Kommun:{{image.site.municipalit}}, Socken:{{image.site.parish}}</pres:placeLabel>
                     <pres:timeLabel>-</pres:timeLabel>
                     <pres:nameLabel>-</pres:nameLabel>
                     </pres:context>
