@@ -32,13 +32,13 @@
         <pres:version>0.99</pres:version>
         <pres:entityUri>https://shfa.dh.gu.se/search/iiif/{{data.uuid}}.tif/meta/{{data.id}}</pres:entityUri>
         <pres:type>{{data.type.text}}</pres:type>
-        <pres:id>{{data.legacy_id}}</pres:id>
+        <pres:id>{{data.id}}</pres:id>
         <pres:idLabel>{{data.site.lamning_id}}</pres:idLabel>
         <pres:itemLabel>{{data.rock_carving_object.name}}</pres:itemLabel>
         <pres:description> Årtal: {{data.year}}, Institution: {{data.institution.name}}, Samling: {{data.collection.name}}</pres:description>        
         <pres:context>
           <pres:event>-</pres:event>
-          <pres:placeLabel>${placeLabel}</pres:placeLabel>
+          <pres:placeLabel>Län:{{data.site.province}}, Kommun:{{data.site.municipalit}}, Socken:{{data.site.parish}}</pres:placeLabel>
           <pres:timeLabel>-</pres:timeLabel>
           <pres:nameLabel>-</pres:nameLabel>
         </pres:context>
@@ -57,9 +57,9 @@
           <pres:mediaLicense>http://kulturarvsdata.se/resurser/license#by</pres:mediaLicense>
         </pres:image>
         <pres:representations>
-          <pres:representation format="HTML">http://kulturarvsdata.se/shfa/bild/html/{{data.legacy_id}}</pres:representation>
-          <pres:representation format="XML">http://kulturarvsdata.se/shfa/bild/xml/{{data.legacy_id}}</pres:representation>
-          <pres:representation format="RDF">http://kulturarvsdata.se/shfa/bild/rdf/{{data.legacy_id}}</pres:representation>
+          <pres:representation format="HTML">http://kulturarvsdata.se/shfa/bild/html/{{data.id}}</pres:representation>
+          <pres:representation format="XML">http://kulturarvsdata.se/shfa/bild/xml/{{data.id}}</pres:representation>
+          <pres:representation format="RDF">http://kulturarvsdata.se/shfa/bild/rdf/{{data.id}}</pres:representation>
         </pres:representations>
         <pres:organization>Svenskt HällristningsForskningsarkiv</pres:organization>
         <pres:organizationShort>SHFA</pres:organizationShort>
@@ -104,7 +104,7 @@
     <type>RAÄ-nummer</type>
     <number>{{data.site.raa_id}}</number>
   </ItemNumber>
-  <ItemNumber rdf:nodeID="num002">
+  <ItemNumber rdf:nodeID="num001">
     <type>Lämningsnummer</type>
     <number>{{data.site.lamning_id}}</number>
   </ItemNumber>
