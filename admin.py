@@ -1,4 +1,3 @@
-from django.contrib.gis.db import models
 from .models import *
 from django.utils.html import format_html
 from django.contrib.gis import admin
@@ -8,10 +7,7 @@ from admin_auto_filters.filters import AutocompleteFilter
 from rangefilter.filters import NumericRangeFilter
 from django.contrib.admin import EmptyFieldListFilter
 from django.conf import settings
-from PIL import Image as ima
-import os
-import base64 
-from io import StringIO
+
 
 class SiteFilter(AutocompleteFilter):
     title = _('Site') # display title
@@ -82,20 +78,19 @@ class ImageModel(admin.ModelAdmin):
 class SiteAdmin(admin.GISModelAdmin):
     fields = get_fields(Site, exclude=DEFAULT_EXCLUDE+["id"])
     readonly_fields = [*DEFAULT_FIELDS]
-    list_display = ['raa_id', 'lamning_id', 'askeladden_id', 'get_ksamsok_link']
-    search_fields = ['raa_id', 'lamning_id']
-    ordering = ('raa_id',)
+    list_display = ['raa_id', 'lamning_id','lokalitet_id', 'askeladden_id', 'get_ksamsok_link', 'placename']
+    search_fields = ['raa_id', 'lamning_id', 'lokalitet_id','placename']
+    ordering = ('raa_id','placename')
 
-    def get_search_results(self, request, queryset, search_term):
-        queryset, use_distinct = super().get_search_results(request, queryset, search_term)
-        try:
-            queryset = Site.objects.filter(raa_id__exact=search_term)
-            print(queryset)
-        except ValueError:
-            pass
-        else:
-            queryset |= Site.objects.filter(raa_id__icontains=search_term)
-        return queryset, use_distinct 
+    # def get_search_results(self, request, queryset, search_term):
+    #     queryset, use_distinct = super().get_search_results(request, queryset, search_term)
+    #     try:
+    #         queryset = Site.objects.filter(raa_id__exact=search_term)
+    #     except ValueError:
+    #         pass
+    #     else:
+    #         queryset |= Site.objects.filter(raa_id__icontains=search_term)
+    #     return queryset, use_distinct 
 
     @admin.display(description=_('Read at Fornsök'))
     def get_ksamsok_link(self, obj):

@@ -2,15 +2,27 @@ from . import models, serializers
 from django.db.models import Q
 from diana.abstract.views import DynamicDepthViewSet, GeoViewSet
 from diana.abstract.models import get_fields, DEFAULT_FIELDS
-from rest_framework_xml.renderers import XMLRenderer
-from django.shortcuts import render
-from rest_framework.views import APIView
-from rest_framework.response import Response
 from django.views.decorators.csrf import csrf_exempt
 from .oai_cat import *
-from django.contrib.gis.geos import Point, Polygon
-from django.contrib.gis.geos import GEOSGeometry
+from django.contrib.gis.geos import Polygon
 from django.contrib.gis.gdal.envelope import Envelope 
+from .intenational_site import *
+
+# uplad_spain_sites('/home/aram/CDH/diana/diana-backend/apps/shfa/spain_sites.csv')
+# uplad_spain_sites('/home/aram/CDH/diana/diana-backend/apps/shfa/italy_sites.csv')
+uplaod_denmark_site('/home/aram/CDH/diana/diana-backend/apps/shfa/denmark_sites.csv')
+uplaod_norway_site('/home/aram/CDH/diana/diana-backend/apps/shfa/norway_site.csv')
+
+class SiteViewSet(DynamicDepthViewSet):
+    serializer_class = serializers.SiteGeoSerializer
+    queryset = models.Site.objects.all()
+                                    
+
+    filterset_fields = get_fields(models.Site, exclude=DEFAULT_FIELDS + ['coordinates'])
+    search_fields = ['raa_id', 'lamning_id', 'ksamsok_id', 'placename']
+    bbox_filter_field = 'coordinates'
+    bbox_filter_include_overlapping = True
+
 
 class SiteGeoViewSet(GeoViewSet):
 

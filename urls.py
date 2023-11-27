@@ -9,6 +9,7 @@ endpoint = utils.build_app_endpoint("shfa")
 documentation = utils.build_app_api_documentation("shfa", endpoint)
 
 router.register(rf'{endpoint}/image', views.IIIFImageViewSet, basename='image')
+router.register(rf'{endpoint}/site', views.SiteViewSet, basename='site')
 router.register(rf'{endpoint}/geojson/site', views.SiteGeoViewSet, basename='site as geojson')
 router.register(rf'{endpoint}/compilation', views.CompilationViewset, basename='compilation')
 # urls for advanced search options 

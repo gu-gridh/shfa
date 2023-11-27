@@ -170,8 +170,8 @@ class Site(abstract.AbstractBaseModel):
     ksamsok_id      = models.CharField(max_length=128, unique=True, null=True, blank=True, verbose_name=_("Fornsök ID"), help_text=_("UUID at the Fornsök (SOCH) portal.")) 
     raa_id          = models.CharField(max_length=128, unique=False, null=True, blank=True, verbose_name=_("RAÄ ID"), help_text=_("Deprecated ID for heritage remains."), validators=[raa_validator])
     lamning_id      = models.CharField(max_length=128, unique=True, null=True, blank=True, verbose_name=_("shfa.lamning_id"), help_text=_("Current ID for heritage remains."), validators=[lamning_validator])
-    askeladden_id   = models.CharField(max_length=256, unique=True, null=True, blank=True, verbose_name=_("shfa.askeladden_id"), help_text=_("ID at the Norwegian Askeladden database, if applicable."))
-    lokalitet_id    = models.CharField(max_length=128, unique=True, null=True, blank=True, verbose_name=_("shfa.lokalitet_id"), help_text=_("ID at the Danish <i>lokalitet</i> database, if applicable."))
+    askeladden_id   = models.CharField(max_length=256, unique=False, null=True, blank=True, verbose_name=_("shfa.askeladden_id"), help_text=_("ID at the Norwegian Askeladden database, if applicable."))
+    lokalitet_id    = models.CharField(max_length=128, unique=False, null=True, blank=True, verbose_name=_("shfa.lokalitet_id"), help_text=_("ID at the Danish <i>lokalitet</i> database, if applicable."))
 
     # Location
     coordinates  = models.PointField(null=True, blank=True, verbose_name=_("Coordinates"), help_text=_("Mid-point coordinates of the site."))
@@ -181,6 +181,13 @@ class Site(abstract.AbstractBaseModel):
 
     # Placename is particularly used outside of Sweden
     placename       = models.CharField(max_length=256, null=True, blank=True, verbose_name=_("Placename"), help_text=_("Free-form, non-indexed placename of the site."))
+    internationl_site = models.BooleanField(null=True, blank=True, help_text=_('If sites is international site you need to set this option true'))
+    
+    # Fields for international sites
+    StedNr = models.PositiveIntegerField(null=True, blank=True, help_text=_('StedNr from Denmark sites'))
+    LokNr = models.PositiveIntegerField(null=True, blank=True, help_text=_('LokNr from Denmark sites'))
+    FredningsNr = models.PositiveIntegerField(null=True, blank=True, help_text=_('FredningsNr from Denmark sites'))
+    stednavn = models.CharField(max_length=256, null=True, blank=True, help_text=_('stednavn from Denmark sites'))
 
     def __str__(self) -> str:
 
@@ -193,6 +200,8 @@ class Site(abstract.AbstractBaseModel):
             name_str = f"Askeladden {self.askeladden_id}"
         elif self.lokalitet_id:
             name_str = f"Lokalitet {self.askeladden_id}"
+        elif self.placename:
+            name_str = f"Placename {self.placename}"
         else:
             name_str = ""
 

@@ -1,6 +1,6 @@
 from .models import *
 from django.db.models import Q
-from django.contrib.gis.geos import GEOSGeometry, Polygon, MultiPolygon
+from django.contrib.gis.geos import GEOSGeometry
 import apps.geography.models as geography
 import geojson
 
