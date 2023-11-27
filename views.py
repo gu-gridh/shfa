@@ -6,12 +6,7 @@ from django.views.decorators.csrf import csrf_exempt
 from .oai_cat import *
 from django.contrib.gis.geos import Polygon
 from django.contrib.gis.gdal.envelope import Envelope 
-from .intenational_site import *
 
-# uplad_spain_sites('/home/aram/CDH/diana/diana-backend/apps/shfa/spain_sites.csv')
-# uplad_spain_sites('/home/aram/CDH/diana/diana-backend/apps/shfa/italy_sites.csv')
-uplaod_denmark_site('/home/aram/CDH/diana/diana-backend/apps/shfa/denmark_sites.csv')
-uplaod_norway_site('/home/aram/CDH/diana/diana-backend/apps/shfa/norway_site.csv')
 
 class SiteViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteGeoSerializer
