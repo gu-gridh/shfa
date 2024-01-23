@@ -14,7 +14,7 @@
                     xmlns:geoF="http://www.mindswap.org/2003/owl/geo/geoFeatures20040307.owl#"
                     xmlns:owl="http://www.w3.org/2002/07/owl#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
                     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#" xmlns:time="http://www.w3.org/2006/time#">
-            <Entity rdf:about="http://kulturarvsdata.se/{{"shfa"}}/{{"bild"}}/{{data.legacy_id}}">
+            <Entity rdf:about="http://kulturarvsdata.se/{{"shfa"}}/{{"bild"}}/{{image.id}}">
                 <ksamsokVersion>0.99</ksamsokVersion>
                 <buildDate>{% now "Y-m-d" %}</buildDate>
                 <createdDate>{{image.created_at|date:"Y-m-d"}}</createdDate>
@@ -27,13 +27,14 @@
                 <dataQuality rdf:resource="{{"http://kulturarvsdata.se/resurser/DataQuality#raw"}}" />
                 <itemType rdf:resource="{{"http://kulturarvsdata.se/resurser/EntityType#photo"}}" />
                 <itemTitle>{{image.site.raa_id}}</itemTitle>
-                <itemLicense rdf:resource="http://kulturarvsdata.se/resurser/License#CC-BY"/>
+                <itemLicense rdf:resource="http://kulturarvsdata.se/resurser/License#CC0"/>
                 <itemLicenseUrl rdf:resource="http://creativecommons.org/publicdomain/zero/1.0/"/>
                 <itemName rdf:nodeID="name001" />
                 <itemLabel>{{image.rock_carving_object.name}}</itemLabel>
                 <itemMotiveWord>{% get_image_tags image %}</itemMotiveWord>
                 <itemTechnique>{{image.type.text}}</itemTechnique>
-                <itemNumber rdf:nodeID="num001"/>
+                <ItemNumber rdf:nodeID="num001"/>
+                <ItemNumber rdf:nodeID="num002"/>
                 <context rdf:nodeID="ctx001" />
                 <visualizes>http://kulturarvsdata.se/raa/lamning/{{image.site.ksamsok_id}}</visualizes>
                 <image rdf:nodeID="im001" />
@@ -107,14 +108,14 @@
                 <byline>{{image.author.name}}</byline>
                 <mediaMotiveWord>{% get_image_tags image %}</mediaMotiveWord>
                 <copyright>SHFA</copyright>
-                <mediaLicense rdf:resource="http://kulturarvsdata.se/resurser/License#by-nc-nd"/>
+                <mediaLicense rdf:resource="http://kulturarvsdata.se/resurser/License#by/4.0"/>
                 <mediaLicenseUrl rdf:resource="https://creativecommons.org/licenses/by/4.0/"/>
             </Image>
             <ItemNumber rdf:nodeID="num001">
                 <type>RAÄ-nummer</type>
                 <number>{{image.site.raa_id}}</number>
             </ItemNumber>
-            <ItemNumber rdf:nodeID="num001">
+            <ItemNumber rdf:nodeID="num002">
                 <type>Lämningsnummer</type>
                 <number>{{image.site.lamning_id}}</number>
             </ItemNumber>
