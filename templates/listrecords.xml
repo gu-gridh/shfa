@@ -21,7 +21,7 @@
                 <lastChangedDate>{{image.updated_at|date:"Y-m-d"}}</lastChangedDate>
                 <serviceOrganization>{{"shfa"}}</serviceOrganization>
                 <serviceName>{{"shfabild"}}</serviceName>
-                <url>https://shfa.dh.gu.se/search/iiif/{{image.uuid}}.tif/meta/{{image.id}}</url>
+                <url>https://shfa.dh.gu.se/image/{{image.id}}</url>
                 <thumbnail>{{"https://data.dh.gu.se/diana/static/"}}{{image.file}}</thumbnail>
                 <mediaType>{{"image/jpeg"}}</mediaType>
                 <dataQuality rdf:resource="{{"http://kulturarvsdata.se/resurser/DataQuality#raw"}}" />
@@ -41,7 +41,7 @@
                 <presentation rdf:parseType="Literal" xmlns:pres="http://kulturarvsdata.se/presentation#">
                 <pres:item>
                     <pres:version>0.99</pres:version>
-                    <pres:entityUri>https://shfa.dh.gu.se/search/iiif/{{image.uuid}}.tif/meta/{{image.id}}</pres:entityUri>
+                    <pres:entityUri>https://shfa.dh.gu.se/image/{{image.id}}</pres:entityUri>
                     <pres:type>{{image.type.text}}</pres:type>
                     <pres:id>{{image.id}}</pres:id>
                     <pres:idLabel>{{image.site.lamning_id}}</pres:idLabel>
@@ -104,7 +104,7 @@
                 <mediaType>image/jpeg</mediaType>
                 <thumbnailSource>{{"https://data.dh.gu.se/diana/static/"}}{{image.file}}</thumbnailSource>
                 <lowresSource>{{"https://data.dh.gu.se/diana/static/"}}{{image.file}}</lowresSource>
-                <highresSource>{{"https://img.dh.gu.se/diana/static/"}}{image.{data.iiif_file}}/full/full/0/default.jpg</highresSource>
+                <highresSource>{{"https://img.dh.gu.se/diana/static/"}}{{image.iiif_file}}/full/full/0/default.jpg</highresSource>
                 <byline>{{image.author.name}}</byline>
                 <mediaMotiveWord>{% get_image_tags image %}</mediaMotiveWord>
                 <copyright>SHFA</copyright>
