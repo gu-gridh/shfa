@@ -269,13 +269,20 @@ class Compilation(abstract.AbstractBaseModel):
 
 
 # Models For OAI_PMH
+class CustomURLField(models.URLField):
+    def to_python(self, value):
+        value = super().to_python(value)
+        if value and not value.endswith('#'):
+            value += '#'  # Append # if it's missing
+        return value
 
 class MetadataFormat(abstract.AbstractBaseModel):
     """MetadataFormat Model."""
 
     prefix = models.CharField(max_length=256, unique=True, verbose_name=_("Prefix"))
     schema = models.URLField(max_length=2048, verbose_name=_("Schema"))
-    namespace = models.URLField(max_length=2048, verbose_name=_("Namespace"))
+    namespace = CustomURLField(max_length=2048, verbose_name=_("Namespace"))
+
 
     def __str__(self):
         """Name."""
