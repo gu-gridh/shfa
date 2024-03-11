@@ -1,13 +1,14 @@
 {% extends "base.xml" %}
 {% load oai_pmh %}
-
+{% load tz %}
 {% block content %}
+
 <ListRecords>
 {% for image in images %}
     <record>
         <header>
             <identifier>oai:shfa.dh.gu.se:objects/{{image.id}}</identifier>
-            <datestamp>{% now "Y-m-dTH:i:s" %}</datestamp>
+            <datestamp>{% now "Y-m-d\TH:i:s\Z" %}</datestamp>
         </header>
         <metadata>
             <rdf:RDF xmlns="http://kulturarvsdata.se/ksamsok#" xmlns:foaf="http://xmlns.com/foaf/0.1/#"
@@ -41,7 +42,7 @@
                 <presentation rdf:parseType="Literal" xmlns:pres="http://kulturarvsdata.se/presentation#">
                 <pres:item>
                     <pres:version>0.99</pres:version>
-                    <pres:entityUri>https://shfa.dh.gu.se/image/{{image.id}}</pres:entityUri>
+                    <pres:entityUri>http://kulturarvsdata.se/shfa/bild/{{image.id}}</pres:entityUri>
                     <pres:type>{{image.type.text}}</pres:type>
                     <pres:id>{{image.id}}</pres:id>
                     <pres:idLabel>{{image.site.lamning_id}}</pres:idLabel>
@@ -56,7 +57,7 @@
                     <georss:where xmlns:georss="http://www.georss.org/georss">
                     <gml:Point xmlns:gml="http://www.opengis.net/gml" srsName="SDO:4326">
                         <gml:coordinates cs="," decimal="." ts=" ">
-                        {% for s in image.site.coordinates %}{% if not forloop.first %}{% if forloop.last %}, {% else %}, {% endif %}{% endif %}{{s}}{% endfor %}</gml:coordinates> 
+                        {% for s in image.site.coordinates %}{% if not forloop.first %}{% if forloop.last %},{% else %},{% endif %}{% endif %}{{s}}{% endfor %}</gml:coordinates> 
                         </gml:Point>
                         </georss:where>
                     <pres:image>
@@ -96,7 +97,7 @@
                     <parishName>{{image.site.parish}}</parishName> 
                     <coordinates rdf:parseType="Literal">
                         <gml:Point xmlns:gml="http://www.opengis.net/gml" srsName="SDO:4326">
-                        <gml:coordinates cs="," decimal="." ts=" "> {% for s in image.site.coordinates %}{% if not forloop.first %}{% if forloop.last %}, {% else %}, {% endif %}{% endif %}{{s}}{% endfor %}</gml:coordinates>
+                        <gml:coordinates cs="," decimal="." ts=" "> {% for s in image.site.coordinates %}{% if not forloop.first %}{% if forloop.last %},{% else %},{% endif %}{% endif %}{{s}}{% endfor %}</gml:coordinates>
                     </gml:Point>
                 </coordinates>
             </Context>
