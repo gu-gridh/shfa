@@ -14,7 +14,8 @@
             <rdf:RDF xmlns="http://kulturarvsdata.se/ksamsok#" xmlns:foaf="http://xmlns.com/foaf/0.1/#"
                     xmlns:geoF="http://www.mindswap.org/2003/owl/geo/geoFeatures20040307.owl#"
                     xmlns:owl="http://www.w3.org/2002/07/owl#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-                    xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#" xmlns:time="http://www.w3.org/2006/time#">
+                    xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#" xmlns:time="http://www.w3.org/2006/time#"
+                    xmlns:dc="http://purl.org/dc/elements/1.1/">
             <Entity rdf:about="http://kulturarvsdata.se/{{"shfa"}}/{{"bild"}}/{{image.id}}">
                 <ksamsokVersion>0.99</ksamsokVersion>
                 <buildDate>{% now "Y-m-d" %}</buildDate>
@@ -43,6 +44,7 @@
                 <pres:item>
                     <pres:version>0.99</pres:version>
                     <pres:entityUri>http://kulturarvsdata.se/shfa/bild/{{image.id}}</pres:entityUri>
+                    <dcterms:replaces rdf:resource="http://kulturarvsdata.se/shfa/bild/{{image.legacy_id}}/"/<http://kulturarvsdata.se/shfa/bild/{{image.id}}/>>
                     <pres:type>{{image.type.text}}</pres:type>
                     <pres:id>{{image.id}}</pres:id>
                     <pres:idLabel>{{image.site.lamning_id}}</pres:idLabel>
