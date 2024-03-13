@@ -28,6 +28,7 @@
                 <serviceOrganization>{{"shfa"}}</serviceOrganization>
                 <serviceName>{{"shfabild"}}</serviceName>
                 <url>https://shfa.dh.gu.se/image/{{image.id}}</url>
+                <dcterms:replaces rdf:resource="http://kulturarvsdata.se/shfa/bild/{{image.legacy_id}}"/>
                 <thumbnail>{{"https://data.dh.gu.se/diana/static/"}}{{image.file}}</thumbnail>
                 <mediaType>{{"image/jpeg"}}</mediaType>
                 <dataQuality rdf:resource="{{"http://kulturarvsdata.se/resurser/DataQuality#raw"}}" />
@@ -48,7 +49,6 @@
                 <pres:item>
                     <pres:version>0.99</pres:version>
                     <pres:entityUri>http://kulturarvsdata.se/shfa/bild/{{image.id}}</pres:entityUri>
-                    <dcterms:replaces rdf:resource="http://kulturarvsdata.se/shfa/bild/{{image.legacy_id}}"/>
                     <pres:type>{{image.type.text}}</pres:type>
                     <pres:id>{{image.id}}</pres:id>
                     <pres:idLabel>{{image.site.lamning_id}}</pres:idLabel>
@@ -60,12 +60,22 @@
                     <pres:timeLabel>-</pres:timeLabel>
                     <pres:nameLabel>-</pres:nameLabel>
                     </pres:context>
-                    <georss:where xmlns:georss="http://www.georss.org/georss">
+                    {% comment %} <georss:where xmlns:georss="http://www.georss.org/georss">
                     <gml:Point xmlns:gml="http://www.opengis.net/gml" srsName="SDO:4326">
                         <gml:coordinates cs="," decimal="." ts=" ">
-                        {% for s in image.site.coordinates %}{% if not forloop.first %}{% if forloop.last %},{% else %},{% endif %}{% endif %}{{s}}{% endfor %}</gml:coordinates> 
+                            {% for s in image.site.coordinates %}{% if not forloop.first %}{% if forloop.last %},{% else %},{% endif %}{% endif %}{{s}}{% endfor %}
+                        </gml:coordinates> 
                         </gml:Point>
-                        </georss:where>
+                    </georss:where> {% endcomment %}
+                    <georss:where xmlns:georss="http://www.georss.org/georss">
+                        {% if image.site.coordinates %}
+                            <gml:Point xmlns:gml="http://www.opengis.net/gml" srsName="SDO:4326">
+                                <gml:coordinates cs="," decimal="." ts=" ">
+                                    {% for s in image.site.coordinates %}{% if not forloop.first %},{% endif %}{{s}}{% endfor %}
+                                </gml:coordinates> 
+                            </gml:Point>
+                        {% endif %}
+                    </georss:where>
                     <pres:image>
                     <pres:src type="thumbnail">{{"https://data.dh.gu.se/diana/static/"}}{{image.file}}</pres:src>
                     <pres:src type="lowres">{{"https://data.dh.gu.se/diana/static/"}}{{image.file}}</pres:src>
@@ -102,10 +112,18 @@
                     <municipalityName>{{image.site.municipality}}</municipalityName> 
                     <parishName>{{image.site.parish}}</parishName> 
                     <coordinates rdf:parseType="Literal">
+                        {% comment %} <gml:Point xmlns:gml="http://www.opengis.net/gml" srsName="SDO:4326">
+                            <gml:coordinates cs="," decimal="." ts=" "> {% for s in image.site.coordinates %}{% if not forloop.first %}{% if forloop.last %},{% else %},{% endif %}{% endif %}{{s}}{% endfor %}</gml:coordinates>
+                        </gml:Point> {% endcomment %}
+                        {% if image.site.coordinates %}
                         <gml:Point xmlns:gml="http://www.opengis.net/gml" srsName="SDO:4326">
-                        <gml:coordinates cs="," decimal="." ts=" "> {% for s in image.site.coordinates %}{% if not forloop.first %}{% if forloop.last %},{% else %},{% endif %}{% endif %}{{s}}{% endfor %}</gml:coordinates>
-                    </gml:Point>
-                </coordinates>
+                            <gml:coordinates cs="," decimal="." ts=" ">
+                                {% for s in image.site.coordinates %}{% if not forloop.first %},{% endif %}{{s}}{% endfor %}
+                            </gml:coordinates> 
+                        </gml:Point>
+                        {% endif %}
+                    </coordinates>
+                    
             </Context>
             <Image rdf:nodeID="im001">
                 <mediaType>image/jpeg</mediaType>
