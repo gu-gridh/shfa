@@ -5,6 +5,7 @@ from django.contrib.gis.db import models
 import apps.geography.models as geography
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
+from django.contrib.postgres.fields import ArrayField
 
 # Validators
 raa_validator = RegexValidator(r"([A-Za-z]+)( )(\d+:?\d+?)")
@@ -266,6 +267,118 @@ class Compilation(abstract.AbstractBaseModel):
     
     def __repr__(self) -> str:
         return str(self)
+
+# 3D models
+
+class Group(abstract.AbstractTagModel):
+    pass
+
+    class Meta:
+        verbose_name = _("Group")
+        verbose_name_plural = _("Groups")
+
+    def __str__(self) -> str:
+        return self.text
+    
+    def __repr__(self) -> str:
+        return str(self)
+    
+class RTI(abstract.AbstractBaseModel):
+    url = models.URLField(max_length=2048, verbose_name=_("URL"), help_text=_("URL to the RTI file"))
+    group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Group"), help_text=_("Group of the RTI"))
+
+    class Meta:
+        verbose_name = _("RTI")
+        verbose_name_plural = _("RTIs")
+    
+    def __str__(self) -> str:
+        return self.url
+    
+class ImageSubType(abstract.AbstractTagModel):
+
+    class Meta:
+        verbose_name = _("Image subtype")
+        verbose_name_plural = _("Image subtypes")
+
+    def __str__(self) -> str:
+        return self.text
+    
+    def __repr__(self) -> str:
+        return str(self)
+
+
+class Geology(abstract.AbstractBaseModel):
+    type = models.CharField(max_length=128, verbose_name=_("Type"), help_text=_("Type of the geology"))
+    description = models.TextField(verbose_name=_("Description"), help_text=_("Description of the geology"))
+    coordinates = models.PointField(null=True, blank=True, verbose_name=_("Coordinates"), help_text=_("Mid-point coordinates of the geology."))
+    
+    class Meta:
+        verbose_name = _("Geology")
+        verbose_name_plural = _("Geologies")
+    
+    def __str__(self) -> str:
+        return self.type
+
+
+class CameraImages(abstract.AbstractBaseModel):
+    link = models.URLField(max_length=2048, verbose_name=_("Link"), help_text=_("Link to the camera images"))
+    image_type = models.ForeignKey(ImageTypeTag, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Image type"), help_text=_("Type of image medium, material or origin."))
+    camera_lens = models.CharField(max_length=128, verbose_name=_("Camera lens"), help_text=_("Camera lens of the camera images"))
+    camera_model = models.CharField(max_length=128, verbose_name=_("Camera model"), help_text=_("Camera model of the camera images"))
+    focal_param = models.FloatField(verbose_name=_("Focal param"), help_text=_("Focal param of the camera images"))
+    group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Group"), help_text=_("Group of the camera images"))
+
+class CarvingDetal(abstract.AbstractBaseModel):
+    group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Group"), help_text=_("Group of the carving detal"))
+    keywords = models.ManyToManyField(KeywordTag, blank=True, related_name="carving_detals", verbose_name=_("Keywords"), help_text=_("Keywords in the carving detal, used for categorization."))
+    creator = models.ForeignKey(Author, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Creator"), help_text=_("Creator of the carving detal"))
+    institution = models.ForeignKey(Institution, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Institution"), help_text=_("Institution of the carving detal"))
+    date = models.IntegerField(null=True, blank=True, verbose_name=_("Date"), help_text=_("Date of the carving detal"))
+    geology = models.ForeignKey(Geology, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Geology"), help_text=_("Geology of the carving detal"))
+
+    class Meta:
+        verbose_name = _("Carving detal")
+        verbose_name_plural = _("Carving detals")
+    
+    def __str__(self) -> str:
+        return self.group
+    
+class SHFA3D(abstract.AbstractBaseModel):
+    creator = models.ForeignKey(Author, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Creator"), help_text=_("Creator of the 3D model"))
+    institution = models.ForeignKey(Institution, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Institution"), help_text=_("Institution of the 3D model"))
+    site = models.ForeignKey(Site, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Site"), help_text=_("Site of the 3D model"))
+    carving = models.ForeignKey(CarvingTag, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Carving"), help_text=_("Carving of the 3D model"))
+    keywords = models.ManyToManyField(KeywordTag, blank=True, related_name="3d_models", verbose_name=_("Keywords"), help_text=_("Keywords in the 3D model, used for categorization."))
+    image_subtype = models.ForeignKey(ImageTypeTag, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Image type"), help_text=_("Type of image medium, material or origin."))
+    image = models.ForeignKey(CameraImages, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Image"), help_text=_("Image of the 3D model"))
+    tree_d_mesh = models.ForeignKey("SHFA3DMesh", on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("3D mesh"), help_text=_("3D mesh of the 3D model"))
+    RTI = models.ForeignKey(RTI, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("RTI"), help_text=_("RTI of the 3D model"))
+
+    class Meta:
+        verbose_name = _("3D model")
+        verbose_name_plural = _("3D models")
+    
+    def __str__(self) -> str:
+        return f"3D model of {self.site}"
+    
+
+class SHFA3DMesh(abstract.AbstractBaseModel):
+    mesh_url = models.URLField(max_length=2048, verbose_name=_("URL"), help_text=_("URL to the 3D mesh file"))
+    quality_url =  models.URLField(max_length=2048, verbose_name=_("Quality URL"), help_text=_("URL to the 3D mesh quality file"))
+    method = models.CharField(max_length=128, verbose_name=_("Method"), help_text=_("Method of the 3D mesh"))
+    num_vertices = models.IntegerField(verbose_name=_("Number of vertices"), help_text=_("Number of vertices in the 3D mesh"))
+    num_faces = models.IntegerField(verbose_name=_("Number of faces"), help_text=_("Number of faces in the 3D mesh"))
+    num_photos = models.IntegerField(verbose_name=_("Number of photos"), help_text=_("Number of photos in the 3D mesh"))
+    dimensions = ArrayField(models.FloatField(max_length=16, blank=True, null=True), size=3)
+    weather = models.CharField(max_length=128, verbose_name=_("Weather"), help_text=_("Weather of the 3D mesh"))
+    group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Group"), help_text=_("Group of the 3D mesh"))
+
+    class Meta:
+        verbose_name = _("3D mesh")
+        verbose_name_plural = _("3D meshes")
+    
+    def __str__(self) -> str:
+        return self.mesh_url
 
 
 # Models For OAI_PMH
