@@ -170,6 +170,63 @@ class CarvingTagAdmin(admin.ModelAdmin):
     list_display = ["text", "english_translation"]
     search_fields = ["text", "english_translation"]
 
+# 3D models admin
+
+@admin.register(Group)
+class GroupAdmin(admin.ModelAdmin):
+    list_display = ["text"]
+    search_fields = ["text"]
+
+@admin.register(RTI)
+class RTIAdmin(admin.ModelAdmin):
+    list_display = ["url", "group"]
+    search_fields = ["group__text"]
+
+@admin.register(ImageSubType)
+class ImageSubTypeAdmin(admin.ModelAdmin):
+    list_display = ["text"]
+    search_fields = ["text"]
+
+@admin.register(Geology)
+class GeologyAdmin(admin.ModelAdmin):
+    list_display = ["type"]
+    search_fields = ["type"]
+
+@admin.register(CameraImages)
+class CameraImagesAdmin(admin.ModelAdmin):
+    fields = get_fields(CameraImages, exclude=DEFAULT_EXCLUDE+["id"])
+    readonly_fields = [*DEFAULT_FIELDS]
+    list_display = ["image_type", "camera_lens", "camera_model", "group"]
+    search_fields = ["image_type", "camera_lens", "camera_model", "group__text"]
+
+
+@admin.register(CarvingDetal)
+class CarvingDetalAdmin(admin.ModelAdmin):
+    fields = get_fields(CarvingDetal, exclude=DEFAULT_EXCLUDE+["id"])
+    readonly_fields = [*DEFAULT_FIELDS]
+    list_display = ["group", "creator", "date", "institution"]
+    search_fields = ["group__text", "creator__name", "date", "institution__name"]
+    list_filter = ["group", "creator", "date", "institution"]
+    autocomplete_fields = ["group", "creator", "institution", "keywords"]
+
+@admin.register(SHFA3D)
+class SHFA3DAdmin(admin.ModelAdmin):
+    fields = get_fields(SHFA3D, exclude=DEFAULT_EXCLUDE+["id"])
+    readonly_fields = [*DEFAULT_FIELDS]
+    list_display = ["creator", "site", "institution"]
+    search_fields = ["creator__name", "site__raa_id", "institution__name"]
+    list_filter = ["creator", "site", "institution"]
+    autocomplete_fields = ["creator", "site", "institution","keywords"]
+
+@admin.register(SHFA3DMesh)
+class SHFA3DMeshAdmin(admin.ModelAdmin):
+    fields = get_fields(SHFA3DMesh, exclude=DEFAULT_EXCLUDE+["id"])
+    readonly_fields = [*DEFAULT_FIELDS]
+    list_display = ["group"]
+    search_fields = ["group__text", "method"]
+    list_filter = ["group"]
+    autocomplete_fields = ["group"]
+
 @admin.register(MetadataFormat)
 class MetadataFormatAdmin(admin.ModelAdmin):
     list_display = ["prefix"]

@@ -268,8 +268,8 @@ class Compilation(abstract.AbstractBaseModel):
     def __repr__(self) -> str:
         return str(self)
 
-# 3D models
 
+# 3D models
 class Group(abstract.AbstractTagModel):
     pass
 
@@ -292,9 +292,10 @@ class RTI(abstract.AbstractBaseModel):
         verbose_name_plural = _("RTIs")
     
     def __str__(self) -> str:
-        return self.url
+        return f"{self.url}, {self.group}"
     
 class ImageSubType(abstract.AbstractTagModel):
+    pass
 
     class Meta:
         verbose_name = _("Image subtype")
@@ -328,6 +329,14 @@ class CameraImages(abstract.AbstractBaseModel):
     focal_param = models.FloatField(verbose_name=_("Focal param"), help_text=_("Focal param of the camera images"))
     group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Group"), help_text=_("Group of the camera images"))
 
+    class Meta:
+        verbose_name = _("Camera images")
+        verbose_name_plural = _("Camera images")
+    
+    def __str__(self) -> str:
+        return f"{self.link}, {self.group}"
+    
+
 class CarvingDetal(abstract.AbstractBaseModel):
     group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Group"), help_text=_("Group of the carving detal"))
     keywords = models.ManyToManyField(KeywordTag, blank=True, related_name="carving_detals", verbose_name=_("Keywords"), help_text=_("Keywords in the carving detal, used for categorization."))
@@ -341,14 +350,14 @@ class CarvingDetal(abstract.AbstractBaseModel):
         verbose_name_plural = _("Carving detals")
     
     def __str__(self) -> str:
-        return self.group
+        return f"{self.group}, {self.dage}, {self.creator}"
     
 class SHFA3D(abstract.AbstractBaseModel):
     creator = models.ForeignKey(Author, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Creator"), help_text=_("Creator of the 3D model"))
     institution = models.ForeignKey(Institution, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Institution"), help_text=_("Institution of the 3D model"))
     site = models.ForeignKey(Site, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Site"), help_text=_("Site of the 3D model"))
     carving = models.ForeignKey(CarvingTag, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Carving"), help_text=_("Carving of the 3D model"))
-    keywords = models.ManyToManyField(KeywordTag, blank=True, related_name="3d_models", verbose_name=_("Keywords"), help_text=_("Keywords in the 3D model, used for categorization."))
+    keywords = models.ManyToManyField(KeywordTag, blank=True, related_name="tree_d_models", verbose_name=_("Keywords"), help_text=_("Keywords in the 3D model, used for categorization."))
     image_subtype = models.ForeignKey(ImageTypeTag, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Image type"), help_text=_("Type of image medium, material or origin."))
     image = models.ForeignKey(CameraImages, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Image"), help_text=_("Image of the 3D model"))
     tree_d_mesh = models.ForeignKey("SHFA3DMesh", on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("3D mesh"), help_text=_("3D mesh of the 3D model"))
@@ -359,7 +368,7 @@ class SHFA3D(abstract.AbstractBaseModel):
         verbose_name_plural = _("3D models")
     
     def __str__(self) -> str:
-        return f"3D model of {self.site}"
+        return f"3D model of {self.site}{self.creator}"
     
 
 class SHFA3DMesh(abstract.AbstractBaseModel):
@@ -378,7 +387,7 @@ class SHFA3DMesh(abstract.AbstractBaseModel):
         verbose_name_plural = _("3D meshes")
     
     def __str__(self) -> str:
-        return self.mesh_url
+        return f"{self.mesh_url}, {self.group}"
 
 
 # Models For OAI_PMH
