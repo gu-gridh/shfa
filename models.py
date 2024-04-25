@@ -350,7 +350,7 @@ class CarvingDetal(abstract.AbstractBaseModel):
         verbose_name_plural = _("Carving detals")
     
     def __str__(self) -> str:
-        return f"{self.group}, {self.dage}, {self.creator}"
+        return f"{self.group}, {self.date}, {self.creator}"
     
 class SHFA3D(abstract.AbstractBaseModel):
     creator = models.ForeignKey(Author, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Creator"), help_text=_("Creator of the 3D model"))
