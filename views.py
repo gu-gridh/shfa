@@ -184,6 +184,9 @@ class GeneralSearch(DynamicDepthViewSet):
                                                |Q(type__english_translation__icontains=q)
                                                |Q(site__raa_id__icontains=q)
                                                |Q(site__lamning_id__icontains=q)
+                                               |Q(site__askeladden_id__icontains=q)
+                                               |Q(site__lokalitet_id__icontains=q)
+                                               |Q(site__placename__icontains=q)
                                                |Q(keywords__text__icontains=q)
                                                |Q(keywords__english_translation__icontains=q)
                                                |Q(rock_carving_object__name__icontains=q)
@@ -202,7 +205,7 @@ class AdvancedSearch(DynamicDepthViewSet):
         query_array = []
         if ("site_name" in self.request.GET):
             site_name = self.request.GET["site_name"]
-            query_array.append(Q(site__raa_id__icontains=site_name) | Q (site__lamning_id__icontains=site_name))
+            query_array.append(Q(site__raa_id__icontains=site_name) | Q (site__lamning_id__icontains=site_name) | Q(site__askeladden_id__icontains=site_name) | Q(site__lokalitet_id__icontains=site_name) |Q(site__placename__icontains=site_name))
             
         if ("keyword" in self.request.GET):
             keyword = self.request.GET["keyword"]
