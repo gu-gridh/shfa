@@ -40,7 +40,7 @@ class ImageModel(admin.ModelAdmin):
     fields              = ['image_preview', *get_fields(Image, exclude=['id'])]
     readonly_fields     = ['legacy_id', 'iiif_file', 'uuid', 'image_preview', *DEFAULT_FIELDS]
     autocomplete_fields = ['site', 'collection', 'author', 'institution', 
-                            'type', 'keywords', 'carving_tags', 'rock_carving_object', 
+                            'type', 'keywords','rock_carving_object', 
                             'dating_tags','subtype']
     list_display        = ['thumbnail_preview', 'site', 'rock_carving_object', 
                             'year', 'collection', 'author', 'institution', 'type', 'subtype']
@@ -85,7 +85,7 @@ class SiteAdmin(admin.GISModelAdmin):
     list_display = ['raa_id', 'lamning_id','lokalitet_id', 'askeladden_id', 'get_ksamsok_link', 'placename']
     search_fields = ['raa_id', 'lamning_id', 'askeladden_id', 'lokalitet_id','placename']
     ordering = ('raa_id','placename')
-    filter_horizontal = ['raa_id', 'lamning_id', 'askeladden_id', 'lokalitet_id','placename']
+    # filter_horizontal = ['raa_id', 'lamning_id', 'askeladden_id', 'lokalitet_id','placename']
     # def get_search_results(self, request, queryset, search_term):
     #     queryset, use_distinct = super().get_search_results(request, queryset, search_term)
     #     try:
@@ -123,7 +123,7 @@ class AuthorAdmin(admin.ModelAdmin):
     list_display = ["name", "english_translation"]
     search_fields = ["name", "english_translation"]
     ordering = ('name',)
-    filter_horizontal = ["name"]
+    # filter_horizontal = ["name"]
 
 @admin.register(Collection)
 class CollectionAdmin(admin.ModelAdmin):
@@ -147,7 +147,7 @@ class ImageTypeTagAdmin(admin.ModelAdmin):
     readonly_fields = ['legacy_id']
     list_display = ["text", "english_translation", "order"]
     search_fields = ["text", "english_translation", "order"]
-    filter_horizontal = ["text"]
+    # filter_horizontal = ["text"]
 
 @admin.register(RockCarvingObject)
 class RockCarvingObjectAdmin(admin.ModelAdmin):
@@ -155,7 +155,7 @@ class RockCarvingObjectAdmin(admin.ModelAdmin):
     list_display = ["name", "code"]
     search_fields = ["name"]
     ordering = ('name',)
-    filter_horizontal = ["name"]
+    # filter_horizontal = ["name"]
 
 @admin.register(KeywordTag)
 class KeywordTagAdmin(admin.ModelAdmin):
@@ -163,7 +163,7 @@ class KeywordTagAdmin(admin.ModelAdmin):
     readonly_fields = ['legacy_id']
     list_display = ["text", "english_translation"]
     search_fields = ["text", "english_translation"]
-    filter_horizontal = ["text"]
+    # filter_horizontal = ["text"]
     
 @admin.register(DatingTag)
 class DatingTagAdmin(admin.ModelAdmin):
@@ -171,7 +171,7 @@ class DatingTagAdmin(admin.ModelAdmin):
     readonly_fields = ['legacy_id']
     list_display = ["text", "english_translation"]
     search_fields = ["text", "english_translation"]
-    filter_horizontal = ["text"]
+    # filter_horizontal = ["text"]
 
 # @admin.register(CarvingTag)
 # class CarvingTagAdmin(admin.ModelAdmin):
@@ -185,7 +185,7 @@ class DatingTagAdmin(admin.ModelAdmin):
 class GroupAdmin(admin.ModelAdmin):
     list_display = ["text"]
     search_fields = ["text"]
-    filter_horizontal = ["text"]
+    # filter_horizontal = ["text"]
 
 @admin.register(RTI)
 class RTIAdmin(admin.ModelAdmin):
@@ -196,11 +196,11 @@ class RTIAdmin(admin.ModelAdmin):
 class ImageSubTypeAdmin(admin.ModelAdmin):
     list_display = ["text", "english_translation", "order"]
     search_fields = ["text", "english_translation", "order"]
-    filter_horizontal = ["text"]
+    # filter_horizontal = ["text"]
 
 @admin.register(Geology)
 class GeologyAdmin(admin.ModelAdmin):
-    list_display = ["type","type_translation","description","description_translation"]
+    list_display = ["type","description"]
     search_fields = ["type","description"]
 
 @admin.register(CameraMeta)

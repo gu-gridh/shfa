@@ -363,9 +363,9 @@ class CameraMeta(abstract.AbstractBaseModel):
     link = models.IntegerField(max_length=24, unique=True, verbose_name=_("Link"), help_text=_("Id of the orthophoto in the Images table"))
     # link = models.URLField(max_length=2048, verbose_name=_("Link"), help_text=_("Link to the camera images"))
     # image_type = models.ForeignKey(ImageTypeTag, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Image type"), help_text=_("Type of image medium, material or origin."))
-    camera_lens = models.CharField(max_length=128, verbose_name=_("Camera lens"), help_text=_("Camera lens of the camera images"))
-    camera_model = models.CharField(max_length=128, verbose_name=_("Camera model"), help_text=_("Camera model of the camera images"))
-    focal_param = models.CharField(null=True, verbose_name=_("Focal param"), help_text=_("Focal param of the camera images"))
+    camera_lens = models.CharField(max_length=256, verbose_name=_("Camera lens"), help_text=_("Camera lens of the camera images"))
+    camera_model = models.CharField(max_length=256, verbose_name=_("Camera model"), help_text=_("Camera model of the camera images"))
+    focal_param = models.CharField(max_length=256,null=True, verbose_name=_("Focal param"), help_text=_("Focal param of the camera images"))
     group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Group"), help_text=_("Group of the camera images"))
 
     class Meta:
@@ -403,7 +403,7 @@ class SHFA3D(abstract.AbstractBaseModel):
     three_d_mesh = models.ForeignKey("SHFA3DMesh", on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("3D Mesh"), help_text=_("3D mesh specifications"))
     RTI = models.ForeignKey(RTI, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("RTI"), help_text=_("RTI of the 3D model"))
     group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Group"), help_text=_("Group of the 3D mesh and corresponding visualisations.  A group should of mesh(es) and visualisations should cover <b>exactly</b> the same area."))
-    date = models.DateField(null=False, blank=True, verbose_name=_("Date"), help_text=_("Date of the data collection/fieldwork.  If exact date is unknown, estimate to the closest month and year."))
+    date = models.DateField(null=True, blank=True, verbose_name=_("Date"), help_text=_("Date of the data collection/fieldwork.  If exact date is unknown, estimate to the closest month and year."))
     geology = models.ForeignKey(Geology, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Geology"), help_text=_("Geology of the rock carving panel"))
 
     class Meta:
