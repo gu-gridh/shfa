@@ -360,7 +360,7 @@ class Geology(abstract.AbstractBaseModel):
 
 
 class CameraMeta(abstract.AbstractBaseModel):
-    link = models.IntegerField(max_length=24, unique=True, verbose_name=_("Link"), help_text=_("Id of the orthophoto in the Images table"))
+    link = models.IntegerField(unique=True, verbose_name=_("Link"), help_text=_("Id of the orthophoto in the Images table"))
     # link = models.URLField(max_length=2048, verbose_name=_("Link"), help_text=_("Link to the camera images"))
     # image_type = models.ForeignKey(ImageTypeTag, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Image type"), help_text=_("Type of image medium, material or origin."))
     camera_lens = models.CharField(max_length=256, verbose_name=_("Camera lens"), help_text=_("Camera lens of the camera images"))
