@@ -5,7 +5,8 @@ from django.contrib.gis.db import models
 import apps.geography.models as geography
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
-from django.contrib.postgres.fields import ArrayField
+# from django.contrib.postgres.fields import ArrayField
+from django_better_admin_arrayfield.models.fields import ArrayField
 
 # Validators
 raa_validator = RegexValidator(r"([A-Za-z]+)( )(\d+:?\d+?)")
@@ -431,6 +432,9 @@ class SHFA3DMesh(abstract.AbstractBaseModel):
     
     def __str__(self) -> str:
         return f"{self.mesh_url}, {self.group}"
+
+    def __str__(self):
+        return str(self.dimensions)
 
 
 # Models For OAI_PMH

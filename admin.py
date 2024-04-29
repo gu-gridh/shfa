@@ -1,6 +1,8 @@
 from .models import *
 from django.utils.html import format_html
 from django.contrib.gis import admin
+# from django.contrib.admin import DynamicArrayMixin
+from django_better_admin_arrayfield.admin.mixins import DynamicArrayMixin
 from django.utils.translation import gettext_lazy as _
 from diana.utils import get_fields, DEFAULT_FIELDS, DEFAULT_EXCLUDE
 from admin_auto_filters.filters import AutocompleteFilter
@@ -8,6 +10,11 @@ from rangefilter.filters import NumericRangeFilter
 from django.contrib.admin import EmptyFieldListFilter
 from django.conf import settings
 
+
+# class MyWidget(DynamicArrayWidget):
+#     def __init__(self, *args, **kwargs):
+#         kwargs['subwidget_form'] = SHFA3DMesh
+#         super().__init__(*args, **kwargs)
 
 class SiteFilter(AutocompleteFilter):
     title = _('Site') # display title
@@ -230,7 +237,7 @@ class SHFA3DAdmin(admin.ModelAdmin):
     autocomplete_fields = ["creator", "site", "institution","keywords"]
     
 @admin.register(SHFA3DMesh)
-class SHFA3DMeshAdmin(admin.ModelAdmin):
+class SHFA3DMeshAdmin(admin.ModelAdmin, DynamicArrayMixin):
     fields = get_fields(SHFA3DMesh, exclude=DEFAULT_EXCLUDE+["id"])
     readonly_fields = [*DEFAULT_FIELDS]
     list_display = ["group"]
