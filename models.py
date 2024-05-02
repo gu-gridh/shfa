@@ -155,6 +155,25 @@ class Author(abstract.AbstractBaseModel):
         return str(self)
 
 
+class People(abstract.AbstractBaseModel):
+    # A photographer, or owner, 
+    # can be a person or institution
+
+    name = models.CharField(max_length=256, unique=True, verbose_name=_("name"), help_text=_("Free-form name of the creator, photographer or author."))
+    legacy_id = models.PositiveBigIntegerField(null=True, blank=True, verbose_name=_("legacy id"))
+    english_translation = models.CharField(max_length=5000, null=True, blank=True, verbose_name=_('translation'), help_text=("English translation for the author"))
+
+    class Meta:
+        verbose_name = _("Person")
+        verbose_name_plural = _("People")
+
+    def __str__(self) -> str:
+        return self.name
+    
+    def __repr__(self) -> str:
+        return str(self)
+
+
 class Institution(abstract.AbstractBaseModel):
 
     legacy_id = models.PositiveBigIntegerField(null=True, blank=True, verbose_name=_("legacy id"))
@@ -393,7 +412,7 @@ class CameraMeta(abstract.AbstractBaseModel):
 #         return f"{self.group}, {self.date}, {self.creator}"
     
 class SHFA3D(abstract.AbstractBaseModel):
-    creator = models.ManyToManyField(Author, blank=True, verbose_name=_("Creator"), help_text=_("Creator(s) of the 3D data, it will be assumed that the orthophotos and visualisation have the same creator."))
+    creators = models.ManyToManyField(People, blank=True, verbose_name=_("Creator"), help_text=_("Creator(s) of the 3D data, it will be assumed that the orthophotos and visualisation have the same creator."))
     institution = models.ForeignKey(Institution, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Institution"), help_text=_("Institution associated with the creator or research project"))
     site = models.ForeignKey(Site, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Site"), help_text=_("Site of the 3D model"))
     # carving = models.ForeignKey(CarvingTag, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Carving"), help_text=_("Carving of the 3D model"))

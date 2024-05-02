@@ -131,6 +131,13 @@ class AuthorAdmin(admin.ModelAdmin):
     ordering = ('name',)
     # filter_horizontal = ["name"]
 
+@admin.register(People)
+class PeopleAdmin(admin.ModelAdmin):
+
+    readonly_fields = ['legacy_id']
+    list_display = ["name", "english_translation"]
+    search_fields = ["name", "english_translation"]
+    ordering = ('name',)
 @admin.register(Collection)
 class CollectionAdmin(admin.ModelAdmin):
 
@@ -235,10 +242,10 @@ class SHFA3DAdmin(admin.ModelAdmin):
     fields = get_fields(SHFA3D, exclude=DEFAULT_EXCLUDE+["id"])
     readonly_fields = [*DEFAULT_FIELDS]
     list_display = ["site", "institution"]
-    search_fields = ["creator__name", "site__placename", "institution__name"]
-    list_filter = ["creator", "site", "institution"]
-    autocomplete_fields = ["creator", "site", "institution","keywords", "datings"]
-    
+    search_fields = ["creators__name", "site__placename", "institution__name"]
+    list_filter = ["creators", "site", "institution"]
+    autocomplete_fields = ["creators", "site", "institution","keywords", "datings"]
+    filter_horizontal = ["creators"]
 @admin.register(SHFA3DMesh)
 class SHFA3DMeshAdmin(admin.ModelAdmin, DynamicArrayMixin):
     fields = get_fields(SHFA3DMesh, exclude=DEFAULT_EXCLUDE+["id"])
