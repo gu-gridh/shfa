@@ -290,6 +290,7 @@ class Image(abstract.AbstractTIFFImageModel):
     # Metadata on collections
     collection  = models.ForeignKey(Collection, null=True, blank=True, on_delete=models.SET_NULL, verbose_name=_("Collection"), help_text=_("Collection from which the image originates."))
     author      = models.ForeignKey(Author, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Image creator"), help_text=_("Creator, photographer or author of the original image."))
+    people      = models.ManyToManyField(People, blank=True, related_name="images", verbose_name=_("People"), help_text=_("People in the image, if applicable."))
     institution = models.ForeignKey(Institution, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Institution"), help_text=_("Original institution housing the image."))
     reference   = models.CharField(max_length=512, null=True, blank=True, verbose_name=_("References"), help_text=_("Reference notes on the image."))
     

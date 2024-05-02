@@ -198,7 +198,6 @@ class DatingTagAdmin(admin.ModelAdmin):
 class GroupAdmin(admin.ModelAdmin):
     list_display = ["text"]
     search_fields = ["text"]
-    # filter_horizontal = ["text"]
 
 @admin.register(WeatherTag)
 class WeatherTagAdmin(admin.ModelAdmin):
@@ -245,7 +244,8 @@ class SHFA3DAdmin(admin.ModelAdmin):
     search_fields = ["creators__name", "site__placename", "institution__name"]
     list_filter = ["creators", "site", "institution"]
     autocomplete_fields = ["creators", "site", "institution","keywords", "datings"]
-    filter_horizontal = ["creators"]
+    filter_horizontal = ["creators", "keywords", "datings"]
+
 @admin.register(SHFA3DMesh)
 class SHFA3DMeshAdmin(admin.ModelAdmin, DynamicArrayMixin):
     fields = get_fields(SHFA3DMesh, exclude=DEFAULT_EXCLUDE+["id"])
@@ -254,7 +254,8 @@ class SHFA3DMeshAdmin(admin.ModelAdmin, DynamicArrayMixin):
     search_fields = ["group__text", "method"]
     list_filter = ["group"]
     autocomplete_fields = ["group", "weather"]
-    
+    filter_horizontal = ["weather"]
+
 
 @admin.register(MetadataFormat)
 class MetadataFormatAdmin(admin.ModelAdmin):
