@@ -63,7 +63,7 @@ class ImageModel(admin.ModelAdmin):
         SiteFilter,
         KeywordFilter,
         ]
-    
+    filter_horizontal =['people', 'keywords', 'dating_tags']
     list_per_page = 25
 
     def image_preview(self, obj):
@@ -121,6 +121,7 @@ class CompilationAdmin(admin.ModelAdmin):
     search_fields = ["name"]
     autocomplete_fields = ["images"]
     ordering = ('name',)
+    filter_horizontal = ["images"]
 
 @admin.register(Author)
 class AuthorAdmin(admin.ModelAdmin):
@@ -129,7 +130,6 @@ class AuthorAdmin(admin.ModelAdmin):
     list_display = ["name", "english_translation"]
     search_fields = ["name", "english_translation"]
     ordering = ('name',)
-    # filter_horizontal = ["name"]
 
 @admin.register(People)
 class PeopleAdmin(admin.ModelAdmin):
