@@ -1,7 +1,6 @@
 from .models import *
 from django.utils.html import format_html
 from django.contrib.gis import admin
-# from django.contrib.admin import DynamicArrayMixin
 from django_better_admin_arrayfield.admin.mixins import DynamicArrayMixin
 from django.utils.translation import gettext_lazy as _
 from diana.utils import get_fields, DEFAULT_FIELDS, DEFAULT_EXCLUDE
@@ -235,7 +234,7 @@ class CameraMetaAdmin(admin.ModelAdmin):
 class SHFA3DAdmin(admin.ModelAdmin):
     fields = get_fields(SHFA3D, exclude=DEFAULT_EXCLUDE+["id"])
     readonly_fields = [*DEFAULT_FIELDS]
-    list_display = ["creator", "site", "institution"]
+    list_display = ["site", "institution"]
     search_fields = ["creator__name", "site__placename", "institution__name"]
     list_filter = ["creator", "site", "institution"]
     autocomplete_fields = ["creator", "site", "institution","keywords", "datings"]

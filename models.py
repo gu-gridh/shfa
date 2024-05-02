@@ -393,7 +393,7 @@ class CameraMeta(abstract.AbstractBaseModel):
 #         return f"{self.group}, {self.date}, {self.creator}"
     
 class SHFA3D(abstract.AbstractBaseModel):
-    creator = models.ForeignKey(Author, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Creator"), help_text=_("Creator(s) of the 3D data, it will be assumed that the orthophotos and visualisation have the same creator."))
+    creator = models.ManyToManyField(Author, blank=True, verbose_name=_("Creator"), help_text=_("Creator(s) of the 3D data, it will be assumed that the orthophotos and visualisation have the same creator."))
     institution = models.ForeignKey(Institution, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Institution"), help_text=_("Institution associated with the creator or research project"))
     site = models.ForeignKey(Site, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Site"), help_text=_("Site of the 3D model"))
     # carving = models.ForeignKey(CarvingTag, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Carving"), help_text=_("Carving of the 3D model"))
