@@ -194,6 +194,10 @@ class GroupAdmin(admin.ModelAdmin):
     search_fields = ["text"]
     # filter_horizontal = ["text"]
 
+@admin.register(WeatherTag)
+class WeatherTagAdmin(admin.ModelAdmin):
+    list_display = ["text"]
+    search_fields = ["text"]
 @admin.register(RTI)
 class RTIAdmin(admin.ModelAdmin):
     list_display = ["url", "group"]
@@ -234,7 +238,7 @@ class SHFA3DAdmin(admin.ModelAdmin):
     list_display = ["creator", "site", "institution"]
     search_fields = ["creator__name", "site__placename", "institution__name"]
     list_filter = ["creator", "site", "institution"]
-    autocomplete_fields = ["creator", "site", "institution","keywords"]
+    autocomplete_fields = ["creator", "site", "institution","keywords", "datings"]
     
 @admin.register(SHFA3DMesh)
 class SHFA3DMeshAdmin(admin.ModelAdmin, DynamicArrayMixin):
@@ -243,7 +247,7 @@ class SHFA3DMeshAdmin(admin.ModelAdmin, DynamicArrayMixin):
     list_display = ["group"]
     search_fields = ["group__text", "method"]
     list_filter = ["group"]
-    autocomplete_fields = ["group"]
+    autocomplete_fields = ["group", "weather"]
     
 
 @admin.register(MetadataFormat)
