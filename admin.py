@@ -240,7 +240,6 @@ class SHFA3DAdmin(admin.ModelAdmin):
     list_filter = ["creators", "site", "institution"]
     autocomplete_fields = ["creators", "site", "institution","keywords", "datings"]
     filter_horizontal = ("creators", "keywords", "datings",)
-@admin.register(SHFA3DMesh)
 class SHFA3DMeshAdmin(admin.ModelAdmin, DynamicArrayMixin):
     display_raw = True
     fields = get_fields(SHFA3DMesh, exclude=DEFAULT_EXCLUDE+["id"])
@@ -260,3 +259,4 @@ class ResumptionTokenAdmin(admin.ModelAdmin):
     list_display=["token"]
 
 admin.site.register(SHFA3D)
+admin.site.register(SHFA3DMesh)
