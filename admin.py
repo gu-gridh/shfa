@@ -116,12 +116,11 @@ class SiteAdmin(admin.GISModelAdmin):
 
 @admin.register(Compilation)
 class CompilationAdmin(admin.ModelAdmin):
-
     list_display = ["name"]
     search_fields = ["name"]
     autocomplete_fields = ["images"]
     ordering = ('name',)
-    filter_horizontal = ["images"]
+    filter_horizontal = ("images",)
 
 @admin.register(Author)
 class AuthorAdmin(admin.ModelAdmin):
@@ -160,7 +159,6 @@ class ImageTypeTagAdmin(admin.ModelAdmin):
     readonly_fields = ['legacy_id']
     list_display = ["text", "english_translation", "order"]
     search_fields = ["text", "english_translation", "order"]
-    # filter_horizontal = ["text"]
 
 @admin.register(RockCarvingObject)
 class RockCarvingObjectAdmin(admin.ModelAdmin):
@@ -168,7 +166,6 @@ class RockCarvingObjectAdmin(admin.ModelAdmin):
     list_display = ["name", "code"]
     search_fields = ["name"]
     ordering = ('name',)
-    # filter_horizontal = ["name"]
 
 @admin.register(KeywordTag)
 class KeywordTagAdmin(admin.ModelAdmin):
@@ -184,7 +181,6 @@ class DatingTagAdmin(admin.ModelAdmin):
     readonly_fields = ['legacy_id']
     list_display = ["text", "english_translation"]
     search_fields = ["text", "english_translation"]
-    # filter_horizontal = ["text"]
 
 # @admin.register(CarvingTag)
 # class CarvingTagAdmin(admin.ModelAdmin):
@@ -212,7 +208,6 @@ class RTIAdmin(admin.ModelAdmin):
 class ImageSubTypeAdmin(admin.ModelAdmin):
     list_display = ["text", "english_translation", "order"]
     search_fields = ["text", "english_translation", "order"]
-    # filter_horizontal = ["text"]
 
 @admin.register(Geology)
 class GeologyAdmin(admin.ModelAdmin):
@@ -236,26 +231,25 @@ class CameraMetaAdmin(admin.ModelAdmin):
 #     list_filter = ["group", "creator", "date", "institution"]
 #     autocomplete_fields = ["group", "creator", "institution", "keywords"]
 
-@admin.register(SHFA3D)
 class SHFA3DAdmin(admin.ModelAdmin):
+    # display_raw = True
     fields = get_fields(SHFA3D, exclude=DEFAULT_EXCLUDE+["id"])
     readonly_fields = [*DEFAULT_FIELDS]
     list_display = ["site", "institution"]
     search_fields = ["creators__name", "site__placename", "institution__name"]
     list_filter = ["creators", "site", "institution"]
     autocomplete_fields = ["creators", "site", "institution","keywords", "datings"]
-    filter_horizontal = ["creators", "keywords", "datings"]
-
+    filter_horizontal = ("creators", "keywords", "datings",)
 @admin.register(SHFA3DMesh)
 class SHFA3DMeshAdmin(admin.ModelAdmin, DynamicArrayMixin):
+    display_raw = True
     fields = get_fields(SHFA3DMesh, exclude=DEFAULT_EXCLUDE+["id"])
     readonly_fields = [*DEFAULT_FIELDS]
     list_display = ["group"]
     search_fields = ["group__text", "method"]
     list_filter = ["group"]
     autocomplete_fields = ["group", "weather"]
-    filter_horizontal = ["weather"]
-
+    filter_horizontal = ("weather",)
 
 @admin.register(MetadataFormat)
 class MetadataFormatAdmin(admin.ModelAdmin):
@@ -264,3 +258,5 @@ class MetadataFormatAdmin(admin.ModelAdmin):
 @admin.register(ResumptionToken)
 class ResumptionTokenAdmin(admin.ModelAdmin):
     list_display=["token"]
+
+admin.site.register(SHFA3D)
