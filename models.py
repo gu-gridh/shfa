@@ -400,7 +400,7 @@ class CameraModel(abstract.AbstractBaseModel):
         verbose_name_plural = _("Camera Models")
     
     def __str__(self) -> str:
-        return f"{self.model}, {self.lens}, {self.focal_param}"
+        return f"{self.name}, {self.lens}"
 
 
 class CameraMeta(abstract.AbstractBaseModel):
