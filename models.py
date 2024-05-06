@@ -382,7 +382,7 @@ class Geology(abstract.AbstractBaseModel):
 
 class CameraLens(abstract.AbstractBaseModel):
     name = models.CharField(max_length=256, verbose_name=_("Lens"), help_text=_("Lens of the camera"))
-    focal_length = models.CharField(max_length=256, verbose_name=_("Focal param"), help_text=_("Focal param of the camera"))
+    focal_length = models.FloatField(null=True, blank=True, verbose_name=_("Focal length"), help_text=_("Focal length of the camera lens"))
 
     class Meta:
         verbose_name = _("Camera Lens")
@@ -417,6 +417,13 @@ class CameraMeta(abstract.AbstractBaseModel):
     
     def __str__(self) -> str:
         return f"{self.link}, {self.group}"
+    
+    @property
+    def mm35_equivalent(self):
+        if self.camera_lens and self.camera_model:
+            return self.camera_lens.focal_length * self.camera_model.crop_factor
+        else:
+            return None
     
 
 # class CarvingDetail(abstract.AbstractBaseModel):
