@@ -54,7 +54,13 @@ class SiteSearchViewSet(GeoViewSet):
         q = self.request.GET["site_name"]
         images = models.Image.objects.all()
         queryset = models.Site.objects.filter(Q
-                                              (Q(raa_id__icontains=q)|Q(lamning_id__icontains=q)) 
+                                              (Q(raa_id__icontains=q)
+                                              |Q(lamning_id__icontains=q)
+                                              |Q(ksamsok_id__icontains=q)
+                                              |Q(placename__icontains=q)
+                                              |Q(askeladden_id__icontains=q)
+                                              |Q(lokalitet_id__icontains=q)
+                                               ) 
                                               &Q
                                               (id__in=list(images.values_list('site', flat=True)))
                                                 ).order_by('raa_id', 'lamning_id','placename')
