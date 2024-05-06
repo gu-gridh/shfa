@@ -73,7 +73,7 @@ class SHFA3DMeshSerializer(DynamicDepthSerializer):
 
     class Meta:
         model = SHFA3DMesh
-        fields = ['id']+get_fields(SHFA3DMesh, exclude=DEFAULT_FIELDS)
+        fields = ['id']+get_fields(SHFA3DMesh, exclude=DEFAULT_FIELDS+['dimensions'])
 
 class GeologySerializer(GeoFeatureModelSerializer):
         

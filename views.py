@@ -43,7 +43,7 @@ class GeologyViewSet(GeoViewSet):
 class SHFA3DMeshViewset(DynamicDepthViewSet):
     serializer_class = serializers.SHFA3DMeshSerializer
     queryset = models.SHFA3DMesh.objects.all()
-    filterset_fields = get_fields(models.SHFA3DMesh, exclude=DEFAULT_FIELDS)
+    filterset_fields = get_fields(models.SHFA3DMesh, exclude=DEFAULT_FIELDS + ['dimensions'])
 
   # Search views  
 class SiteSearchViewSet(GeoViewSet):

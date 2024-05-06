@@ -12,7 +12,6 @@ router.register(rf'{endpoint}/image', views.IIIFImageViewSet, basename='image')
 router.register(rf'{endpoint}/site', views.SiteViewSet, basename='site')
 router.register(rf'{endpoint}/geojson/site', views.SiteGeoViewSet, basename='site as geojson')
 router.register(rf'{endpoint}/compilation', views.CompilationViewset, basename='compilation')
-router.register(rf'{endpoint}/shfa_meshes', views.SHFA3DMeshViewset, basename='3D meshes')
 
 # urls for advanced search options 
 router.register(rf'{endpoint}/search/site', views.SiteSearchViewSet, basename='site')
@@ -29,6 +28,7 @@ router.register(rf'{endpoint}/search', views.GeneralSearch, basename='search')
 
 # urls for the 3D models
 router.register(rf'{endpoint}/geology', views.GeologyViewSet, basename='geology')
+router.register(rf'{endpoint}/shfa3dmesh', views.SHFA3DMeshViewset, basename='3D meshes')
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -39,8 +39,8 @@ urlpatterns = [
     # Automatically generated views
     *utils.get_model_urls('shfa', endpoint, 
         exclude=['image', 'site', 'compilation', 'image_keywords', 
-                'image_carving_tags', 'image_dating_tags', 'compilation_images', 'geology']),
+                'image_carving_tags', 'image_dating_tags', 'compilation_images', 'geology', 'shfa3dmesh']),
 
-    *utils.get_model_urls('shfa', f'{endpoint}', exclude=['image', 'site', 'geology']),
+    *utils.get_model_urls('shfa', f'{endpoint}', exclude=['image', 'site', 'geology', 'shfa3dmesh']),
     *documentation
 ]
