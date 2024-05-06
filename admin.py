@@ -214,12 +214,24 @@ class GeologyAdmin(admin.ModelAdmin):
     list_display = ["type","description"]
     search_fields = ["type","description"]
 
+@admin.register(CameraLens)
+class CameraLensAdmin(admin.ModelAdmin):
+    list_display = ["name", "focal_length"]
+    search_fields = ["name", "focal_length"]
+
+
+@admin.register(CameraModel)
+class CameraModelAdmin(admin.ModelAdmin):
+    list_display = ["name", ]
+    search_fields = ["name", "lens__name"]
+
+
 @admin.register(CameraMeta)
 class CameraMetaAdmin(admin.ModelAdmin):
     fields = get_fields(CameraMeta, exclude=DEFAULT_EXCLUDE+["id"])
     readonly_fields = [*DEFAULT_FIELDS]
     list_display = ["link","camera_lens", "camera_model", "group"]
-    search_fields = ["link","camera_lens", "camera_model", "group__text"]
+    search_fields = ["link","camera_lens__name", "camera_model__name", "group__text"]
 
 
 # @admin.register(CarvingDetail)

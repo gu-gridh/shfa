@@ -380,13 +380,35 @@ class Geology(abstract.AbstractBaseModel):
         return self.type
 
 
+class CameraLens(abstract.AbstractBaseModel):
+    name = models.CharField(max_length=256, verbose_name=_("Lens"), help_text=_("Lens of the camera"))
+    focal_length = models.CharField(max_length=256, verbose_name=_("Focal param"), help_text=_("Focal param of the camera"))
+
+    class Meta:
+        verbose_name = _("Camera Lens")
+        verbose_name_plural = _("Camera Lenses")
+    
+    def __str__(self) -> str:
+        return self.name
+
+class CameraModel(abstract.AbstractBaseModel):
+    name = models.CharField(max_length=256, verbose_name=_("Model"), help_text=_("Model of the camera"))
+    lens = models.ForeignKey(CameraLens, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Lens"), help_text=_("Lens of the camera"))
+    crop_factor = models.FloatField(null=True, blank=True, verbose_name=_("Crop factor"), help_text=_("Crop factor of the camera"))
+    class Meta:
+        verbose_name = _("Camera Model")
+        verbose_name_plural = _("Camera Models")
+    
+    def __str__(self) -> str:
+        return f"{self.model}, {self.lens}, {self.focal_param}"
+
+
 class CameraMeta(abstract.AbstractBaseModel):
     link = models.IntegerField(unique=True, verbose_name=_("Link"), help_text=_("Id of the orthophoto in the Images table"))
     # link = models.URLField(max_length=2048, verbose_name=_("Link"), help_text=_("Link to the camera images"))
     # image_type = models.ForeignKey(ImageTypeTag, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Image type"), help_text=_("Type of image medium, material or origin."))
-    camera_lens = models.CharField(max_length=256, verbose_name=_("Camera lens"), help_text=_("Camera lens of the camera images"))
-    camera_model = models.CharField(max_length=256, verbose_name=_("Camera model"), help_text=_("Camera model of the camera images"))
-    focal_param = models.CharField(max_length=256,null=True, verbose_name=_("Focal param"), help_text=_("Focal param of the camera images"))
+    camera_lens = models.ForeignKey(CameraLens, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Camera Lens"), help_text=_("Lens of the camera images"))
+    camera_model = models.ForeignKey(CameraModel, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Camera Model"), help_text=_("Model of the camera images"))
     group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Group"), help_text=_("Group of the camera images"))
 
     class Meta:
