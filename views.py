@@ -32,7 +32,20 @@ class SiteGeoViewSet(GeoViewSet):
     bbox_filter_field = 'coordinates'
     bbox_filter_include_overlapping = True
 
-    
+# Add 3D views
+
+class GeologyViewSet(GeoViewSet):
+    serializer_class = serializers.GeologySerializer
+    queryset = models.Geology.objects.all()
+    filterset_fields = get_fields(models.Geology, exclude=DEFAULT_FIELDS + ['coordinates'])
+
+
+class SHFA3DMeshViewset(DynamicDepthViewSet):
+    serializer_class = serializers.SHFA3DMeshSerializer
+    queryset = models.SHFA3DMesh.objects.all()
+    filterset_fields = get_fields(models.SHFA3DMesh, exclude=DEFAULT_FIELDS)
+
+  # Search views  
 class SiteSearchViewSet(GeoViewSet):
     serializer_class = serializers.SiteGeoSerializer
 

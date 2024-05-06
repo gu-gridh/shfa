@@ -68,3 +68,16 @@ class ImageTypeSerializer(DynamicDepthSerializer):
     class Meta:
         model = ImageTypeTag
         fields = ['id']+get_fields(ImageTypeTag, exclude=DEFAULT_FIELDS)
+
+class SHFA3DMeshSerializer(DynamicDepthSerializer):
+
+    class Meta:
+        model = SHFA3DMesh
+        fields = ['id']+get_fields(SHFA3DMesh, exclude=DEFAULT_FIELDS)
+
+class GeologySerializer(GeoFeatureModelSerializer):
+        
+        class Meta:
+            model = Geology
+            fields = ['id']+get_fields(Geology, exclude=DEFAULT_FIELDS)
+            geo_field = 'coordinates'
