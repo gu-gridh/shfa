@@ -63,7 +63,7 @@ class SiteSearchViewSet(GeoViewSet):
                                                ) 
                                               &Q
                                               (id__in=list(images.values_list('site', flat=True)))
-                                                ).order_by('raa_id', 'lamning_id','placename')
+                                                ).order_by('raa_id', 'lamning_id','placename', 'ksamsok_id', 'askeladden_id', 'lokalitet_id')
 
         return queryset
     
@@ -224,8 +224,14 @@ class AdvancedSearch(DynamicDepthViewSet):
         query_array = []
         if ("site_name" in self.request.GET):
             site_name = self.request.GET["site_name"]
-            query_array.append(Q(site__raa_id__icontains=site_name) | Q (site__lamning_id__icontains=site_name) | Q(site__askeladden_id__icontains=site_name) | Q(site__lokalitet_id__icontains=site_name) |Q(site__placename__icontains=site_name))
-            
+            query_array.append(Q(site__raa_id__icontains=site_name)
+                             | Q(site__lamning_id__icontains=site_name) 
+                             | Q(site__askeladden_id__icontains=site_name) 
+                             | Q(site__lokalitet_id__icontains=site_name) 
+                             | Q(site__placename__icontains=site_name)
+                             | Q(site__ksamsok_id__icontains=site_name)
+                            )
+                        
         if ("keyword" in self.request.GET):
             keyword = self.request.GET["keyword"]
             query_array.append(Q(keywords__text__icontains=keyword)|Q(keywords__english_translation__icontains=keyword))
