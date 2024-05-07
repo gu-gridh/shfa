@@ -250,8 +250,9 @@ class SHFA3DAdmin(admin.ModelAdmin):
     list_display = ["site", "institution"]
     search_fields = ["creators__name", "site__placename", "institution__name"]
     list_filter = ["creators", "site", "institution"]
-    autocomplete_fields = ["creators", "site", "institution","keywords", "datings"]
-    filter_horizontal = ("creators", "keywords", "datings",)
+    # autocomplete_fields = ["creators", "site", "institution","keywords", "datings"]
+    filter_horizontal = ["creators", "keywords", "datings"]
+
 class SHFA3DMeshAdmin(admin.ModelAdmin, DynamicArrayMixin):
     display_raw = True
     fields = get_fields(SHFA3DMesh, exclude=DEFAULT_EXCLUDE+["id"])
@@ -259,8 +260,8 @@ class SHFA3DMeshAdmin(admin.ModelAdmin, DynamicArrayMixin):
     list_display = ["group"]
     search_fields = ["group__text", "method"]
     list_filter = ["group"]
-    autocomplete_fields = ["group", "weather"]
-    filter_horizontal = ("weather",)
+    autocomplete_fields = ["group"]
+    filter_horizontal = ["weather"]
 
 @admin.register(MetadataFormat)
 class MetadataFormatAdmin(admin.ModelAdmin):
@@ -270,5 +271,5 @@ class MetadataFormatAdmin(admin.ModelAdmin):
 class ResumptionTokenAdmin(admin.ModelAdmin):
     list_display=["token"]
 
-admin.site.register(SHFA3D)
-admin.site.register(SHFA3DMesh)
+admin.site.register(SHFA3D, SHFA3DAdmin)
+admin.site.register(SHFA3DMesh, SHFA3DMeshAdmin)

@@ -171,7 +171,7 @@ class People(abstract.AbstractBaseModel):
         return self.name
     
     def __repr__(self) -> str:
-        return str(self)
+        return str(self.name)
 
 
 class Institution(abstract.AbstractBaseModel):
@@ -461,7 +461,7 @@ class SHFA3D(abstract.AbstractBaseModel):
         verbose_name_plural = _("3D Data Overviews")
     
     def __str__(self) -> str:
-        return f"3D model of {self.site}{self.creators}"
+        return f"3D model of {self.site}"
     
 
 class SHFA3DMesh(abstract.AbstractBaseModel):
