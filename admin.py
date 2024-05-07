@@ -195,6 +195,12 @@ class GroupAdmin(admin.ModelAdmin):
     list_display = ["text"]
     search_fields = ["text"]
 
+@admin.register(MethodTag)
+class MethodTagAdmin(admin.ModelAdmin):
+    list_display = ["text", "english_translation"]
+    search_fields = ["text", "english_translation"]
+
+
 @admin.register(WeatherTag)
 class WeatherTagAdmin(admin.ModelAdmin):
     list_display = ["text"]
