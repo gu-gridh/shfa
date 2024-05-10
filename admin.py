@@ -16,65 +16,70 @@ from django.conf import settings
 #         super().__init__(*args, **kwargs)
 
 class SiteFilter(AutocompleteFilter):
-    title = _('Site') # display title
-    field_name = 'site' # name of the foreign key field
-    
+    title = _('Site')  # display title
+    field_name = 'site'  # name of the foreign key field
+
+
 class InstitutionFilter(AutocompleteFilter):
-    title = _('Institution') # display title
-    field_name = 'institution' # name of the foreign key field
+    title = _('Institution')  # display title
+    field_name = 'institution'  # name of the foreign key field
+
 
 class CollectionFilter(AutocompleteFilter):
-    title = _('Collection') # display title
-    field_name = 'collection' # name of the foreign key field
+    title = _('Collection')  # display title
+    field_name = 'collection'  # name of the foreign key field
+
 
 class AuthorFilter(AutocompleteFilter):
-    title = _('Creator') # display title
-    field_name = 'author' # name of the foreign key field
+    title = _('Creator')  # display title
+    field_name = 'author'  # name of the foreign key field
+
 
 class KeywordFilter(AutocompleteFilter):
-    title = _('Keywords') # display title
-    field_name = 'keywords' # name of the foreign key field
-    
+    title = _('Keywords')  # display title
+    field_name = 'keywords'  # name of the foreign key field
+
+
 class FilenameFilter(AutocompleteFilter):
-    title = _('Upload Filename') #display title
-    field_name = 'filename' #name of the foreign key field
+    title = _('Upload Filename')  # display title
+    field_name = 'filename'  # name of the foreign key field
 
 
 @admin.register(Image)
 class ImageModel(admin.ModelAdmin):
 
-    fields              = ['image_preview', *get_fields(Image, exclude=['id'])]
-    readonly_fields     = ['legacy_id', 'iiif_file', 'uuid', 'image_preview', *DEFAULT_FIELDS]
-    autocomplete_fields = ['site', 'collection', 'author', 'institution', 
-                            'type', 'keywords','rock_carving_object', 
-                            'dating_tags','subtype']
-    list_display        = ['thumbnail_preview', 'site', 'rock_carving_object', 
-                            'year', 'collection', 'author', 'institution', 'type', 'subtype']
-    search_fields       = ['site__lamning_id', 'site__raa_id', 'rock_carving_object__name', 
-                            'site__municipality__name', 'site__parish__name', 'subtype']
-    list_filter         = [
-        ('year', NumericRangeFilter), 
-        ('site', EmptyFieldListFilter), 
-        'type', 
+    fields = ['image_preview', *get_fields(Image, exclude=['id'])]
+    readonly_fields = ['legacy_id', 'iiif_file',
+                       'uuid', 'image_preview', *DEFAULT_FIELDS]
+    autocomplete_fields = ['site', 'collection', 'author', 'institution',
+                           'type', 'keywords', 'rock_carving_object',
+                           'dating_tags', 'subtype']
+    list_display = ['thumbnail_preview', 'site', 'rock_carving_object',
+                    'year', 'collection', 'author', 'institution', 'type', 'subtype']
+    search_fields = ['site__lamning_id', 'site__raa_id', 'rock_carving_object__name',
+                     'site__municipality__name', 'site__parish__name', 'subtype']
+    list_filter = [
+        ('year', NumericRangeFilter),
+        ('site', EmptyFieldListFilter),
+        'type',
         'published',
         InstitutionFilter,
         CollectionFilter,
         AuthorFilter,
         SiteFilter,
         KeywordFilter,
-        ]
-    filter_horizontal =['people', 'keywords', 'dating_tags']
+    ]
+    filter_horizontal = ['people', 'keywords', 'dating_tags']
     list_per_page = 25
 
     def image_preview(self, obj):
-        if 'tif' in  obj.file.path:
+        if 'tif' in obj.file.path:
             return format_html(f'<img src="{settings.IIIF_URL}{obj.iiif_file}/full/full/0/default.jpg" height="300" />')
         else:
             return format_html(f'<img src="{settings.ORIGINAL_URL}/{obj.file}" height="300" />')
 
-
     def thumbnail_preview(self, obj):
-        if 'tif' in  obj.file.path:
+        if 'tif' in obj.file.path:
             return format_html(f'<img src="{settings.IIIF_URL}{obj.iiif_file}/full/full/0/default.jpg" height="100" />')
         else:
             return format_html(f'<img src="{settings.ORIGINAL_URL}/{obj.file}" height="100" />')
@@ -84,13 +89,16 @@ class ImageModel(admin.ModelAdmin):
     # thumbnail_preview.short_description = 'Image thumbnail'
     # thumbnail_preview.allow_tags = True
 
+
 @admin.register(Site)
 class SiteAdmin(admin.GISModelAdmin):
     fields = get_fields(Site, exclude=DEFAULT_EXCLUDE+["id"])
     readonly_fields = [*DEFAULT_FIELDS]
-    list_display = ['raa_id', 'lamning_id','lokalitet_id', 'askeladden_id', 'get_ksamsok_link', 'placename']
-    search_fields = ['raa_id', 'lamning_id', 'askeladden_id', 'lokalitet_id','placename']
-    ordering = ('raa_id','placename')
+    list_display = ['raa_id', 'lamning_id', 'lokalitet_id',
+                    'askeladden_id', 'get_ksamsok_link', 'placename']
+    search_fields = ['raa_id', 'lamning_id',
+                     'askeladden_id', 'lokalitet_id', 'placename']
+    ordering = ('raa_id', 'placename')
     # filter_horizontal = ['raa_id', 'lamning_id', 'askeladden_id', 'lokalitet_id','placename']
     # def get_search_results(self, request, queryset, search_term):
     #     queryset, use_distinct = super().get_search_results(request, queryset, search_term)
@@ -100,16 +108,16 @@ class SiteAdmin(admin.GISModelAdmin):
     #         pass
     #     else:
     #         queryset |= Site.objects.filter(raa_id__icontains=search_term)
-    #     return queryset, use_distinct 
+    #     return queryset, use_distinct
 
     @admin.display(description=_('Read at Fornsök'))
     def get_ksamsok_link(self, obj):
 
         if obj.ksamsok_id:
-        
-            return format_html("<a href='{url}' target='_blank' rel='noopener noreferrer'>{ksamsok_id}</a>", 
-                            url="https://kulturarvsdata.se/raa/lamning/" + obj.ksamsok_id,
-                            ksamsok_id=obj.ksamsok_id)
+
+            return format_html("<a href='{url}' target='_blank' rel='noopener noreferrer'>{ksamsok_id}</a>",
+                               url="https://kulturarvsdata.se/raa/lamning/" + obj.ksamsok_id,
+                               ksamsok_id=obj.ksamsok_id)
         else:
             return format_html("")
 
@@ -122,6 +130,7 @@ class CompilationAdmin(admin.ModelAdmin):
     ordering = ('name',)
     filter_horizontal = ("images",)
 
+
 @admin.register(Author)
 class AuthorAdmin(admin.ModelAdmin):
 
@@ -130,6 +139,7 @@ class AuthorAdmin(admin.ModelAdmin):
     search_fields = ["name", "english_translation"]
     ordering = ('name',)
 
+
 @admin.register(People)
 class PeopleAdmin(admin.ModelAdmin):
 
@@ -137,6 +147,8 @@ class PeopleAdmin(admin.ModelAdmin):
     list_display = ["name", "english_translation"]
     search_fields = ["name", "english_translation"]
     ordering = ('name',)
+
+
 @admin.register(Collection)
 class CollectionAdmin(admin.ModelAdmin):
 
@@ -144,6 +156,7 @@ class CollectionAdmin(admin.ModelAdmin):
     list_display = ["name"]
     search_fields = ["name"]
     ordering = ('name',)
+
 
 @admin.register(Institution)
 class InstitutionAdmin(admin.ModelAdmin):
@@ -153,12 +166,14 @@ class InstitutionAdmin(admin.ModelAdmin):
     search_fields = ["name"]
     ordering = ('name',)
 
+
 @admin.register(ImageTypeTag)
 class ImageTypeTagAdmin(admin.ModelAdmin):
 
     readonly_fields = ['legacy_id']
     list_display = ["text", "english_translation", "order"]
     search_fields = ["text", "english_translation", "order"]
+
 
 @admin.register(RockCarvingObject)
 class RockCarvingObjectAdmin(admin.ModelAdmin):
@@ -167,6 +182,7 @@ class RockCarvingObjectAdmin(admin.ModelAdmin):
     search_fields = ["name"]
     ordering = ('name',)
 
+
 @admin.register(KeywordTag)
 class KeywordTagAdmin(admin.ModelAdmin):
 
@@ -174,7 +190,8 @@ class KeywordTagAdmin(admin.ModelAdmin):
     list_display = ["text", "english_translation"]
     search_fields = ["text", "english_translation"]
     # filter_horizontal = ["text"]
-    
+
+
 @admin.register(DatingTag)
 class DatingTagAdmin(admin.ModelAdmin):
 
@@ -190,10 +207,12 @@ class DatingTagAdmin(admin.ModelAdmin):
 
 # 3D models admin
 
+
 @admin.register(Group)
 class GroupAdmin(admin.ModelAdmin):
     list_display = ["text"]
     search_fields = ["text"]
+
 
 @admin.register(MethodTag)
 class MethodTagAdmin(admin.ModelAdmin):
@@ -203,22 +222,27 @@ class MethodTagAdmin(admin.ModelAdmin):
 
 @admin.register(WeatherTag)
 class WeatherTagAdmin(admin.ModelAdmin):
-    list_display = ["text"]
-    search_fields = ["text"]
+    list_display = ["text", "english_translation"]
+    search_fields = ["text", "english_translation"]
+
+
 @admin.register(RTI)
 class RTIAdmin(admin.ModelAdmin):
     list_display = ["url", "group"]
     search_fields = ["group__text"]
+
 
 @admin.register(ImageSubType)
 class ImageSubTypeAdmin(admin.ModelAdmin):
     list_display = ["text", "english_translation", "order"]
     search_fields = ["text", "english_translation", "order"]
 
+
 @admin.register(Geology)
 class GeologyAdmin(admin.ModelAdmin):
-    list_display = ["type","description"]
-    search_fields = ["type","description"]
+    list_display = ["type", "description"]
+    search_fields = ["type", "description"]
+
 
 @admin.register(CameraLens)
 class CameraLensAdmin(admin.ModelAdmin):
@@ -236,8 +260,9 @@ class CameraModelAdmin(admin.ModelAdmin):
 class CameraMetaAdmin(admin.ModelAdmin):
     fields = get_fields(CameraMeta, exclude=DEFAULT_EXCLUDE+["id"])
     readonly_fields = [*DEFAULT_FIELDS]
-    list_display = ["link","camera_lens", "camera_model", "group"]
-    search_fields = ["link","camera_lens__name", "camera_model__name", "group__text"]
+    list_display = ["link", "camera_lens", "camera_model", "group"]
+    search_fields = ["link", "camera_lens__name",
+                     "camera_model__name", "group__text"]
 
 
 # @admin.register(CarvingDetail)
@@ -259,6 +284,7 @@ class SHFA3DAdmin(admin.ModelAdmin):
     # autocomplete_fields = ["creators", "site", "institution","keywords", "datings"]
     filter_horizontal = ["creators", "keywords", "datings"]
 
+
 class SHFA3DMeshAdmin(admin.ModelAdmin, DynamicArrayMixin):
     display_raw = True
     fields = get_fields(SHFA3DMesh, exclude=DEFAULT_EXCLUDE+["id"])
@@ -269,13 +295,16 @@ class SHFA3DMeshAdmin(admin.ModelAdmin, DynamicArrayMixin):
     autocomplete_fields = ["group"]
     filter_horizontal = ["weather"]
 
+
 @admin.register(MetadataFormat)
 class MetadataFormatAdmin(admin.ModelAdmin):
     list_display = ["prefix"]
 
+
 @admin.register(ResumptionToken)
 class ResumptionTokenAdmin(admin.ModelAdmin):
-    list_display=["token"]
+    list_display = ["token"]
+
 
 admin.site.register(SHFA3D, SHFA3DAdmin)
 admin.site.register(SHFA3DMesh, SHFA3DMeshAdmin)
