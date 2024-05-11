@@ -559,7 +559,7 @@ class SHFA3D(abstract.AbstractBaseModel):
 class SHFA3DMesh(abstract.AbstractBaseModel):
     mesh_url = models.URLField(max_length=2048, verbose_name=_(
         "URL"), help_text=_("URL to the 3D mesh file"))
-    quality_url = models.URLField(null=True, max_length=2048, verbose_name=_(
+    quality_url = models.URLField(null=True, blank=True, max_length=2048, verbose_name=_(
         "Quality URL"), help_text=_("URL to the 3D mesh quality file"))
     method = models.ForeignKey(MethodTag, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_(
         "Data type"), help_text=_("Method the mesh is derived from, e.g. SfM, laser scanning."))
