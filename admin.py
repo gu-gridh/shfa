@@ -9,12 +9,6 @@ from rangefilter.filters import NumericRangeFilter
 from django.contrib.admin import EmptyFieldListFilter
 from django.conf import settings
 
-
-# class MyWidget(DynamicArrayWidget):
-#     def __init__(self, *args, **kwargs):
-#         kwargs['subwidget_form'] = SHFA3DMesh
-#         super().__init__(*args, **kwargs)
-
 class SiteFilter(AutocompleteFilter):
     title = _('Site')  # display title
     field_name = 'site'  # name of the foreign key field
@@ -44,6 +38,27 @@ class FilenameFilter(AutocompleteFilter):
     title = _('Upload Filename')  # display title
     field_name = 'filename'  # name of the foreign key field
 
+@admin.register(People)
+class PeopleAdmin(admin.ModelAdmin):
+
+    readonly_fields = ['legacy_id']
+    list_display = ["name", "english_translation"]
+    search_fields = ["name", "english_translation"]
+    ordering = ('name',)
+
+@admin.register(KeywordTag)
+class KeywordTagAdmin(admin.ModelAdmin):
+
+    readonly_fields = ['legacy_id']
+    list_display = ["text", "english_translation"]
+    search_fields = ["text", "english_translation"]
+
+@admin.register(DatingTag)
+class DatingTagAdmin(admin.ModelAdmin):
+
+    readonly_fields = ['legacy_id']
+    list_display = ["text", "english_translation"]
+    search_fields = ["text", "english_translation"]
 
 @admin.register(Image)
 class ImageModel(admin.ModelAdmin):
@@ -57,7 +72,7 @@ class ImageModel(admin.ModelAdmin):
     list_display = ['thumbnail_preview', 'site', 'rock_carving_object',
                     'year', 'collection', 'author', 'institution', 'type', 'subtype']
     search_fields = ['site__lamning_id', 'site__raa_id', 'rock_carving_object__name',
-                     'site__municipality__name', 'site__parish__name', 'subtype']
+                     'site__municipality__name', 'site__parish__name', 'subtype__text']
     list_filter = [
         ('year', NumericRangeFilter),
         ('site', EmptyFieldListFilter),
@@ -139,16 +154,6 @@ class AuthorAdmin(admin.ModelAdmin):
     search_fields = ["name", "english_translation"]
     ordering = ('name',)
 
-
-@admin.register(People)
-class PeopleAdmin(admin.ModelAdmin):
-
-    readonly_fields = ['legacy_id']
-    list_display = ["name", "english_translation"]
-    search_fields = ["name", "english_translation"]
-    ordering = ('name',)
-
-
 @admin.register(Collection)
 class CollectionAdmin(admin.ModelAdmin):
 
@@ -183,22 +188,6 @@ class RockCarvingObjectAdmin(admin.ModelAdmin):
     ordering = ('name',)
 
 
-@admin.register(KeywordTag)
-class KeywordTagAdmin(admin.ModelAdmin):
-
-    readonly_fields = ['legacy_id']
-    list_display = ["text", "english_translation"]
-    search_fields = ["text", "english_translation"]
-    # filter_horizontal = ["text"]
-
-
-@admin.register(DatingTag)
-class DatingTagAdmin(admin.ModelAdmin):
-
-    readonly_fields = ['legacy_id']
-    list_display = ["text", "english_translation"]
-    search_fields = ["text", "english_translation"]
-
 # @admin.register(CarvingTag)
 # class CarvingTagAdmin(admin.ModelAdmin):
 
@@ -206,8 +195,6 @@ class DatingTagAdmin(admin.ModelAdmin):
 #     search_fields = ["text", "english_translation"]
 
 # 3D models admin
-
-
 @admin.register(Group)
 class GroupAdmin(admin.ModelAdmin):
     list_display = ["text"]
