@@ -370,6 +370,9 @@ class Image(abstract.AbstractTIFFImageModel):
     dating_tags = models.ManyToManyField(DatingTag, blank=True, related_name="images", verbose_name=_(
         "Datings"), help_text=_("A list of estimated dating(s) of motifs in the image"))
 
+    group = models.ForeignKey("Group", on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_(
+        "Group"), help_text=_("Group of images and visualisations the image belongs to. "))
+
     class Meta:
         verbose_name = _("Image")
         verbose_name_plural = _("Images")
@@ -505,22 +508,6 @@ class CameraMeta(abstract.AbstractBaseModel):
             return self.camera_lens.focal_length * self.camera_model.crop_factor
         else:
             return None
-
-
-# class CarvingDetail(abstract.AbstractBaseModel):
-#     group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Group"), help_text=_("Group name of the corresponding mesh and visualisations"))
-#     keywords = models.ManyToManyField(KeywordTag, blank=True, related_name="carving_details", verbose_name=_("Keywords"), help_text=_("Keywords for motifs present in the data, used for categorisation."))
-#     creator = models.ForeignKey(Author, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Creator"), help_text=_("Creator of the carving detail"))
-#     institution = models.ForeignKey(Institution, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Institution"), help_text=_("Institution of the carving detail"))
-#     date = models.IntegerField(null=True, blank=True, verbose_name=_("Date"), help_text=_("Date of the carving detail"))
-#     geology = models.ForeignKey(Geology, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Geology"), help_text=_("Geology of the carving detail"))
-
-#     class Meta:
-#         verbose_name = _("Carving Detail")
-#         verbose_name_plural = _("Carving Details")
-
-#     def __str__(self) -> str:
-#         return f"{self.group}, {self.date}, {self.creator}"
 
 class SHFA3D(abstract.AbstractBaseModel):
     creators = models.ManyToManyField(People, blank=True, verbose_name=_("Creator"), help_text=_(
