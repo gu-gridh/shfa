@@ -342,7 +342,7 @@ class Image(abstract.AbstractTIFFImageModel):
     author = models.ForeignKey(Author, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_(
         "Image creator"), help_text=_("Creator, photographer or author of the original image."))
     people = models.ManyToManyField(People, blank=True, related_name="images", verbose_name=_(
-        "People"), help_text=_("People in the image, if applicable."))
+        "People"), help_text=_("Creator, photographer or author of the original image, added as individual names."))
     institution = models.ForeignKey(Institution, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_(
         "Institution"), help_text=_("Original institution housing the image."))
     reference = models.CharField(max_length=512, null=True, blank=True, verbose_name=_(
@@ -508,6 +508,7 @@ class CameraMeta(abstract.AbstractBaseModel):
             return self.camera_lens.focal_length * self.camera_model.crop_factor
         else:
             return None
+
 
 class SHFA3D(abstract.AbstractBaseModel):
     creators = models.ManyToManyField(People, blank=True, verbose_name=_("Creator"), help_text=_(
