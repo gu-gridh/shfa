@@ -1,8 +1,9 @@
-from diana.abstract.serializers import DynamicDepthSerializer, GenericSerializer
+from diana.abstract.serializers import DynamicDepthSerializer
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 from . import models
 from diana.utils import get_fields, DEFAULT_FIELDS
 from .models import *
+from rest_framework import serializers
 
 
 class TIFFImageSerializer(DynamicDepthSerializer):
@@ -75,9 +76,50 @@ class SHFA3DMeshSerializer(DynamicDepthSerializer):
         model = SHFA3DMesh
         fields = ['id']+get_fields(SHFA3DMesh, exclude=DEFAULT_FIELDS+['dimensions'])
 
+
+
+class PeopleSerializer(DynamicDepthSerializer):
+
+    class Meta:
+        model = People
+        fields = ['id']+get_fields(People, exclude=DEFAULT_FIELDS)
+
+class KeywordSerializer(DynamicDepthSerializer):
+    class Meta:
+        model = KeywordTag
+        fields = ['id']+get_fields(KeywordTag, exclude=DEFAULT_FIELDS)
+
+class DatingSerializer(DynamicDepthSerializer):
+    class Meta:
+        model = DatingTag
+        fields = ['id']+get_fields(DatingTag, exclude=DEFAULT_FIELDS)
+    
+
+class CreatorsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = People
+        fields = ['id']+get_fields(People, exclude=DEFAULT_FIELDS)
+
+
+class SHFA3DSerializer(DynamicDepthSerializer):
+    creators = CreatorsSerializer(many=True, read_only=True)
+    keywords = KeywordSerializer(many=True, read_only=True)
+    datings = DatingSerializer(many=True, read_only=True)
+    class Meta:
+        model = SHFA3D
+        fields = ['id'] + get_fields(SHFA3D, exclude=DEFAULT_FIELDS)
+
+class VisualizationGroupSerializer(DynamicDepthSerializer):
+    
+    visualization_group = serializers.IntegerField() 
+    shfa_3d_data = SHFA3DSerializer(many=True, read_only=True)
+    class Meta:
+        model = Group
+        fields =['id']+ get_fields(Group, exclude=DEFAULT_FIELDS)+['visualization_group', 'shfa_3d_data']
+        depth=1
 class GeologySerializer(GeoFeatureModelSerializer):
-        
-        class Meta:
-            model = Geology
-            fields = ['id']+get_fields(Geology, exclude=DEFAULT_FIELDS)
-            geo_field = 'coordinates'
+    class Meta:
+        model = Geology
+        fields = ['id']+get_fields(Geology, exclude=DEFAULT_FIELDS)
+        geo_field = 'coordinates'
+

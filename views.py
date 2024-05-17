@@ -1,11 +1,13 @@
 from . import models, serializers
-from django.db.models import Q
+from django.db.models import Q, Count
 from diana.abstract.views import DynamicDepthViewSet, GeoViewSet
 from diana.abstract.models import get_fields, DEFAULT_FIELDS
 from django.views.decorators.csrf import csrf_exempt
 from .oai_cat import *
 from django.contrib.gis.geos import Polygon
 from django.contrib.gis.gdal.envelope import Envelope 
+from functools import reduce
+from django.contrib.postgres.aggregates import ArrayAgg
 
 
 class SiteViewSet(DynamicDepthViewSet):
@@ -34,10 +36,32 @@ class SiteGeoViewSet(GeoViewSet):
 
 # Add 3D views
 
+class SHFA3DViewSet(DynamicDepthViewSet):
+    serializer_class = serializers.SHFA3DSerializer
+    tree_d_data_group = models.Group.objects.all()
+    queryset = models.SHFA3D.objects.all().filter(group_id__in=list(tree_d_data_group.values_list('id', flat=True)))
+    filterset_fields = get_fields(models.SHFA3D, exclude=DEFAULT_FIELDS )
+
+class VisualizationGroupViewset(DynamicDepthViewSet):
+    serializer_class = serializers.VisualizationGroupSerializer
+
+    def get_queryset(self):
+        # Annotate the main queryset with the count of related objects
+        queryset = models.Group.objects.annotate(
+            visualization_group=Count('id'),
+            shfa_3d_data=ArrayAgg('shfa3d__id')  # Assuming SHFA3D has 'id' field
+        )
+        # Fetch related objects for each group and inject into the main queryset
+        for vis_group in queryset:
+            vis_group.visualization_group = len(vis_group.shfa3d_set.all())
+            vis_group.shfa_3d_data = models.SHFA3D.objects.filter(id__in=vis_group.shfa_3d_data)
+        return queryset
+    filterset_fields = get_fields(models.Geology, exclude=DEFAULT_FIELDS+['dimensions', 'creators', 'type', 'type_translation', 'description', 'desc_translation', 'coordinates'])
+
 class GeologyViewSet(GeoViewSet):
     serializer_class = serializers.GeologySerializer
     queryset = models.Geology.objects.all()
-    filterset_fields = get_fields(models.Geology, exclude=DEFAULT_FIELDS + ['coordinates'])
+    filterset_fields = get_fields(models.Geology, exclude=DEFAULT_FIELDS + ['coordinates', ])
 
 
 class SHFA3DMeshViewset(DynamicDepthViewSet):
@@ -50,7 +74,6 @@ class SiteSearchViewSet(GeoViewSet):
     serializer_class = serializers.SiteGeoSerializer
 
     def get_queryset(self):
-
         q = self.request.GET["site_name"]
         images = models.Image.objects.all()
         queryset = models.Site.objects.filter(Q
@@ -216,53 +239,93 @@ class GeneralSearch(DynamicDepthViewSet):
     filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
 # Add mixed search option
+# class AdvancedSearch(DynamicDepthViewSet):
+#     serializer_class = serializers.TIFFImageSerializer
+
+#     def get_queryset(self):
+
+#         query_array = []
+#         if ("site_name" in self.request.GET):
+#             site_name = self.request.GET["site_name"]
+#             query_array.append(Q(site__raa_id__icontains=site_name)
+#                              | Q(site__lamning_id__icontains=site_name) 
+#                              | Q(site__askeladden_id__icontains=site_name) 
+#                              | Q(site__lokalitet_id__icontains=site_name) 
+#                              | Q(site__placename__icontains=site_name)
+#                              | Q(site__ksamsok_id__icontains=site_name)
+#                             )
+                        
+#         if ("keyword" in self.request.GET):
+#             keyword = self.request.GET["keyword"]
+#             query_array.append(Q(keywords__text__icontains=keyword)|Q(keywords__english_translation__icontains=keyword))
+
+#         if ("author_name" in self.request.GET):
+#             author_name = self.request.GET["author_name"]
+#             query_array.append(Q(author__name__icontains=author_name)| Q(author__english_translation__icontains=author_name))
+
+#         if ("dating_tag" in self.request.GET):
+#             dating_tag = self.request.GET["dating_tag"]
+#             query_array.append(Q(dating_tags__text__icontains=dating_tag)| Q(dating_tags__english_translation__icontains=dating_tag))
+
+#         if ("image_type" in self.request.GET):
+#             image_type = self.request.GET["image_type"]
+#             query_array.append(Q(type__text__icontains=image_type) | Q(type__english_translation__icontains=image_type))
+
+#         if ("institution_name" in self.request.GET):
+#             institution_name = self.request.GET["institution_name"]
+#             query_array.append(Q(institution__name__icontains=institution_name))
+
+#         if len(query_array)==0:
+#             pass # User has not provided a single field, throw error
+#         processed_query = query_array[0]
+
+#         for index in range(1, len(query_array)):
+#             processed_query = processed_query & query_array[index]
+#         queryset = models.Image.objects.filter(processed_query & Q(published=True)).order_by('type__order')
+
+#         return queryset
+    
+#     filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
+
+
 class AdvancedSearch(DynamicDepthViewSet):
     serializer_class = serializers.TIFFImageSerializer
 
     def get_queryset(self):
+        query_params = self.request.GET
 
-        query_array = []
-        if ("site_name" in self.request.GET):
-            site_name = self.request.GET["site_name"]
-            query_array.append(Q(site__raa_id__icontains=site_name)
-                             | Q(site__lamning_id__icontains=site_name) 
-                             | Q(site__askeladden_id__icontains=site_name) 
-                             | Q(site__lokalitet_id__icontains=site_name) 
-                             | Q(site__placename__icontains=site_name)
-                             | Q(site__ksamsok_id__icontains=site_name)
-                            )
-                        
-        if ("keyword" in self.request.GET):
-            keyword = self.request.GET["keyword"]
-            query_array.append(Q(keywords__text__icontains=keyword)|Q(keywords__english_translation__icontains=keyword))
+        query_conditions = []
 
-        if ("author_name" in self.request.GET):
-            author_name = self.request.GET["author_name"]
-            query_array.append(Q(author__name__icontains=author_name)| Q(author__english_translation__icontains=author_name))
+        # Define mapping between query params and model fields
+        field_mapping = {
+            "site_name": ["site__raa_id", "site__lamning_id", "site__askeladden_id", 
+                          "site__lokalitet_id", "site__placename", "site__ksamsok_id"],
+            "keyword": ["keywords__text", "keywords__english_translation"],
+            "author_name": ["author__name", "author__english_translation"],
+            "dating_tag": ["dating_tags__text", "dating_tags__english_translation"],
+            "image_type": ["type__text", "type__english_translation"],
+            "institution_name": ["institution__name"]
+        }
 
-        if ("dating_tag" in self.request.GET):
-            dating_tag = self.request.GET["dating_tag"]
-            query_array.append(Q(dating_tags__text__icontains=dating_tag)| Q(dating_tags__english_translation__icontains=dating_tag))
+        for param, fields in field_mapping.items():
+            if param in query_params:
+                value = query_params[param]
+                # Creating OR conditions for each field
+                or_conditions = [Q(**{field + '__icontains': value}) for field in fields]
+                query_conditions.append(reduce(lambda x, y: x | y, or_conditions))
 
-        if ("image_type" in self.request.GET):
-            image_type = self.request.GET["image_type"]
-            query_array.append(Q(type__text__icontains=image_type) | Q(type__english_translation__icontains=image_type))
+        if not query_conditions:
+            # Handle no query parameters provided
+            # You might want to raise an error or return an empty queryset
+            # For now, returning an empty queryset
+            return models.Image.objects.none()
 
-        if ("institution_name" in self.request.GET):
-            institution_name = self.request.GET["institution_name"]
-            query_array.append(Q(institution__name__icontains=institution_name))
-
-        if len(query_array)==0:
-            pass # User has not provided a single field, throw error
-        processed_query = query_array[0]
-
-        for index in range(1, len(query_array)):
-            processed_query = processed_query & query_array[index]
-        queryset = models.Image.objects.filter(processed_query & Q(published=True)).order_by('type__order')
+        queryset = models.Image.objects.filter(reduce(lambda x, y: x & y, query_conditions), published=True).order_by('type__order')
 
         return queryset
     
-    filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
+    filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
+
 
 # VIEW FOR OAI_CAT
 
