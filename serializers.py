@@ -68,7 +68,7 @@ class ImageTypeSerializer(DynamicDepthSerializer):
 
     class Meta:
         model = ImageTypeTag
-        fields = ['id']+get_fields(ImageTypeTag, exclude=DEFAULT_FIELDS)
+        fields = ['id']+get_fields(ImageTypeTag, exclude=DEFAULT_FIELDS)+['creators', 'keywords', 'datings']
 
 class SHFA3DMeshSerializer(DynamicDepthSerializer):
 
@@ -102,21 +102,20 @@ class CreatorsSerializer(serializers.ModelSerializer):
 
 
 class SHFA3DSerializer(DynamicDepthSerializer):
-    creators = CreatorsSerializer(many=True, read_only=True)
-    keywords = KeywordSerializer(many=True, read_only=True)
-    datings = DatingSerializer(many=True, read_only=True)
+
     class Meta:
         model = SHFA3D
-        fields = ['id'] + get_fields(SHFA3D, exclude=DEFAULT_FIELDS)
+        fields = '__all__'  # Include all fields in the SHFA3D model
+
 
 class VisualizationGroupSerializer(DynamicDepthSerializer):
-    
-    visualization_group = serializers.IntegerField() 
-    shfa_3d_data = SHFA3DSerializer(many=True, read_only=True)
+    visualization_group_count = serializers.IntegerField() 
+    shfa_3d_data = SHFA3DSerializer(many=True, read_only=False, source='shfa3d_set')
+
     class Meta:
         model = Group
-        fields =['id']+ get_fields(Group, exclude=DEFAULT_FIELDS)+['visualization_group', 'shfa_3d_data']
-        depth=1
+        fields =['id', 'text', 'visualization_group_count', 'shfa_3d_data']
+        
 class GeologySerializer(GeoFeatureModelSerializer):
     class Meta:
         model = Geology

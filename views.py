@@ -1,5 +1,5 @@
 from . import models, serializers
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Prefetch
 from diana.abstract.views import DynamicDepthViewSet, GeoViewSet
 from diana.abstract.models import get_fields, DEFAULT_FIELDS
 from django.views.decorators.csrf import csrf_exempt
@@ -7,7 +7,7 @@ from .oai_cat import *
 from django.contrib.gis.geos import Polygon
 from django.contrib.gis.gdal.envelope import Envelope 
 from functools import reduce
-from django.contrib.postgres.aggregates import ArrayAgg
+from django.contrib.postgres.aggregates import ArrayAgg, JSONBAgg
 
 
 class SiteViewSet(DynamicDepthViewSet):
@@ -44,20 +44,17 @@ class SHFA3DViewSet(DynamicDepthViewSet):
 
 class VisualizationGroupViewset(DynamicDepthViewSet):
     serializer_class = serializers.VisualizationGroupSerializer
-
+    
     def get_queryset(self):
-        # Annotate the main queryset with the count of related objects
-        queryset = models.Group.objects.annotate(
-            visualization_group=Count('id'),
-            shfa_3d_data=ArrayAgg('shfa3d__id')  # Assuming SHFA3D has 'id' field
-        )
-        # Fetch related objects for each group and inject into the main queryset
-        for vis_group in queryset:
-            vis_group.visualization_group = len(vis_group.shfa3d_set.all())
-            vis_group.shfa_3d_data = models.SHFA3D.objects.filter(id__in=vis_group.shfa_3d_data)
+        # Prefetch related SHFA3D objects
+        shfa_3d = Prefetch('shfa3d_set', queryset=models.SHFA3D.objects.all())
+        # Annotate with the count of related SHFA3D objects
+        queryset = models.Group.objects.all().annotate(
+            visualization_group_count=Count('shfa3d_set')
+        ).prefetch_related(shfa_3d)
+        
         return queryset
-    filterset_fields = get_fields(models.Geology, exclude=DEFAULT_FIELDS+['dimensions', 'creators', 'type', 'type_translation', 'description', 'desc_translation', 'coordinates'])
-
+    
 class GeologyViewSet(GeoViewSet):
     serializer_class = serializers.GeologySerializer
     queryset = models.Geology.objects.all()

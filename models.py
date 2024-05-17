@@ -529,7 +529,7 @@ class SHFA3D(abstract.AbstractBaseModel):
         "3D Mesh"), help_text=_("3D mesh specifications"))
     RTI = models.ForeignKey(RTI, on_delete=models.SET_NULL, null=True,
                             blank=True, verbose_name=_("RTI"), help_text=_("RTI of the 3D model"))
-    group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Group"), help_text=_(
+    group = models.ForeignKey(Group, on_delete=models.SET_NULL, related_name='shfa3d_set', null=True, blank=True, verbose_name=_("Group"), help_text=_(
         "Group of the 3D mesh and corresponding visualisations.  A group should of mesh(es) and visualisations should cover <b>exactly</b> the same area."))
     date = models.DateField(null=True, blank=True, verbose_name=_("Date"), help_text=_(
         "Date of the data collection/fieldwork.  If exact date is unknown, estimate to the closest month and year."))
