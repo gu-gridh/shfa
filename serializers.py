@@ -102,10 +102,13 @@ class CreatorsSerializer(serializers.ModelSerializer):
 
 
 class SHFA3DSerializer(DynamicDepthSerializer):
-
+    creators = CreatorsSerializer(many=True, read_only=True)
+    keywords = KeywordSerializer(many=True, read_only=True)
+    datings = DatingSerializer(many=True, read_only=True)
     class Meta:
         model = SHFA3D
-        fields = '__all__'  # Include all fields in the SHFA3D model
+        fields = ['id'] + get_fields(SHFA3D, exclude=DEFAULT_FIELDS) +['creators', 'keywords', 'datings']
+        # fields = '__all__'  # Include all fields in the SHFA3D model
 
 
 class VisualizationGroupSerializer(DynamicDepthSerializer):
