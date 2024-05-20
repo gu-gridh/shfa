@@ -1,6 +1,5 @@
 from diana.abstract.serializers import DynamicDepthSerializer
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
-from . import models
 from diana.utils import get_fields, DEFAULT_FIELDS
 from .models import *
 from rest_framework import serializers
@@ -99,29 +98,35 @@ class CreatorsSerializer(serializers.ModelSerializer):
     class Meta:
         model = People
         fields = ['id']+get_fields(People, exclude=DEFAULT_FIELDS)
-
-
-class SHFA3DSerializer(DynamicDepthSerializer):
-    creators = CreatorsSerializer(many=True, read_only=True)
-    keywords = KeywordSerializer(many=True, read_only=True)
-    datings = DatingSerializer(many=True, read_only=True)
-    class Meta:
-        model = SHFA3D
-        fields = ['id'] + get_fields(SHFA3D, exclude=DEFAULT_FIELDS) +['creators', 'keywords', 'datings']
-        # fields = '__all__'  # Include all fields in the SHFA3D model
-
-
-class VisualizationGroupSerializer(DynamicDepthSerializer):
-    visualization_group_count = serializers.IntegerField() 
-    shfa_3d_data = SHFA3DSerializer(many=True, read_only=False, source='shfa3d_set')
-
-    class Meta:
-        model = Group
-        fields =['id', 'text', 'visualization_group_count', 'shfa_3d_data']
-        
+    
 class GeologySerializer(GeoFeatureModelSerializer):
     class Meta:
         model = Geology
         fields = ['id']+get_fields(Geology, exclude=DEFAULT_FIELDS)
         geo_field = 'coordinates'
 
+class SHFA3DSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SHFA3D
+        fields = '__all__'
+        depth = 1  # Set a default depth for related objects
+
+class VisualizationGroupSerializer(serializers.ModelSerializer):
+    visualization_group_count = serializers.IntegerField()
+    shfa_3d_data = SHFA3DSerializer(many=True, read_only=True, source='shfa3d_set')
+
+    class Meta:
+        model = Group
+        fields = ['id', 'text', 'visualization_group_count', 'shfa_3d_data']
+        depth = 1  # Ensure a default depth is set
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        depth = self.context.get('depth', 1)
+        if depth > 1:
+            nested_data = []
+            for shfa3d_instance in instance.shfa3d_set.all():
+                nested_representation = SHFA3DSerializer(shfa3d_instance, context={'depth': depth - 1}).data
+                nested_data.append(nested_representation)
+            representation['shfa_3d_data'] = nested_data
+        return representation
