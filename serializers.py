@@ -24,7 +24,6 @@ class SiteGeoSerializer(GeoFeatureModelSerializer):
         fields = ['id']+get_fields(Site, exclude=DEFAULT_FIELDS)
         geo_field = 'coordinates'
 
-
 class KeywordsSerializer(DynamicDepthSerializer):
 
     class Meta:
@@ -75,8 +74,6 @@ class SHFA3DMeshSerializer(DynamicDepthSerializer):
         model = SHFA3DMesh
         fields = ['id']+get_fields(SHFA3DMesh, exclude=DEFAULT_FIELDS+['dimensions'])
 
-
-
 class PeopleSerializer(DynamicDepthSerializer):
 
     class Meta:
@@ -105,19 +102,37 @@ class GeologySerializer(GeoFeatureModelSerializer):
         fields = ['id']+get_fields(Geology, exclude=DEFAULT_FIELDS)
         geo_field = 'coordinates'
 
-class SHFA3DSerializer(serializers.ModelSerializer):
+
+class CameraLensSerializer(DynamicDepthSerializer):
+    class Meta:
+        model = CameraLens
+        fields = ['id']+get_fields(CameraLens, exclude=DEFAULT_FIELDS)
+
+
+class CamerModelSerializer(DynamicDepthSerializer):
+    class Meta:
+        model = CameraModel
+        fields = ['id']+get_fields(CameraModel, exclude=DEFAULT_FIELDS)
+
+class CameraSpecificationSerializer(DynamicDepthSerializer):
+    class Meta:
+        model = CameraMeta
+        fields = ['id']+get_fields(CameraMeta, exclude=DEFAULT_FIELDS)
+
+class SHFA3DSerializer(DynamicDepthSerializer):
     class Meta:
         model = SHFA3D
-        fields = '__all__'
+        fields = ['id']+get_fields(SHFA3D, exclude=DEFAULT_FIELDS)
         depth = 1  # Set a default depth for related objects
 
-class VisualizationGroupSerializer(serializers.ModelSerializer):
+class VisualizationGroupSerializer(DynamicDepthSerializer):
     visualization_group_count = serializers.IntegerField()
     shfa_3d_data = SHFA3DSerializer(many=True, read_only=True, source='shfa3d_set')
 
     class Meta:
         model = Group
         fields = ['id', 'text', 'visualization_group_count', 'shfa_3d_data']
+        # fields += get_fields(Group, exclude=DEFAULT_FIELDS)
         depth = 1  # Ensure a default depth is set
 
     def to_representation(self, instance):

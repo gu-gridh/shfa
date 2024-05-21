@@ -39,7 +39,7 @@ class SiteGeoViewSet(GeoViewSet):
 class SHFA3DViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SHFA3DSerializer
     tree_d_data_group = models.Group.objects.all()
-    queryset = models.SHFA3D.objects.all().filter(
+    queryset = models.SHFA3D.objects.filter(
         group_id__in=list(tree_d_data_group.values_list('id', flat=True)))
     filterset_fields = get_fields(models.SHFA3D, exclude=DEFAULT_FIELDS)
 
