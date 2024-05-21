@@ -62,9 +62,9 @@ class VisualizationGroupViewset(DynamicDepthViewSet):
             depth = 1
         context['depth'] = depth
         return context
-    
-    filterset_fields = get_fields(models.Group, exclude=DEFAULT_FIELDS)
 
+    filterset_fields = get_fields(models.Group, exclude=DEFAULT_FIELDS)
+    
 class GeologyViewSet(GeoViewSet):
     serializer_class = serializers.GeologySerializer
     queryset = models.Geology.objects.all()
