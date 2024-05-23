@@ -119,15 +119,26 @@ class CameraSpecificationSerializer(DynamicDepthSerializer):
         model = CameraMeta
         fields = ['id']+get_fields(CameraMeta, exclude=DEFAULT_FIELDS)
 
+class SiteSerializerExcludeCoordinates(serializers.ModelSerializer):
+    class Meta:
+        model = Site
+        exclude = ['coordinates']  # Exclude the coordinates field
+
 class SHFA3DSerializer(DynamicDepthSerializer):
     class Meta:
         model = SHFA3D
         fields = ['id']+get_fields(SHFA3D, exclude=DEFAULT_FIELDS)
         depth = 1  # Set a default depth for related objects
 
+class SHFA3DSerializerExcludeCoordinates(DynamicDepthSerializer):
+    site=SiteSerializerExcludeCoordinates()
+    class Meta:
+        model = SHFA3D
+        fields = ['id']+get_fields(SHFA3D, exclude=DEFAULT_FIELDS)
+        
 class VisualizationGroupSerializer(DynamicDepthSerializer):
     visualization_group_count = serializers.IntegerField()
-    shfa_3d_data = SHFA3DSerializer(many=True, read_only=True, source='shfa3d_set')
+    shfa_3d_data = SHFA3DSerializerExcludeCoordinates(many=True, read_only=True, source='shfa3d_set')
 
     class Meta:
         model = Group
@@ -141,7 +152,7 @@ class VisualizationGroupSerializer(DynamicDepthSerializer):
         if depth > 1:
             nested_data = []
             for shfa3d_instance in instance.shfa3d_set.all():
-                nested_representation = SHFA3DSerializer(shfa3d_instance, context={'depth': depth - 1}).data
+                nested_representation = SHFA3DSerializerExcludeCoordinates(shfa3d_instance, context={'depth': depth - 1}).data
                 nested_data.append(nested_representation)
             representation['shfa_3d_data'] = nested_data
         return representation
