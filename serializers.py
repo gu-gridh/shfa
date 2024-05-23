@@ -135,15 +135,21 @@ class SHFA3DSerializerExcludeCoordinates(DynamicDepthSerializer):
     class Meta:
         model = SHFA3D
         fields = ['id']+get_fields(SHFA3D, exclude=DEFAULT_FIELDS)
-        
+
+class TIFFImageExcludeSiteSerializer(DynamicDepthSerializer):
+
+    class Meta:
+        model = Image
+        fields = ['id']+get_fields(Image, exclude=['created_at', 'updated_at', 'site'])
+
 class VisualizationGroupSerializer(DynamicDepthSerializer):
     visualization_group_count = serializers.IntegerField()
     shfa_3d_data = SHFA3DSerializerExcludeCoordinates(many=True, read_only=True, source='shfa3d_set')
+    colour_images = TIFFImageExcludeSiteSerializer(many=True, read_only=True, source='images_set')
 
     class Meta:
         model = Group
-        fields = ['id', 'text', 'visualization_group_count', 'shfa_3d_data']
-        # fields += get_fields(Group, exclude=DEFAULT_FIELDS)
+        fields = ['id', 'text', 'visualization_group_count', 'shfa_3d_data', 'colour_images']
         depth = 1  # Ensure a default depth is set
 
     def to_representation(self, instance):
@@ -151,8 +157,13 @@ class VisualizationGroupSerializer(DynamicDepthSerializer):
         depth = self.context.get('depth', 1)
         if depth > 1:
             nested_data = []
+            images_nested_data = [] 
             for shfa3d_instance in instance.shfa3d_set.all():
                 nested_representation = SHFA3DSerializerExcludeCoordinates(shfa3d_instance, context={'depth': depth - 1}).data
                 nested_data.append(nested_representation)
             representation['shfa_3d_data'] = nested_data
+            for image_instance in instance.images_set.all():
+                nested_representation = TIFFImageExcludeSiteSerializer(image_instance, context={'depth': depth - 1}).data
+                images_nested_data.append(nested_representation)
+            representation['colour_images'] = images_nested_data
         return representation

@@ -371,7 +371,7 @@ class Image(abstract.AbstractTIFFImageModel):
         "Datings"), help_text=_("A list of estimated dating(s) of motifs in the image"))
 
     group = models.ForeignKey("Group", on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_(
-        "Group"), help_text=_("Group of images and visualisations the image belongs to. "))
+        "Group"),  related_name='images_set', help_text=_("Group of images and visualisations the image belongs to. "))
 
     class Meta:
         verbose_name = _("Image")
