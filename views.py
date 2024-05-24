@@ -48,7 +48,7 @@ class VisualizationGroupViewset(DynamicDepthViewSet):
 
     def get_queryset(self):
         shfa3d_prefetch = Prefetch('shfa3d_set', queryset=models.SHFA3D.objects.all())
-        images_prefetch = Prefetch('images_set', queryset=models.Image.objects.all().order_by('subtype__id'))
+        images_prefetch = Prefetch('images_set', queryset=models.Image.objects.all().order_by('subtype__order'))
 
         queryset = models.Group.objects.all().annotate(
             visualization_group_count=Count('shfa3d_set')
