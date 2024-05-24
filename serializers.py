@@ -66,7 +66,7 @@ class ImageTypeSerializer(DynamicDepthSerializer):
 
     class Meta:
         model = ImageTypeTag
-        fields = ['id']+get_fields(ImageTypeTag, exclude=DEFAULT_FIELDS)+['creators', 'keywords', 'datings']
+        fields = ['id']+get_fields(ImageTypeTag, exclude=DEFAULT_FIELDS)
 
 class SHFA3DMeshSerializer(DynamicDepthSerializer):
 
