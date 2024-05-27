@@ -115,9 +115,14 @@ class CamerModelSerializer(DynamicDepthSerializer):
         fields = ['id']+get_fields(CameraModel, exclude=DEFAULT_FIELDS)
 
 class CameraSpecificationSerializer(DynamicDepthSerializer):
+    mm35_equivalent = serializers.SerializerMethodField()
+
     class Meta:
         model = CameraMeta
-        fields = ['id']+get_fields(CameraMeta, exclude=DEFAULT_FIELDS)
+        fields = ['id']+get_fields(CameraMeta, exclude=DEFAULT_FIELDS)+['mm35_equivalent']
+    
+    def get_mm35_equivalent(self, obj):
+        return obj.mm35_equivalent
 
 class SiteSerializerExcludeCoordinates(serializers.ModelSerializer):
     class Meta:
@@ -132,6 +137,7 @@ class SHFA3DSerializer(DynamicDepthSerializer):
 
 class SHFA3DSerializerExcludeCoordinates(DynamicDepthSerializer):
     site=SiteSerializerExcludeCoordinates()
+    image = CameraSpecificationSerializer()
     class Meta:
         model = SHFA3D
         fields = ['id']+get_fields(SHFA3D, exclude=DEFAULT_FIELDS)
@@ -146,7 +152,6 @@ class VisualizationGroupSerializer(DynamicDepthSerializer):
     visualization_group_count = serializers.IntegerField()
     shfa_3d_data = SHFA3DSerializerExcludeCoordinates(many=True, read_only=True, source='shfa3d_set')
     colour_images = TIFFImageExcludeSiteSerializer(many=True, read_only=True, source='images_set')
-
     class Meta:
         model = Group
         fields = ['id', 'text', 'visualization_group_count', 'shfa_3d_data', 'colour_images']

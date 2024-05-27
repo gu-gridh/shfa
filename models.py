@@ -495,19 +495,19 @@ class CameraMeta(abstract.AbstractBaseModel):
     group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_(
         "Group"), help_text=_("Visualisation Group of the images"))
 
+    @property
+    def mm35_equivalent(self):
+        if self.camera_lens and self.camera_model and self.camera_lens.focal_length is not None and self.camera_model.crop_factor is not None:
+            return self.camera_lens.focal_length * self.camera_model.crop_factor
+        else:
+            return None
+    
     class Meta:
         verbose_name = _("Camera Specification")
         verbose_name_plural = _("Camera Specifications")
 
     def __str__(self) -> str:
         return f"{self.link}, {self.group}"
-
-    @property
-    def mm35_equivalent(self):
-        if self.camera_lens and self.camera_model:
-            return self.camera_lens.focal_length * self.camera_model.crop_factor
-        else:
-            return None
 
 
 class SHFA3D(abstract.AbstractBaseModel):

@@ -242,24 +242,18 @@ class CameraModelAdmin(admin.ModelAdmin):
     list_display = ["name", ]
     search_fields = ["name", "lens__name"]
 
-
-@admin.register(CameraMeta)
 class CameraMetaAdmin(admin.ModelAdmin):
-    fields = get_fields(CameraMeta, exclude=DEFAULT_EXCLUDE+["id"])
+    fields = get_fields(CameraMeta, exclude=DEFAULT_EXCLUDE + ["id"])
     readonly_fields = [*DEFAULT_FIELDS]
-    list_display = ["link", "camera_lens", "camera_model", "group"]
-    search_fields = ["link", "camera_lens__name",
-                     "camera_model__name", "group__text"]
+    list_display = ["link", "camera_lens", "camera_model", "group", "mm35_equivalent_display"]
+    search_fields = ["link", "camera_lens__name", "camera_model__name", "group__text"]
 
+    def mm35_equivalent_display(self, obj):
+        return obj.mm35_equivalent
 
-# @admin.register(CarvingDetail)
-# class CarvingDetailAdmin(admin.ModelAdmin):
-#     fields = get_fields(CarvingDetail, exclude=DEFAULT_EXCLUDE+["id"])
-#     readonly_fields = [*DEFAULT_FIELDS]
-#     list_display = ["group", "creator", "date", "institution"]
-#     search_fields = ["group__text", "creator__name", "date", "institution__name"]
-#     list_filter = ["group", "creator", "date", "institution"]
-#     autocomplete_fields = ["group", "creator", "institution", "keywords"]
+    mm35_equivalent_display.short_description = '35mm Equivalent'
+
+admin.site.register(CameraMeta, CameraMetaAdmin)
 
 class SHFA3DAdmin(admin.ModelAdmin):
     # display_raw = True
