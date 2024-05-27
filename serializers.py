@@ -116,10 +116,12 @@ class CamerModelSerializer(DynamicDepthSerializer):
 
 class CameraSpecificationSerializer(DynamicDepthSerializer):
     mm35_equivalent = serializers.SerializerMethodField()
-
+    camera_lens = CameraLensSerializer()
+    camera_model = CamerModelSerializer()
     class Meta:
         model = CameraMeta
         fields = ['id']+get_fields(CameraMeta, exclude=DEFAULT_FIELDS)+['mm35_equivalent']
+
     
     def get_mm35_equivalent(self, obj):
         return obj.mm35_equivalent
@@ -130,6 +132,7 @@ class SiteSerializerExcludeCoordinates(serializers.ModelSerializer):
         exclude = ['coordinates']  # Exclude the coordinates field
 
 class SHFA3DSerializer(DynamicDepthSerializer):
+
     class Meta:
         model = SHFA3D
         fields = ['id']+get_fields(SHFA3D, exclude=DEFAULT_FIELDS)
@@ -137,10 +140,10 @@ class SHFA3DSerializer(DynamicDepthSerializer):
 
 class SHFA3DSerializerExcludeCoordinates(DynamicDepthSerializer):
     site=SiteSerializerExcludeCoordinates()
-    # image = CameraSpecificationSerializer()
+    image = CameraSpecificationSerializer()
     class Meta:
         model = SHFA3D
-        fields = ['id']+get_fields(SHFA3D, exclude=DEFAULT_FIELDS)
+        fields = ['id']+get_fields(SHFA3D, exclude=DEFAULT_FIELDS)+['image']
 
 class TIFFImageExcludeSiteSerializer(DynamicDepthSerializer):
 
