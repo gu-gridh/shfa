@@ -81,9 +81,16 @@ class SHFA3DMeshViewset(DynamicDepthViewSet):
     filterset_fields = get_fields(
         models.SHFA3DMesh, exclude=DEFAULT_FIELDS + ['dimensions'])
 
+
+class CameraSpecificationViewSet(DynamicDepthViewSet):
+    serializer_class = serializers.CameraSpecificationSerializer
+    queryset = models.CameraMeta.objects.all()
+    filterset_fields = get_fields(
+        models.CameraMeta, exclude=DEFAULT_FIELDS)  
+    
+    
+
   # Search views
-
-
 class SiteSearchViewSet(GeoViewSet):
     serializer_class = serializers.SiteGeoSerializer
 
@@ -268,56 +275,6 @@ class GeneralSearch(DynamicDepthViewSet):
 
     filterset_fields = [
         'id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
-
-# Add mixed search option
-# class AdvancedSearch(DynamicDepthViewSet):
-#     serializer_class = serializers.TIFFImageSerializer
-
-#     def get_queryset(self):
-
-#         query_array = []
-#         if ("site_name" in self.request.GET):
-#             site_name = self.request.GET["site_name"]
-#             query_array.append(Q(site__raa_id__icontains=site_name)
-#                              | Q(site__lamning_id__icontains=site_name)
-#                              | Q(site__askeladden_id__icontains=site_name)
-#                              | Q(site__lokalitet_id__icontains=site_name)
-#                              | Q(site__placename__icontains=site_name)
-#                              | Q(site__ksamsok_id__icontains=site_name)
-#                             )
-
-#         if ("keyword" in self.request.GET):
-#             keyword = self.request.GET["keyword"]
-#             query_array.append(Q(keywords__text__icontains=keyword)|Q(keywords__english_translation__icontains=keyword))
-
-#         if ("author_name" in self.request.GET):
-#             author_name = self.request.GET["author_name"]
-#             query_array.append(Q(author__name__icontains=author_name)| Q(author__english_translation__icontains=author_name))
-
-#         if ("dating_tag" in self.request.GET):
-#             dating_tag = self.request.GET["dating_tag"]
-#             query_array.append(Q(dating_tags__text__icontains=dating_tag)| Q(dating_tags__english_translation__icontains=dating_tag))
-
-#         if ("image_type" in self.request.GET):
-#             image_type = self.request.GET["image_type"]
-#             query_array.append(Q(type__text__icontains=image_type) | Q(type__english_translation__icontains=image_type))
-
-#         if ("institution_name" in self.request.GET):
-#             institution_name = self.request.GET["institution_name"]
-#             query_array.append(Q(institution__name__icontains=institution_name))
-
-#         if len(query_array)==0:
-#             pass # User has not provided a single field, throw error
-#         processed_query = query_array[0]
-
-#         for index in range(1, len(query_array)):
-#             processed_query = processed_query & query_array[index]
-#         queryset = models.Image.objects.filter(processed_query & Q(published=True)).order_by('type__order')
-
-#         return queryset
-
-#     filterset_fields = ['id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
-
 
 class AdvancedSearch(DynamicDepthViewSet):
     serializer_class = serializers.TIFFImageSerializer

@@ -31,6 +31,7 @@ router.register(rf'{endpoint}/visualization_groups', views.VisualizationGroupVie
 router.register(rf'{endpoint}/shfa3d', views.SHFA3DViewSet, basename='3D models')
 router.register(rf'{endpoint}/shfa3dmesh', views.SHFA3DMeshViewset, basename='3D meshes')
 router.register(rf'{endpoint}/geology', views.GeologyViewSet, basename='geology')
+router.register(rf'{endpoint}/camerameta', views.CameraSpecificationViewSet, basename='camera meta data')
 
 
 urlpatterns = [

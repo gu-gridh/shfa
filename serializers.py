@@ -137,7 +137,7 @@ class SHFA3DSerializer(DynamicDepthSerializer):
 
 class SHFA3DSerializerExcludeCoordinates(DynamicDepthSerializer):
     site=SiteSerializerExcludeCoordinates()
-    image = CameraSpecificationSerializer()
+    # image = CameraSpecificationSerializer()
     class Meta:
         model = SHFA3D
         fields = ['id']+get_fields(SHFA3D, exclude=DEFAULT_FIELDS)
