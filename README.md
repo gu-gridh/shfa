@@ -1,5 +1,5 @@
 # SHFA
-This is an application for the CDH Django database coordination solution Diana.
+This is an application for the GRIDH Django database coordination solution Diana.
 
 ## Data
 The data was created from JSON files with a predetermined structure. To load the data, use the `load_shfa` management command:
