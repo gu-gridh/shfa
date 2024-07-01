@@ -36,6 +36,8 @@ class SiteGeoViewSet(GeoViewSet):
     bbox_filter_include_overlapping = True
 
 # Add 3D views
+
+
 class SHFA3DViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SHFA3DSerializer
     tree_d_data_group = models.Group.objects.all()
@@ -43,17 +45,20 @@ class SHFA3DViewSet(DynamicDepthViewSet):
         group_id__in=list(tree_d_data_group.values_list('id', flat=True)))
     filterset_fields = get_fields(models.SHFA3D, exclude=DEFAULT_FIELDS)
 
+
 class VisualizationGroupViewset(DynamicDepthViewSet):
     serializer_class = serializers.VisualizationGroupSerializer
 
     def get_queryset(self):
-        shfa3d_prefetch = Prefetch('shfa3d_set', queryset=models.SHFA3D.objects.all())
-        images_prefetch = Prefetch('images_set', queryset=models.Image.objects.all().order_by('subtype__order'))
+        shfa3d_prefetch = Prefetch(
+            'shfa3d_set', queryset=models.SHFA3D.objects.all())
+        images_prefetch = Prefetch(
+            'images_set', queryset=models.Image.objects.all().order_by('subtype__order'))
 
         queryset = models.Group.objects.all().annotate(
             visualization_group_count=Count('shfa3d_set')
         ).prefetch_related(shfa3d_prefetch, images_prefetch)
-        
+
         return queryset
 
     def get_serializer_context(self):
@@ -67,7 +72,8 @@ class VisualizationGroupViewset(DynamicDepthViewSet):
         return context
 
     filterset_fields = get_fields(models.Group, exclude=DEFAULT_FIELDS)
-    
+
+
 class GeologyViewSet(GeoViewSet):
     serializer_class = serializers.GeologySerializer
     queryset = models.Geology.objects.all()
@@ -86,11 +92,11 @@ class CameraSpecificationViewSet(DynamicDepthViewSet):
     serializer_class = serializers.CameraSpecificationSerializer
     queryset = models.CameraMeta.objects.all()
     filterset_fields = get_fields(
-        models.CameraMeta, exclude=DEFAULT_FIELDS)  
-    
-    
+        models.CameraMeta, exclude=DEFAULT_FIELDS)
 
   # Search views
+
+
 class SiteSearchViewSet(GeoViewSet):
     serializer_class = serializers.SiteGeoSerializer
 
@@ -209,6 +215,22 @@ class SearchAuthor(DynamicDepthViewSet):
         return queryset
 
 
+class SearchPeople(DynamicDepthViewSet):
+    serializer_class = serializers.PeopleSerializer
+
+    def get_queryset(self):
+        q = self.request.GET["auhtor_name"]
+        language = self.request.GET["language"]
+        if language == "sv":
+            queryset = models.People.objects.filter(
+                name__icontains=q).order_by('name')
+        else:
+            queryset = models.People.objects.filter(
+                english_translation__icontains=q).order_by('name')
+
+        return queryset
+
+
 class SearchInstitution(DynamicDepthViewSet):
     serializer_class = serializers.InstitutionSerializer
 
@@ -275,6 +297,7 @@ class GeneralSearch(DynamicDepthViewSet):
 
     filterset_fields = [
         'id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
+
 
 class AdvancedSearch(DynamicDepthViewSet):
     serializer_class = serializers.TIFFImageSerializer
