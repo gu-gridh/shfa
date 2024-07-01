@@ -179,11 +179,10 @@ class SearchKeywords(DynamicDepthViewSet):
         language = self.request.GET["language"]
         if language == "sv":
             queryset = models.KeywordTag.objects.filter(
-                text__icontains=q).order_by('text')
+                Q(text__icontains=q) | Q(category__icontains=q)).distinct().order_by('text', 'category')
         else:
-            queryset = models.KeywordTag.objects.filter(
-                english_translation__icontains=q).order_by('text')
-
+            queryset = models.KeywordTag.objects.filter(Q(english_translation__icontains=q) | Q(
+                category_translation__icontains=q)).distinct().order_by('text', 'category')
         return queryset
 
 
@@ -290,6 +289,8 @@ class GeneralSearch(DynamicDepthViewSet):
                                                | Q(site__placename__icontains=q)
                                                | Q(keywords__text__icontains=q)
                                                | Q(keywords__english_translation__icontains=q)
+                                               | Q(keywords__category__icontains=q)
+                                               | Q(keywords__category_translation__icontains=q)
                                                | Q(rock_carving_object__name__icontains=q)
                                                | Q(institution__name__icontains=q)
                                                ).filter(published=True).distinct().order_by('type__order')
@@ -311,7 +312,7 @@ class AdvancedSearch(DynamicDepthViewSet):
         field_mapping = {
             "site_name": ["site__raa_id", "site__lamning_id", "site__askeladden_id",
                           "site__lokalitet_id", "site__placename", "site__ksamsok_id"],
-            "keyword": ["keywords__text", "keywords__english_translation"],
+            "keyword": ["keywords__text", "keywords__english_translation", "keywords__category", "keywords__category_translation"],
             "author_name": ["people__name", "people__english_translation"],
             "dating_tag": ["dating_tags__text", "dating_tags__english_translation"],
             "image_type": ["type__text", "type__english_translation"],
