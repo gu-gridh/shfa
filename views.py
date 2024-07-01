@@ -279,8 +279,8 @@ class GeneralSearch(DynamicDepthViewSet):
         q = self.request.GET["q"]
         queryset = models.Image.objects.filter(Q(dating_tags__text__icontains=q)
                                                | Q(dating_tags__english_translation__icontains=q)
-                                               | Q(author__name__icontains=q)
-                                               | Q(author__english_translation__icontains=q)
+                                               | Q(people__name__icontains=q)
+                                               | Q(people__english_translation__icontains=q)
                                                | Q(type__text__icontains=q)
                                                | Q(type__english_translation__icontains=q)
                                                | Q(site__raa_id__icontains=q)
@@ -312,7 +312,7 @@ class AdvancedSearch(DynamicDepthViewSet):
             "site_name": ["site__raa_id", "site__lamning_id", "site__askeladden_id",
                           "site__lokalitet_id", "site__placename", "site__ksamsok_id"],
             "keyword": ["keywords__text", "keywords__english_translation"],
-            "author_name": ["author__name", "author__english_translation"],
+            "author_name": ["people__name", "people__english_translation"],
             "dating_tag": ["dating_tags__text", "dating_tags__english_translation"],
             "image_type": ["type__text", "type__english_translation"],
             "institution_name": ["institution__name"]
