@@ -501,7 +501,7 @@ class CameraMeta(abstract.AbstractBaseModel):
             return self.camera_lens.focal_length * self.camera_model.crop_factor
         else:
             return None
-    
+
     class Meta:
         verbose_name = _("Camera Specification")
         verbose_name_plural = _("Camera Specifications")
@@ -520,7 +520,7 @@ class SHFA3D(abstract.AbstractBaseModel):
     # carving = models.ForeignKey(CarvingTag, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Carving"), help_text=_("Carving of the 3D model"))
     keywords = models.ManyToManyField(KeywordTag, blank=True, related_name="three_d_models", verbose_name=_(
         "Keywords"), help_text=_("Keywords for motifs in the 3D model and visualisations, used for categorisation."))
-    datings = models.ManyToManyField(DatingTag, related_name="three_d_models", verbose_name=_("Datings"), help_text=_(
+    datings = models.ManyToManyField(DatingTag, null=True, blank=True, related_name="three_d_models", verbose_name=_("Datings"), help_text=_(
         "Estimated dating(s) for motifs in the 3D model and visualisations, used for categorisation."))
     # image_subtype = models.ForeignKey(ImageSubType, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Image type"), help_text=_("Type of image medium, material or origin."))
     image = models.ForeignKey(CameraMeta, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_(
@@ -572,7 +572,7 @@ class SHFA3DMesh(abstract.AbstractBaseModel):
         return f"{self.mesh_url}, {self.group}"
 
     def __str__(self):
-        return str(self.dimensions)
+        return str(self.group)
 
 
 # Models For OAI_PMH
