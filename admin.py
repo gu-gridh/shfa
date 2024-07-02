@@ -9,6 +9,7 @@ from rangefilter.filters import NumericRangeFilter
 from django.contrib.admin import EmptyFieldListFilter
 from django.conf import settings
 
+
 class SiteFilter(AutocompleteFilter):
     title = _('Site')  # display title
     field_name = 'site'  # name of the foreign key field
@@ -38,6 +39,7 @@ class FilenameFilter(AutocompleteFilter):
     title = _('Upload Filename')  # display title
     field_name = 'filename'  # name of the foreign key field
 
+
 @admin.register(People)
 class PeopleAdmin(admin.ModelAdmin):
 
@@ -46,6 +48,7 @@ class PeopleAdmin(admin.ModelAdmin):
     search_fields = ["name", "english_translation"]
     ordering = ('name',)
 
+
 @admin.register(KeywordTag)
 class KeywordTagAdmin(admin.ModelAdmin):
 
@@ -53,12 +56,14 @@ class KeywordTagAdmin(admin.ModelAdmin):
     list_display = ["text", "english_translation"]
     search_fields = ["text", "english_translation"]
 
+
 @admin.register(DatingTag)
 class DatingTagAdmin(admin.ModelAdmin):
 
     readonly_fields = ['legacy_id']
     list_display = ["text", "english_translation"]
     search_fields = ["text", "english_translation"]
+
 
 @admin.register(Image)
 class ImageModel(admin.ModelAdmin):
@@ -154,6 +159,7 @@ class AuthorAdmin(admin.ModelAdmin):
     search_fields = ["name", "english_translation"]
     ordering = ('name',)
 
+
 @admin.register(Collection)
 class CollectionAdmin(admin.ModelAdmin):
 
@@ -242,24 +248,29 @@ class CameraModelAdmin(admin.ModelAdmin):
     list_display = ["name", ]
     search_fields = ["name", "lens__name"]
 
+
 class CameraMetaAdmin(admin.ModelAdmin):
     fields = get_fields(CameraMeta, exclude=DEFAULT_EXCLUDE + ["id"])
     readonly_fields = [*DEFAULT_FIELDS]
-    list_display = ["link", "camera_lens", "camera_model", "group", "mm35_equivalent_display"]
-    search_fields = ["link", "camera_lens__name", "camera_model__name", "group__text"]
+    list_display = ["link", "camera_lens", "camera_model",
+                    "group", "mm35_equivalent_display"]
+    search_fields = ["link", "camera_lens__name",
+                     "camera_model__name", "group__text"]
 
     def mm35_equivalent_display(self, obj):
         return obj.mm35_equivalent
 
     mm35_equivalent_display.short_description = '35mm Equivalent'
 
+
 admin.site.register(CameraMeta, CameraMetaAdmin)
+
 
 class SHFA3DAdmin(admin.ModelAdmin):
     # display_raw = True
     fields = get_fields(SHFA3D, exclude=DEFAULT_EXCLUDE+["id"])
     readonly_fields = [*DEFAULT_FIELDS]
-    list_display = ["site", "institution"]
+    list_display = ["site", "institution", "group"]
     search_fields = ["creators__name", "site__placename", "institution__name"]
     list_filter = ["creators", "site", "institution"]
     # autocomplete_fields = ["creators", "site", "institution","keywords", "datings"]
