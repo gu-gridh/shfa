@@ -293,7 +293,7 @@ class GeneralSearch(DynamicDepthViewSet):
                                                | Q(keywords__category_translation__icontains=q)
                                                | Q(rock_carving_object__name__icontains=q)
                                                | Q(institution__name__icontains=q)
-                                               ).filter(published=True).distinct().order_by('type__order')
+                                               ).filter(published=True).distinct().order_by('-id', 'type__order')
         return queryset
 
     filterset_fields = [
@@ -335,7 +335,7 @@ class AdvancedSearch(DynamicDepthViewSet):
             return models.Image.objects.none()
 
         queryset = models.Image.objects.filter(reduce(
-            lambda x, y: x & y, query_conditions), published=True).order_by('type__order')
+            lambda x, y: x & y, query_conditions), published=True).order_by('-id', 'type__order')
 
         return queryset
 
