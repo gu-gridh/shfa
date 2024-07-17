@@ -8,6 +8,7 @@ from admin_auto_filters.filters import AutocompleteFilter
 from rangefilter.filters import NumericRangeFilter
 from django.contrib.admin import EmptyFieldListFilter
 from django.conf import settings
+import mapwidgets
 
 
 class SiteFilter(AutocompleteFilter):
@@ -111,7 +112,7 @@ class ImageModel(admin.ModelAdmin):
 
 
 @admin.register(Site)
-class SiteAdmin(admin.GISModelAdmin):
+class SiteAdmin(admin.ModelAdmin):
     fields = get_fields(Site, exclude=DEFAULT_EXCLUDE+["id"])
     readonly_fields = [*DEFAULT_FIELDS]
     list_display = ['raa_id', 'lamning_id', 'lokalitet_id',
@@ -119,6 +120,10 @@ class SiteAdmin(admin.GISModelAdmin):
     search_fields = ['raa_id', 'lamning_id',
                      'askeladden_id', 'lokalitet_id', 'placename']
     ordering = ('raa_id', 'placename')
+    formfield_overrides = {
+        models.PointField: {"widget": mapwidgets.LeafletPointFieldWidget}
+    }
+
     # filter_horizontal = ['raa_id', 'lamning_id', 'askeladden_id', 'lokalitet_id','placename']
     # def get_search_results(self, request, queryset, search_term):
     #     queryset, use_distinct = super().get_search_results(request, queryset, search_term)
