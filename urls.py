@@ -17,11 +17,11 @@ router.register(rf'{endpoint}/compilation',
 
 # urls for advanced search options
 router.register(rf'{endpoint}/search/site',
-                views.SiteSearchViewSet, basename='site')
+                views.SiteSearchViewSet, basename='search site')
 router.register(rf'{endpoint}/search/image',
                 views.SearchBoundingBoxImageViewSet, basename='bounding box image')
 router.register(rf'{endpoint}/search/type',
-                views.TypeSearchViewSet, basename='site')
+                views.TypeSearchViewSet, basename='site type')
 router.register(rf'{endpoint}/search/keywords',
                 views.SearchKeywords, basename='keywords')
 router.register(rf'{endpoint}/search/carving',
@@ -39,7 +39,7 @@ router.register(rf'{endpoint}/search', views.GeneralSearch, basename='search')
 
 # urls for the 3D models
 router.register(rf'{endpoint}/visualization_groups',
-                views.VisualizationGroupViewset, basename='3D models')
+                views.VisualizationGroupViewset, basename='Visualization 3D models')
 router.register(rf'{endpoint}/shfa3d',
                 views.SHFA3DViewSet, basename='3D models')
 router.register(rf'{endpoint}/shfa3dmesh',
