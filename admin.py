@@ -11,6 +11,26 @@ from django.conf import settings
 import mapwidgets
 
 
+MAP_WIDGETS = {
+    "Leaflet": {
+        "PointField": {
+            "interactive": {
+                "mapOptions": {
+                    "zoom": 5,
+                    "scrollWheelZoom": True,
+                    "center": (57.124093162383616, 7.830100815389867),
+                },
+                "tileLayer": {
+                    "urlTemplate": "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                    "options": {"maxZoom": 20},
+                },
+            }
+        },
+        "markerFitZoom": 14,
+    }
+}
+
+
 class SiteFilter(AutocompleteFilter):
     title = _('Site')  # display title
     field_name = 'site'  # name of the foreign key field
@@ -121,7 +141,8 @@ class SiteAdmin(admin.ModelAdmin):
                      'askeladden_id', 'lokalitet_id', 'placename']
     ordering = ('raa_id', 'placename')
     formfield_overrides = {
-        models.PointField: {"widget": mapwidgets.LeafletPointFieldWidget}
+        models.PointField: {
+            "widget": mapwidgets.LeafletPointFieldWidget(settings=MAP_WIDGETS)}
     }
 
     # filter_horizontal = ['raa_id', 'lamning_id', 'askeladden_id', 'lokalitet_id','placename']
