@@ -73,12 +73,11 @@ class ImageModel(admin.ModelAdmin):
     readonly_fields = ['legacy_id', 'iiif_file',
                        'uuid', 'image_preview', *DEFAULT_FIELDS]
     autocomplete_fields = ['site', 'collection', 'author', 'institution',
-                           'type', 'keywords', 'rock_carving_object',
-                           'dating_tags', 'subtype']
+                           'type', 'rock_carving_object', 'subtype']
     list_display = ['thumbnail_preview', 'site', 'rock_carving_object',
-                    'year', 'collection', 'author', 'institution', 'type', 'subtype']
+                    'year', 'collection', 'author', 'institution', 'type', 'subtype', 'file']
     search_fields = ['site__lamning_id', 'site__raa_id', 'rock_carving_object__name',
-                     'site__municipality__name', 'site__parish__name', 'subtype__text']
+                     'site__municipality__name', 'site__parish__name', 'subtype__text', 'file']
     list_filter = [
         ('year', NumericRangeFilter),
         ('site', EmptyFieldListFilter),
@@ -89,6 +88,7 @@ class ImageModel(admin.ModelAdmin):
         AuthorFilter,
         SiteFilter,
         KeywordFilter,
+        'file'
     ]
     filter_horizontal = ['people', 'keywords', 'dating_tags']
     list_per_page = 25
