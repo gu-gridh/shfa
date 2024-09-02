@@ -274,7 +274,6 @@ class CameraModelAdmin(admin.ModelAdmin):
     list_display = ["name", ]
     search_fields = ["name", "lens__name"]
 
-
 class CameraMetaAdmin(admin.ModelAdmin):
     fields = get_fields(CameraMeta, exclude=DEFAULT_EXCLUDE + ["id"])
     readonly_fields = [*DEFAULT_FIELDS]
@@ -290,7 +289,6 @@ class CameraMetaAdmin(admin.ModelAdmin):
 
 
 admin.site.register(CameraMeta, CameraMetaAdmin)
-
 
 class SHFA3DAdmin(admin.ModelAdmin):
     # display_raw = True
@@ -308,7 +306,7 @@ class SHFA3DMeshAdmin(admin.ModelAdmin, DynamicArrayMixin):
     fields = get_fields(SHFA3DMesh, exclude=DEFAULT_EXCLUDE+["id"])
     readonly_fields = [*DEFAULT_FIELDS]
     list_display = ["group"]
-    search_fields = ["group__text", "method"]
+    search_fields = ["group__text", "method__text", "method__english_translation"]
     list_filter = ["group"]
     autocomplete_fields = ["group"]
     filter_horizontal = ["weather"]
