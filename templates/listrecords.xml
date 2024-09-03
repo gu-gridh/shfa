@@ -136,7 +136,7 @@
                         <byline>{{image.author.name}}</byline>
                         <mediaMotiveWord>{% get_image_tags image %}</mediaMotiveWord>
                         <copyright>SHFA</copyright>
-                        <mediaLicense rdf:resource="http://kulturarvsdata.se/resurser/License#by/4.0"/>
+                        <mediaLicense rdf:resource="http://kulturarvsdata.se/resurser/license#by"/>
                         <mediaLicenseUrl rdf:resource="https://creativecommons.org/licenses/by/4.0/"/>
                     </Image>
                     <ItemNumber rdf:nodeID="num001">
