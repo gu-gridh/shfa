@@ -142,6 +142,13 @@ class IIIFImageViewSet(DynamicDepthViewSet):
         'id']+get_fields(models.Image, exclude=['created_at', 'updated_at'] + ['iiif_file', 'file'])
 
 
+class NullVisualizationGroupViewset(DynamicDepthViewSet):
+    serializer_class = serializers.TIFFImageSerializer
+    queryset = models.Image.objects.filter(
+        group=None, published=True).order_by('type__order')
+    filterset_fields = [
+        'id']+get_fields(models.Image, exclude=['created_at', 'updated_at'] + ['iiif_file', 'file'])
+
 class SearchBoundingBoxImageViewSet(DynamicDepthViewSet):
     serializer_class = serializers.TIFFImageSerializer
 

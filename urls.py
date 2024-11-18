@@ -48,7 +48,8 @@ router.register(rf'{endpoint}/geology',
                 views.GeologyViewSet, basename='geology')
 router.register(rf'{endpoint}/camerameta',
                 views.CameraSpecificationViewSet, basename='camera meta data')
-
+router.register(rf'{endpoint}/null_visualization_group',
+                views.NullVisualizationGroupViewset, basename='Null Visualization images')    
 
 urlpatterns = [
     path('', include(router.urls)),
