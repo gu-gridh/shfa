@@ -145,7 +145,7 @@ class IIIFImageViewSet(DynamicDepthViewSet):
 class NullVisualizationGroupViewset(DynamicDepthViewSet):
     serializer_class = serializers.TIFFImageSerializer
     queryset = models.Image.objects.filter(
-        group=None, published=True).order_by('type__order')
+        group__isnull=False, published=True).order_by('type__order')
     filterset_fields = [
         'id']+get_fields(models.Image, exclude=['created_at', 'updated_at'] + ['iiif_file', 'file'])
 
