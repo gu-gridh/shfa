@@ -135,7 +135,7 @@ class ImageModel(admin.ModelAdmin):
 class SiteAdmin(admin.ModelAdmin):
     fields = get_fields(Site, exclude=DEFAULT_EXCLUDE+["id"])
     readonly_fields = [*DEFAULT_FIELDS]
-    list_display = ['raa_id', 'lamning_id', 'lokalitet_id',
+    list_display = ['id', 'raa_id', 'lamning_id', 'lokalitet_id',
                     'askeladden_id', 'get_ksamsok_link', 'placename']
     search_fields = ['raa_id', 'lamning_id',
                      'askeladden_id', 'lokalitet_id', 'placename']
