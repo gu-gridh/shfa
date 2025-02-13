@@ -14,7 +14,8 @@ from diana.forms import ContactForm
 from django.core.mail import send_mail
 from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import OuterRef, Subquery
+from django.db.models import F, Window
+from django.db.models.functions import RowNumber
 
 class SiteViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteGeoSerializer
@@ -363,74 +364,68 @@ class GalleryViewSet(DynamicDepthViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
-
     def list(self, request, *args, **kwargs):
         """Handles the GET request for categorized image results."""
         search_type = request.GET.get("search_type")
-        box = request.GET.get("in_bbox")  
+        box = request.GET.get("in_bbox")  # Check for bbox filtering
         site = request.GET.get("site")
 
+        # If no search_type and no filtering (like bbox), return an empty response
         if not search_type and not box and not site:
             return Response([])
 
+
         queryset = self.queryset
 
+        # Handle site filtering if provided
         if site:
             queryset = queryset.filter(site_id=site)
 
+        # Handle bbox filtering if provided
         if box:
             box = box.strip().split(',')
-            bbox_coords = [float(box[0]), float(box[1]), float(box[2]), float(box[3])]
-            bounding_box = Polygon.from_bbox(tuple(bbox_coords))
-            sites = models.Site.objects.filter(coordinates__intersects=bounding_box)
+            bbox_coords = [
+                float(box[0]), float(box[1]),
+                float(box[2]), float(box[3]),
+            ]
+            bounding_box = Polygon.from_bbox((bbox_coords))
+            bounding_box = Envelope((bbox_coords))
+            sites = models.Site.objects.filter(
+                coordinates__intersects=bounding_box.wkt)
             queryset = queryset.filter(site_id__in=sites)
-
+                                                
+        # Handle different search types
         elif search_type == "advanced":
             queryset = self.get_advanced_search_queryset()
         elif search_type == "general":
             queryset = self.get_general_search_queryset()
         else:
-            queryset = self.filter_queryset(self.get_queryset())
+            queryset = self.filter_queryset(self.get_queryset())  # Apply default filters
 
-        # **Step 1: Get the real count per category**
-        category_counts = queryset.values('type__text').annotate(real_count=Count('id'))
+        # Apply categorization if bbox or search_type is used
+        if box or search_type or site:
+            categorized_data = self.categorize_by_type(queryset)
+            return Response(categorized_data)
 
-        # **Step 2: Use Subquery to limit results to 5 per category**
-        limited_queryset = models.Image.objects.filter(
-            id__in=Subquery(
-                queryset.filter(type=OuterRef("type"))
-                .order_by("id")  # Change sorting if needed
-                .values("id")[:5]  # **Limits to 5 per category**
-            )
-        )
+        # Otherwise, return normal serialized data
+        return Response(self.get_serializer(queryset, many=True).data)
 
-        # **Step 3: Convert category_counts to a dictionary for quick lookup**
-        count_dict = {entry["type__text"]: entry["real_count"] for entry in category_counts}
-
-        # **Step 4: Categorize the data while keeping the real count**
-        categorized_data = self.categorize_by_type(limited_queryset, count_dict)
-        return Response(categorized_data)
-
-    def categorize_by_type(self, queryset, count_dict):
-        """Groups queryset results by `type__text`, keeping the real count and limiting images to 5."""
-        category_dict = defaultdict(lambda: {"count": 0, "real_count": 0, "images": []})
+    def categorize_by_type(self, queryset):
+        """Groups queryset results by `type__text` with counts."""
+        category_dict = defaultdict(lambda: {"count": 0, "images": []})
 
         for image in queryset:
             type_text = image.type.text if image.type else "Unknown"
             type_translation = image.type.english_translation if image.type else "Unknown"
-
-            category_dict[type_text]["real_count"] = count_dict.get(type_text, 0)  # Keep the real count
+            category_dict[type_text]["count"] += 1
             category_dict[type_text]["images"].append(serializers.TIFFImageSerializer(image).data)
 
-        return [
-            {
-                "type": type_text,
-                "type_translation": type_translation,
-                "real_count": data["real_count"],  # Actual count of items in the category
-                "images": data["images"],  # Limited to 5
-            }
-            for type_text, data in category_dict.items()
-        ]
+        return [{"type": type_text,
+                 "type_translation": type_translation, 
+                 "count": data["count"], 
+                 "images": data["images"]}
+
+                for type_text, data in category_dict.items()]
 
     def get_advanced_search_queryset(self):
         """Handles advanced search with query parameters."""
