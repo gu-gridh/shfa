@@ -420,6 +420,10 @@ class GalleryViewSet(DynamicDepthViewSet):
             category_dict[type_text]["count"] += 1
             category_dict[type_text]["images"].append(serializers.TIFFImageSerializer(image).data)
 
+        # Only keep up to 5 images per category
+        if len(category_dict[type_text]["images"]) < 5:
+            category_dict[type_text]["images"].append(serializers.TIFFImageSerializer(image).data)
+
         return [{"type": type_text,
                  "type_translation": type_translation, 
                  "count": data["count"], 
