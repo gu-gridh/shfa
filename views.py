@@ -359,7 +359,6 @@ class GalleryViewSet(DynamicDepthViewSet):
     queryset = models.Image.objects.filter(published=True).order_by('type__order')
     serializer_class = serializers.TIFFImageSerializer
     filter_backends = [DjangoFilterBackend]
-
     filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
     def list(self, request, *args, **kwargs):
@@ -374,14 +373,18 @@ class GalleryViewSet(DynamicDepthViewSet):
 
         # Handle bbox filtering if provided
         if bbox:
-            try:
-                box = bbox.strip().split(',')
-                bbox_coords = [float(box[0]), float(box[1]), float(box[2]), float(box[3])]
-                bounding_box = Envelope(bbox_coords)  # Creates an envelope for spatial query
-                sites = models.Site.objects.filter(coordinates__intersects=bounding_box.wkt)
-                queryset = models.Image.objects.filter(site_id__in=sites, published=True).order_by('type__order')
-            except (ValueError, IndexError):
-                return Response({"error": "Invalid bbox format. Use 'minX,minY,maxX,maxY'."}, status=400)
+            box = box.strip().split(',')
+            bbox_coords = [
+                float(box[0]), float(box[1]),
+                float(box[2]), float(box[3]),
+        ]
+            bounding_box = Polygon.from_bbox((bbox_coords))
+            bounding_box = Envelope(bbox_coords)  # Creates an envelope for spatial query
+            sites = models.Site.objects.filter(coordinates__intersects=bounding_box.wkt)
+            queryset = models.Image.objects.filter(
+                                               Q(site_id__in=sites)
+                                             & Q(published=True)).order_by('type__order')
+
 
         # Handle different search types
         elif search_type == "advanced":
