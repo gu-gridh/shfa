@@ -356,6 +356,7 @@ class AdvancedSearch(DynamicDepthViewSet):
 
 # Add gallery view
 class GalleryViewSet(DynamicDepthViewSet):  
+
     queryset = models.Image.objects.filter(published=True).order_by('type__order')
     serializer_class = serializers.TIFFImageSerializer
     filter_backends = [DjangoFilterBackend]
@@ -364,7 +365,8 @@ class GalleryViewSet(DynamicDepthViewSet):
     def list(self, request, *args, **kwargs):
         """Handles the GET request for categorized image results."""
         search_type = request.GET.get("search_type")
-        bbox = request.GET.get("in_bbox")  # Check for bbox filtering
+        box = request.GET.get("in_bbox")  # Check for bbox filtering
+        
         filters_applied = any(param in request.GET for param in self.filterset_fields)
 
         # If no search_type and no filtering (like bbox), return an empty response
@@ -372,16 +374,18 @@ class GalleryViewSet(DynamicDepthViewSet):
             return Response([])
 
         # Handle bbox filtering if provided
-        if bbox:
-            box = bbox.strip().split(',')
+        if box:
+            box = box.strip().split(',')
             bbox_coords = [
                 float(box[0]), float(box[1]),
                 float(box[2]), float(box[3]),
-        ]
-            bounding_box = Polygon.from_bbox(tuple(bbox_coords))  # Correct usage
-            sites = models.Site.objects.filter(coordinates__intersects=bounding_box.wkt)
-            queryset = models.Image.objects.filter(site_id__in=sites)
-                                           
+            ]
+            bounding_box = Polygon.from_bbox((bbox_coords))
+            bounding_box = Envelope((bbox_coords))
+            sites = models.Site.objects.filter(
+                coordinates__intersects=bounding_box.wkt)
+            queryset = self.queryset.filter(site_id__in=sites)
+                                                
         # Handle different search types
         elif search_type == "advanced":
             queryset = self.get_advanced_search_queryset()
@@ -391,7 +395,7 @@ class GalleryViewSet(DynamicDepthViewSet):
             queryset = self.filter_queryset(self.get_queryset())  # Apply default filters
 
         # Apply categorization if bbox or search_type is used
-        if bbox or search_type:
+        if box or search_type:
             categorized_data = self.categorize_by_type(queryset)
             return Response(categorized_data)
 
@@ -408,7 +412,11 @@ class GalleryViewSet(DynamicDepthViewSet):
             category_dict[type_text]["count"] += 1
             category_dict[type_text]["images"].append(serializers.TIFFImageSerializer(image).data)
 
-        return [{"type": type_text, "type_translation": type_translation, "count": data["count"], "images": data["images"]}
+        return [{"type": type_text,
+                 "type_translation": type_translation, 
+                 "count": data["count"], 
+                 "images": data["images"]}
+
                 for type_text, data in category_dict.items()]
 
     def get_advanced_search_queryset(self):
@@ -433,18 +441,18 @@ class GalleryViewSet(DynamicDepthViewSet):
                 query_conditions.append(reduce(lambda x, y: x | y, or_conditions))
 
         if not query_conditions:
-            return models.Image.objects.none()
+            return self.queryset.none()
 
-        return models.Image.objects.filter(reduce(lambda x, y: x & y, query_conditions), published=True).order_by('type__order')
+        return self.queryset.filter(reduce(lambda x, y: x & y, query_conditions), published=True).order_by('type__order')
 
     def get_general_search_queryset(self):
         """Handles general search with 'q' parameter."""
         q = self.request.GET.get("q", "")
 
         if not q:
-            return models.Image.objects.none()
+            return self.queryset.none()
 
-        return models.Image.objects.filter(
+        return self.queryset.filter(
             Q(dating_tags__text__icontains=q)
             | Q(dating_tags__english_translation__icontains=q)
             | Q(people__name__icontains=q)
@@ -463,7 +471,6 @@ class GalleryViewSet(DynamicDepthViewSet):
             | Q(rock_carving_object__name__icontains=q)
             | Q(institution__name__icontains=q)
         ).filter(published=True).order_by('-id', 'type__order').distinct()
-
 
 
 # VIEW FOR OAI_CAT
