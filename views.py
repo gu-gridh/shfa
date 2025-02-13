@@ -355,7 +355,7 @@ class AdvancedSearch(DynamicDepthViewSet):
         'id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
 # Add gallery view
-class GalleryViewSet(viewsets.ModelViewSet):  
+class GalleryViewSet(DynamicDepthViewSet):  
     queryset = models.Image.objects.filter(published=True).order_by('type__order')
     serializer_class = serializers.TIFFImageSerializer
     filter_backends = [DjangoFilterBackend]
@@ -365,22 +365,33 @@ class GalleryViewSet(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         """Handles the GET request for categorized image results."""
         search_type = request.GET.get("search_type")
-        bbox = request.GET.get("in_bbox")  # Check if bbox filtering is applied
+        bbox = request.GET.get("in_bbox")  # Check for bbox filtering
         filters_applied = any(param in request.GET for param in self.filterset_fields)
 
         # If no search_type and no filtering (like bbox), return an empty response
         if not search_type and not filters_applied:
             return Response([])
 
+        # Handle bbox filtering if provided
+        if bbox:
+            try:
+                box = bbox.strip().split(',')
+                bbox_coords = [float(box[0]), float(box[1]), float(box[2]), float(box[3])]
+                bounding_box = Envelope(bbox_coords)  # Creates an envelope for spatial query
+                sites = models.Site.objects.filter(coordinates__intersects=bounding_box.wkt)
+                queryset = models.Image.objects.filter(site_id__in=sites, published=True).order_by('type__order')
+            except (ValueError, IndexError):
+                return Response({"error": "Invalid bbox format. Use 'minX,minY,maxX,maxY'."}, status=400)
+
         # Handle different search types
-        if search_type == "advanced":
+        elif search_type == "advanced":
             queryset = self.get_advanced_search_queryset()
         elif search_type == "general":
             queryset = self.get_general_search_queryset()
         else:
-            queryset = self.filter_queryset(self.get_queryset())  # Apply filters like bbox
+            queryset = self.filter_queryset(self.get_queryset())  # Apply default filters
 
-        # If bbox or search_type is used, categorize the results
+        # Apply categorization if bbox or search_type is used
         if bbox or search_type:
             categorized_data = self.categorize_by_type(queryset)
             return Response(categorized_data)
