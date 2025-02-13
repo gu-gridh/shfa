@@ -14,6 +14,8 @@ from diana.forms import ContactForm
 from django.core.mail import send_mail
 from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
+from django.db.models import F, Window
+from django.db.models.functions import RowNumber
 
 class SiteViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteGeoSerializer
@@ -372,8 +374,12 @@ class GalleryViewSet(DynamicDepthViewSet):
         if not search_type and not box and not site:
             return Response([])
 
+
+        queryset = self.queryset
+
+        # Handle site filtering if provided
         if site:
-            queryset = self.queryset.filter(site_id=site)
+            queryset = queryset.filter(site_id=site)
 
         # Handle bbox filtering if provided
         if box:
@@ -386,7 +392,7 @@ class GalleryViewSet(DynamicDepthViewSet):
             bounding_box = Envelope((bbox_coords))
             sites = models.Site.objects.filter(
                 coordinates__intersects=bounding_box.wkt)
-            queryset = self.queryset.filter(site_id__in=sites)
+            queryset = queryset.filter(site_id__in=sites)
                                                 
         # Handle different search types
         elif search_type == "advanced":
@@ -396,13 +402,26 @@ class GalleryViewSet(DynamicDepthViewSet):
         else:
             queryset = self.filter_queryset(self.get_queryset())  # Apply default filters
 
-        # Apply categorization if bbox or search_type is used
-        if box or search_type or site:
-            categorized_data = self.categorize_by_type(queryset)
-            return Response(categorized_data)
 
-        # Otherwise, return normal serialized data
-        return Response(self.get_serializer(queryset, many=True).data)
+        # **Apply a window function to get only the first 5 images per category**
+        queryset = queryset.annotate(
+            row_number=Window(
+                expression=RowNumber(),
+                partition_by=[F('type')],
+                order_by=F('id').asc()
+            )
+        ).filter(row_number__lte=5)
+
+        categorized_data = self.categorize_by_type(queryset)
+        return Response(categorized_data)
+    
+        # # Apply categorization if bbox or search_type is used
+        # if box or search_type or site:
+        #     categorized_data = self.categorize_by_type(queryset)
+        #     return Response(categorized_data)
+
+        # # Otherwise, return normal serialized data
+        # return Response(self.get_serializer(queryset, many=True).data)
 
     def categorize_by_type(self, queryset):
         """Groups queryset results by `type__text` with counts."""
