@@ -6,6 +6,8 @@ from .views import oai
 
 router = routers.DefaultRouter()
 endpoint = utils.build_app_endpoint("shfa")
+contact_endpoint = utils.build_contact_form_endpoint("shfa")
+
 documentation = utils.build_app_api_documentation("shfa", endpoint)
 
 router.register(rf'{endpoint}/image', views.IIIFImageViewSet, basename='image')
@@ -37,6 +39,10 @@ router.register(rf'{endpoint}/search/advance',
 # General search url
 router.register(rf'{endpoint}/search', views.GeneralSearch, basename='search')
 
+# urls for the image gallery
+router.register(rf'{endpoint}/gallery',
+                views.GalleryViewSet, basename='gallery')
+
 # urls for the 3D models
 router.register(rf'{endpoint}/visualization_groups',
                 views.VisualizationGroupViewset, basename='Visualization 3D models')
@@ -51,12 +57,14 @@ router.register(rf'{endpoint}/camerameta',
 router.register(rf'{endpoint}/null_visualization_group',
                 views.NullVisualizationGroupViewset, basename='Null Visualization images')    
 
+# url for contact form
+router.register(rf'{contact_endpoint}', views.ContactFormViewSet, basename='contact')
+
 urlpatterns = [
     path('', include(router.urls)),
 
     # add oai-pmh end points
-    path(rf'{endpoint}/OAICat/', views.oai, name="oai"),
-
+    #                                                                                                                 path(rf'{endpoint}/OAICat/', views.oai, name="oai"),
     # Automatically generated views
     *utils.get_model_urls('shfa', endpoint,
                           exclude=['image', 'site', 'compilation', 'image_keywords',

@@ -7,8 +7,12 @@ from .oai_cat import *
 from django.contrib.gis.geos import Polygon
 from django.contrib.gis.gdal.envelope import Envelope
 from functools import reduce
-from django.contrib.postgres.aggregates import ArrayAgg, JSONBAgg
-
+from rest_framework import viewsets, status
+from rest_framework.response import Response
+from collections import defaultdict
+from diana.forms import ContactForm
+from django.core.mail import send_mail
+from django.conf import settings
 
 class SiteViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteGeoSerializer
@@ -350,6 +354,94 @@ class AdvancedSearch(DynamicDepthViewSet):
         'id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
 
+# Add new api for gallery view
+class GalleryViewSet(viewsets.ViewSet):
+    image_serializer = serializers.TIFFImageSerializer
+    
+    def list(self, request):
+        """Handles the GET request for categorized image results."""
+        search_type = request.GET.get("search_type")
+
+        if search_type == "advanced":
+            queryset = self.get_advanced_search_queryset()
+        elif search_type == "general":
+            queryset = self.get_general_search_queryset()
+        else:
+            queryset = models.Image.objects.filter(published=True)
+
+        # Categorize results by `type__text`
+        categorized_data = self.categorize_by_type(queryset)
+
+        return Response(categorized_data)
+
+    def categorize_by_type(self, queryset):
+        """Groups queryset results by `type__text` with counts."""
+        category_dict = defaultdict(lambda: {"count": 0, "images": []})
+
+        for image in queryset:
+            type_text = image.type.text if image.type else "Unknown"
+            type_translation = image.type.english_translation if image.type else "Unknown"
+            category_dict[type_text]["count"] += 1
+            category_dict[type_text]["images"].append(serializers.TIFFImageSerializer(image).data)
+
+        # Convert defaultdict to list format
+        return [{"type": type_text, "type_translation": type_translation ,"count": data["count"], "images": data["images"]}
+                for type_text, data in category_dict.items()]
+
+    def get_advanced_search_queryset(self):
+        """Handles advanced search with query parameters."""
+        query_params = self.request.GET
+        query_conditions = []
+
+        field_mapping = {
+            "site_name": ["site__raa_id", "site__lamning_id", "site__askeladden_id",
+                          "site__lokalitet_id", "site__placename", "site__ksamsok_id"],
+            "keyword": ["keywords__text", "keywords__english_translation", "keywords__category", "keywords__category_translation"],
+            "author_name": ["people__name", "people__english_translation"],
+            "dating_tag": ["dating_tags__text", "dating_tags__english_translation"],
+            "image_type": ["type__text", "type__english_translation"],
+            "institution_name": ["institution__name"]
+        }
+
+        for param, fields in field_mapping.items():
+            if param in query_params:
+                value = query_params[param]
+                or_conditions = [Q(**{f"{field}__icontains": value}) for field in fields]
+                query_conditions.append(reduce(lambda x, y: x | y, or_conditions))
+
+        if not query_conditions:
+            return models.Image.objects.none()
+
+        return models.Image.objects.filter(reduce(lambda x, y: x & y, query_conditions), published=True).order_by('type__order')
+
+    def get_general_search_queryset(self):
+        """Handles general search with 'q' parameter."""
+        q = self.request.GET.get("q", "")
+
+        if not q:
+            return models.Image.objects.none()
+
+        return models.Image.objects.filter(
+            Q(dating_tags__text__icontains=q)
+            | Q(dating_tags__english_translation__icontains=q)
+            | Q(people__name__icontains=q)
+            | Q(people__english_translation__icontains=q)
+            | Q(type__text__icontains=q)
+            | Q(type__english_translation__icontains=q)
+            | Q(site__raa_id__icontains=q)
+            | Q(site__lamning_id__icontains=q)
+            | Q(site__askeladden_id__icontains=q)
+            | Q(site__lokalitet_id__icontains=q)
+            | Q(site__placename__icontains=q)
+            | Q(keywords__text__icontains=q)
+            | Q(keywords__english_translation__icontains=q)
+            | Q(keywords__category__icontains=q)
+            | Q(keywords__category_translation__icontains=q)
+            | Q(rock_carving_object__name__icontains=q)
+            | Q(institution__name__icontains=q)
+        ).filter(published=True).order_by('-id', 'type__order')
+
+
 # VIEW FOR OAI_CAT
 
 @csrf_exempt
@@ -371,3 +463,29 @@ def oai(request):
             output = verb_error(request)
 
     return output
+
+
+# Add contact form view
+class ContactFormViewSet(viewsets.ViewSet):
+    def create(self, request):
+        if request.method == 'POST':
+            form = ContactForm(request.POST)
+            if form.is_valid():
+                # Process the form data
+                name = form.cleaned_data['name']
+                email = form.cleaned_data['email']
+                subject = form.cleaned_data['subject']
+                message = form.cleaned_data['message']
+                
+                # Send an email
+                send_mail(
+                    f'From {name}, Subject: {subject}',
+                    f'Message: {message}\n',
+                    email,  # From email
+                    [settings.EMAIL_HOST_USER],  # To email
+                    fail_silently=False,
+                )
+            return Response({'message': 'Email sent successfully'}, status=status.HTTP_200_OK)
+        else:
+            form = ContactForm()
+            return render(request, 'contact.html', {'form': form})
