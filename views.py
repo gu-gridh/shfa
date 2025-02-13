@@ -354,35 +354,34 @@ class AdvancedSearch(DynamicDepthViewSet):
     filterset_fields = [
         'id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
-
-# Add new api for gallery view
-
-class GalleryViewSet(viewsets.ModelViewSet):  # Changed to ModelViewSet to enable filtering
+# Add gallery view
+class GalleryViewSet(viewsets.ModelViewSet):  
     queryset = models.Image.objects.filter(published=True).order_by('type__order')
     serializer_class = serializers.TIFFImageSerializer
     filter_backends = [DjangoFilterBackend]
-    
-    # Keep filterset_fields to maintain existing filtering (including bbox)
+
     filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
     def list(self, request, *args, **kwargs):
         """Handles the GET request for categorized image results."""
         search_type = request.GET.get("search_type")
         bbox = request.GET.get("bbox")  # Check if bbox filtering is applied
+        filters_applied = any(param in request.GET for param in self.filterset_fields)
 
-        # If no search_type is specified and no bbox filtering, return an empty response
-        if not search_type and not bbox:
+        # If no search_type and no filtering (like bbox), return an empty response
+        if not search_type and not filters_applied:
             return Response([])
 
+        # Handle different search types
         if search_type == "advanced":
             queryset = self.get_advanced_search_queryset()
         elif search_type == "general":
             queryset = self.get_general_search_queryset()
         else:
-            queryset = self.filter_queryset(self.get_queryset())  # Apply filters including bbox
+            queryset = self.filter_queryset(self.get_queryset())  # Apply filters like bbox
 
-        # If bbox filtering is applied, categorize the results
-        if bbox:
+        # If bbox or search_type is used, categorize the results
+        if bbox or search_type:
             categorized_data = self.categorize_by_type(queryset)
             return Response(categorized_data)
 
@@ -399,7 +398,6 @@ class GalleryViewSet(viewsets.ModelViewSet):  # Changed to ModelViewSet to enabl
             category_dict[type_text]["count"] += 1
             category_dict[type_text]["images"].append(serializers.TIFFImageSerializer(image).data)
 
-        # Convert defaultdict to list format
         return [{"type": type_text, "type_translation": type_translation, "count": data["count"], "images": data["images"]}
                 for type_text, data in category_dict.items()]
 
@@ -456,8 +454,9 @@ class GalleryViewSet(viewsets.ModelViewSet):  # Changed to ModelViewSet to enabl
             | Q(institution__name__icontains=q)
         ).filter(published=True).order_by('-id', 'type__order').distinct()
 
-# VIEW FOR OAI_CAT
 
+
+# VIEW FOR OAI_CAT
 @csrf_exempt
 def oai(request):
     params = request.POST.copy() if request.method == "POST" else request.GET.copy()
