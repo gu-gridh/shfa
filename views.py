@@ -365,7 +365,7 @@ class GalleryViewSet(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         """Handles the GET request for categorized image results."""
         search_type = request.GET.get("search_type")
-        bbox = request.GET.get("bbox")  # Check if bbox filtering is applied
+        bbox = request.GET.get("in_bbox")  # Check if bbox filtering is applied
         filters_applied = any(param in request.GET for param in self.filterset_fields)
 
         # If no search_type and no filtering (like bbox), return an empty response
