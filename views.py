@@ -13,6 +13,7 @@ from collections import defaultdict
 from diana.forms import ContactForm
 from django.core.mail import send_mail
 from django.conf import settings
+from django_filters.rest_framework import DjangoFilterBackend
 
 class SiteViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteGeoSerializer
@@ -355,24 +356,38 @@ class AdvancedSearch(DynamicDepthViewSet):
 
 
 # Add new api for gallery view
-class GalleryViewSet(viewsets.ViewSet):
-    image_serializer = serializers.TIFFImageSerializer
+
+class GalleryViewSet(viewsets.ModelViewSet):  # Changed to ModelViewSet to enable filtering
+    queryset = models.Image.objects.filter(published=True).order_by('type__order')
+    serializer_class = serializers.TIFFImageSerializer
+    filter_backends = [DjangoFilterBackend]
     
-    def list(self, request):
+    # Keep filterset_fields to maintain existing filtering (including bbox)
+    filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
+
+    def list(self, request, *args, **kwargs):
         """Handles the GET request for categorized image results."""
         search_type = request.GET.get("search_type")
+        bbox = request.GET.get("bbox")  # Check if bbox filtering is applied
+
+        # If no search_type is specified and no bbox filtering, return an empty response
+        if not search_type and not bbox:
+            return Response([])
 
         if search_type == "advanced":
             queryset = self.get_advanced_search_queryset()
         elif search_type == "general":
             queryset = self.get_general_search_queryset()
         else:
-            queryset = models.Image.objects.filter(published=True)
+            queryset = self.filter_queryset(self.get_queryset())  # Apply filters including bbox
 
-        # Categorize results by `type__text`
-        categorized_data = self.categorize_by_type(queryset)
+        # If bbox filtering is applied, categorize the results
+        if bbox:
+            categorized_data = self.categorize_by_type(queryset)
+            return Response(categorized_data)
 
-        return Response(categorized_data)
+        # Otherwise, return normal serialized data
+        return Response(self.get_serializer(queryset, many=True).data)
 
     def categorize_by_type(self, queryset):
         """Groups queryset results by `type__text` with counts."""
@@ -385,7 +400,7 @@ class GalleryViewSet(viewsets.ViewSet):
             category_dict[type_text]["images"].append(serializers.TIFFImageSerializer(image).data)
 
         # Convert defaultdict to list format
-        return [{"type": type_text, "type_translation": type_translation ,"count": data["count"], "images": data["images"]}
+        return [{"type": type_text, "type_translation": type_translation, "count": data["count"], "images": data["images"]}
                 for type_text, data in category_dict.items()]
 
     def get_advanced_search_queryset(self):
@@ -439,8 +454,7 @@ class GalleryViewSet(viewsets.ViewSet):
             | Q(keywords__category_translation__icontains=q)
             | Q(rock_carving_object__name__icontains=q)
             | Q(institution__name__icontains=q)
-        ).filter(published=True).order_by('-id', 'type__order')
-
+        ).filter(published=True).order_by('-id', 'type__order').distinct()
 
 # VIEW FOR OAI_CAT
 
