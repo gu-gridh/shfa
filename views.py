@@ -367,10 +367,10 @@ class GalleryViewSet(DynamicDepthViewSet):
         search_type = request.GET.get("search_type")
         box = request.GET.get("in_bbox")  # Check for bbox filtering
         
-        filters_applied = any(param in request.GET for param in self.filterset_fields)
+        # filters_applied = any(param in request.GET for param in self.filterset_fields)
 
         # If no search_type and no filtering (like bbox), return an empty response
-        if not search_type and not filters_applied:
+        if not search_type and not box:
             return Response([])
 
         # Handle bbox filtering if provided
