@@ -366,12 +366,14 @@ class GalleryViewSet(DynamicDepthViewSet):
         """Handles the GET request for categorized image results."""
         search_type = request.GET.get("search_type")
         box = request.GET.get("in_bbox")  # Check for bbox filtering
-        
-        # filters_applied = any(param in request.GET for param in self.filterset_fields)
+        site = request.GET.get("site")
 
         # If no search_type and no filtering (like bbox), return an empty response
-        if not search_type and not box:
+        if not search_type and not box and not site:
             return Response([])
+
+        if site:
+            queryset = self.queryset.filter(site_id=site)
 
         # Handle bbox filtering if provided
         if box:
@@ -395,7 +397,7 @@ class GalleryViewSet(DynamicDepthViewSet):
             queryset = self.filter_queryset(self.get_queryset())  # Apply default filters
 
         # Apply categorization if bbox or search_type is used
-        if box or search_type:
+        if box or search_type or site:
             categorized_data = self.categorize_by_type(queryset)
             return Response(categorized_data)
 
