@@ -373,10 +373,10 @@ class GalleryViewSet(DynamicDepthViewSet):
 
         # Handle bbox filtering if provided
         if bbox:
-            box = box.strip().split(',')
+            bbox = bbox.strip().split(',')
             bbox_coords = [
-                float(box[0]), float(box[1]),
-                float(box[2]), float(box[3]),
+                float(bbox[0]), float(bbox[1]),
+                float(bbox[2]), float(bbox[3]),
         ]
             bounding_box = Polygon.from_bbox((bbox_coords))
             bounding_box = Envelope(bbox_coords)  # Creates an envelope for spatial query
