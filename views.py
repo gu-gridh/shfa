@@ -373,19 +373,15 @@ class GalleryViewSet(DynamicDepthViewSet):
 
         # Handle bbox filtering if provided
         if bbox:
-            bbox = bbox.strip().split(',')
+            box = bbox.strip().split(',')
             bbox_coords = [
-                float(bbox[0]), float(bbox[1]),
-                float(bbox[2]), float(bbox[3]),
+                float(box[0]), float(box[1]),
+                float(box[2]), float(box[3]),
         ]
-            bounding_box = Polygon.from_bbox((bbox_coords))
-            bounding_box = Envelope(bbox_coords)  # Creates an envelope for spatial query
+            bounding_box = Polygon.from_bbox(tuple(bbox_coords))  # Correct usage
             sites = models.Site.objects.filter(coordinates__intersects=bounding_box.wkt)
-            queryset = models.Image.objects.filter(
-                                               Q(site_id__in=sites)
-                                             & Q(published=True)).order_by('type__order')
-
-
+            queryset = models.Image.objects.filter(site_id__in=sites)
+                                           
         # Handle different search types
         elif search_type == "advanced":
             queryset = self.get_advanced_search_queryset()
