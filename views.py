@@ -547,4 +547,4 @@ class ContactFormViewSet(viewsets.ViewSet):
             return Response({'message': 'Email sent successfully'}, status=status.HTTP_200_OK)
         else:
             form = ContactForm()
-            return render(request, 'contact.html', {'form': form})
+        return Response({'error': 'Invalid request method'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
