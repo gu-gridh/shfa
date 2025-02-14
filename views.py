@@ -8,14 +8,13 @@ from django.contrib.gis.geos import Polygon
 from django.contrib.gis.gdal.envelope import Envelope
 from functools import reduce
 from rest_framework import viewsets, status
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.response import Response
 from collections import defaultdict
 from diana.forms import ContactForm
 from django.core.mail import send_mail
 from django.conf import settings
-from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import F, Window
-from django.db.models.functions import RowNumber
+
 
 class SiteViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteGeoSerializer
@@ -374,7 +373,6 @@ class GalleryViewSet(DynamicDepthViewSet):
         if not search_type and not box and not site:
             return Response([])
 
-
         queryset = self.queryset
 
         # Handle site filtering if provided
@@ -411,25 +409,44 @@ class GalleryViewSet(DynamicDepthViewSet):
         return Response(self.get_serializer(queryset, many=True).data)
 
     def categorize_by_type(self, queryset):
-        """Groups queryset results by `type__text` with counts."""
-        category_dict = defaultdict(lambda: {"count": 0, "images": []})
+        """Groups queryset results by `type__text` with counts and limits images to 5 per type."""
+        
+        # Step 1: Group data by type with translation and count
+        grouped_data = (
+            queryset.values("type__id", "type__text", "type__english_translation")
+            .annotate(count=Count("id"))
+            .order_by("type__text")
+        )
 
-        for image in queryset:
-            type_text = image.type.text if image.type else "Unknown"
-            type_translation = image.type.english_translation if image.type else "Unknown"
-            category_dict[type_text]["count"] += 1
-            category_dict[type_text]["images"].append(serializers.TIFFImageSerializer(image).data)
+        category_dict = {
+            entry["type__id"]: {
+                "type": entry["type__text"],
+                "type_translation": entry.get("type__english_translation", "Unknown"),
+                "count": entry["count"],
+                "images": [],
+            }
+            for entry in grouped_data
+        }
 
-        # Only keep up to 5 images per category
-        if len(category_dict[type_text]["images"]) < 5:
-            category_dict[type_text]["images"].append(serializers.TIFFImageSerializer(image).data)
+        # Step 2: Fetch images but limit 5 per type
+        limited_images = (
+            queryset
+            .values()
+            .order_by("type_id", "id")  # Order ensures images are grouped
+        )
 
-        return [{"type": type_text,
-                 "type_translation": type_translation, 
-                 "count": data["count"], 
-                 "images": data["images"]}
+        # Track image count per category
+        image_count_per_category = defaultdict(int)
 
-                for type_text, data in category_dict.items()]
+        for img in limited_images:
+            type_id = img["type_id"]
+
+            if type_id in category_dict and image_count_per_category[type_id] < 5:
+                category_dict[type_id]["images"].append(img)
+                image_count_per_category[type_id] += 1
+
+        # Step 3: Convert dictionary to list format
+        return list(category_dict.values())
 
     def get_advanced_search_queryset(self):
         """Handles advanced search with query parameters."""
