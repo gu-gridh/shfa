@@ -401,30 +401,27 @@ class GalleryViewSet(DynamicDepthViewSet):
         else:
             queryset = self.filter_queryset(self.get_queryset())  # Apply default filters
 
+        # Apply pagination for image_type filter
         if image_type:
             queryset = queryset.filter(type__text=image_type)
-            # Return by pagination if image_type is used
-            
-            # Get page number from request
-            page_number = request.GET.get("page", 1)  # Default to page 1
-            
-            # Paginate results
-            paginator_images = Paginator(queryset, NUM_PER_PAGE)
-            
-            try:
-                queryset = paginator_images.page(page_number)
-            except EmptyPage:
-                queryset = []  # Return empty if page number is out of range
-
         else:
             # Apply categorization if bbox or search_type is used
             if box or search_type or site:
                 categorized_data = self.categorize_by_type(queryset)
                 return Response(categorized_data)
+            
 
-        # Otherwise, return normal serialized data
-        return Response(self.get_serializer(queryset, many=True).data)
+        # Apply pagination using DRF's built-in method
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
 
+        # If pagination is not needed, return normal response
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    
     def categorize_by_type(self, queryset):
         
         """Groups queryset results by `type__text` with counts and limits images to 5 per type."""
