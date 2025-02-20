@@ -363,64 +363,138 @@ class GalleryViewSet(DynamicDepthViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
-    def list(self, request, *args, **kwargs):
-        """Handles the GET request for categorized image results."""
-        search_type = request.GET.get("search_type")
-        box = request.GET.get("in_bbox")  # Check for bbox filtering
-        site = request.GET.get("site")
-        image_type = request.GET.get("image_type")
+    # def list(self, request, *args, **kwargs):
+    #     """Handles the GET request for categorized image results."""
+    #     search_type = request.GET.get("search_type")
+    #     box = request.GET.get("in_bbox")  # Check for bbox filtering
+    #     site = request.GET.get("site")
+    #     image_type = request.GET.get("image_type")
 
-        # If no search_type and no filtering (like bbox), return an empty response
-        if not search_type and not box and not site:
+    #     # If no search_type and no filtering (like bbox), return an empty response
+    #     if not search_type and not box and not site:
+    #         return Response([])
+
+    #     queryset = self.queryset
+
+    #     # Handle site filtering if provided
+    #     if site:
+    #         queryset = queryset.filter(site_id=site)
+
+    #     # Handle bbox filtering if provided
+    #     if box:
+    #         box = box.strip().split(',')
+    #         bbox_coords = [
+    #             float(box[0]), float(box[1]),
+    #             float(box[2]), float(box[3]),
+    #         ]
+    #         bounding_box = Polygon.from_bbox((bbox_coords))
+    #         bounding_box = Envelope((bbox_coords))
+    #         sites = models.Site.objects.filter(
+    #             coordinates__intersects=bounding_box.wkt)
+    #         queryset = queryset.filter(site_id__in=sites)
+                                                
+    #     # Handle different search types
+    #     elif search_type == "advanced":
+    #         queryset = self.get_advanced_search_queryset()
+    #     elif search_type == "general":
+    #         queryset = self.get_general_search_queryset()
+    #     else:
+    #         queryset = self.filter_queryset(self.get_queryset())  # Apply default filters
+
+    #     # Apply pagination for image_type filter
+    #     if image_type:
+    #         queryset = queryset.filter(type__text=image_type)
+    #     else:
+    #         # Apply categorization if bbox or search_type is used
+    #         if box or search_type or site:
+    #             categorized_data = self.categorize_by_type(queryset)
+    #             return Response(categorized_data)
+            
+    #     # Generate summary BEFORE pagination
+    #     summary_data = self.summarize_results(queryset)
+
+    #     # Apply pagination
+    #     page = self.paginate_queryset(queryset)
+    #     if page is not None:
+    #         serializer = self.get_serializer(page, many=True)
+    #         paginated_response = self.get_paginated_response(serializer.data)
+
+    #         # Add the summary to the paginated response
+    #         paginated_response.data["summary"] = summary_data
+    #         return paginated_response
+
+    #     # If pagination is disabled, return full results with summary
+    #     serializer = self.get_serializer(queryset, many=True)
+    #     return Response({
+    #         "results": serializer.data,
+    #         "summary": summary_data
+    #     })
+        
+
+    def list(self, request, *args, **kwargs):
+        """Handles GET requests, returning paginated image results with summary by creator and institution."""
+
+        search_type = request.GET.get("search_type")
+        box = request.GET.get("in_bbox")
+        site = request.GET.get("site")
+        category_type = request.GET.get("category_type")
+
+        if not search_type and not box and not site and not category_type:
             return Response([])
 
         queryset = self.queryset
 
-        # Handle site filtering if provided
+        # Apply site filter
         if site:
             queryset = queryset.filter(site_id=site)
 
-        # Handle bbox filtering if provided
+        # Apply bbox filter
         if box:
-            box = box.strip().split(',')
-            bbox_coords = [
-                float(box[0]), float(box[1]),
-                float(box[2]), float(box[3]),
-            ]
-            bounding_box = Polygon.from_bbox((bbox_coords))
-            bounding_box = Envelope((bbox_coords))
-            sites = models.Site.objects.filter(
-                coordinates__intersects=bounding_box.wkt)
+            box = list(map(float, box.strip().split(',')))
+            bounding_box = Envelope(box)  # Assuming spatial filtering
+            sites = models.Site.objects.filter(coordinates__intersects=bounding_box.wkt)
             queryset = queryset.filter(site_id__in=sites)
-                                                
-        # Handle different search types
+
+        # Apply search types
         elif search_type == "advanced":
             queryset = self.get_advanced_search_queryset()
         elif search_type == "general":
             queryset = self.get_general_search_queryset()
         else:
-            queryset = self.filter_queryset(self.get_queryset())  # Apply default filters
+            queryset = self.filter_queryset(self.get_queryset())
 
-        # Apply pagination for image_type filter
-        if image_type:
-            queryset = queryset.filter(type__text=image_type)
+        # Apply image type filter
+        if category_type:
+            queryset = queryset.filter(type__text=category_type)
         else:
-            # Apply categorization if bbox or search_type is used
-            if box or search_type or site:
-                categorized_data = self.categorize_by_type(queryset)
-                return Response(categorized_data)
-            
+            # Categorize images by type
+            categorized_data = self.categorize_by_type(queryset)
+            summerized_data = self.summarize_results(queryset)
+            return Response({
+                "results": categorized_data,
+                "summary": summerized_data
+            })
 
-        # Apply pagination using DRF's built-in method
+        # Generate summary BEFORE pagination
+        summary_data = self.summarize_results(queryset)
+
+        # Apply pagination
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            paginated_response = self.get_paginated_response(serializer.data)
 
-        # If pagination is not needed, return normal response
+            # Add the summary to the paginated response
+            paginated_response.data["summary"] = summary_data
+            return paginated_response
+
+        # If pagination is disabled, return full results with summary
         serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-    
+        return Response({
+            "results": serializer.data,
+            "summary": summary_data
+        })
+
     
     def categorize_by_type(self, queryset):
         
@@ -516,6 +590,44 @@ class GalleryViewSet(DynamicDepthViewSet):
             | Q(rock_carving_object__name__icontains=q)
             | Q(institution__name__icontains=q)
         ).filter(published=True).order_by('-id', 'type__order').distinct()
+
+
+    def summarize_results(self, queryset):
+        """Summarizes search results by creator and institution."""
+
+        summary = {
+            "creators": [],
+            "institutions": []
+        }
+
+        # Count images per creator
+        creator_counts = (
+            queryset
+            .values("people__name")
+            .annotate(count=Count("id"))
+            .order_by("-count")
+        )
+
+        # Count images per institution
+        institution_counts = (
+            queryset
+            .values("institution__name")
+            .annotate(count=Count("id"))
+            .order_by("-count")
+        )
+
+        # Format summary
+        summary["creators"] = [
+            {"creator": entry["people__name"], "count": entry["count"]}
+            for entry in creator_counts if entry["people__name"]
+        ]
+
+        summary["institutions"] = [
+            {"institution": entry["institution__name"], "count": entry["count"]}
+            for entry in institution_counts if entry["institution__name"]
+        ]
+
+        return summary
 
 
 # VIEW FOR OAI_CAT
