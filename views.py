@@ -368,6 +368,7 @@ class GalleryViewSet(DynamicDepthViewSet):
         search_type = request.GET.get("search_type")
         box = request.GET.get("in_bbox")  # Check for bbox filtering
         site = request.GET.get("site")
+        image_type = request.GET.get("image_type")
 
         # If no search_type and no filtering (like bbox), return an empty response
         if not search_type and not box and not site:
@@ -400,10 +401,13 @@ class GalleryViewSet(DynamicDepthViewSet):
         else:
             queryset = self.filter_queryset(self.get_queryset())  # Apply default filters
 
-        # Apply categorization if bbox or search_type is used
-        if box or search_type or site:
-            categorized_data = self.categorize_by_type(queryset)
-            return Response(categorized_data)
+        if image_type:
+            queryset = queryset.filter(type__text=image_type)
+        else:
+            # Apply categorization if bbox or search_type is used
+            if box or search_type or site:
+                categorized_data = self.categorize_by_type(queryset)
+                return Response(categorized_data)
 
         # Otherwise, return normal serialized data
         return Response(self.get_serializer(queryset, many=True).data)
@@ -413,16 +417,17 @@ class GalleryViewSet(DynamicDepthViewSet):
         
         # Step 1: Group data by type with translation and count
         grouped_data = (
-            queryset.values("type__id", "type__text", "type__english_translation")
-            .annotate(count=Count("id"))
-            .order_by("type__text")
+            queryset
+            .annotate(img_count=Count("id"))
+            .values("type__id", "type__text", "type__english_translation", "img_count")
+            .order_by("type__order")
         )
 
         category_dict = {
             entry["type__id"]: {
                 "type": entry["type__text"],
                 "type_translation": entry.get("type__english_translation", "Unknown"),
-                "count": entry["count"],
+                "count": entry["img_count"],
                 "images": [],
             }
             for entry in grouped_data
@@ -432,7 +437,7 @@ class GalleryViewSet(DynamicDepthViewSet):
         limited_images = (
             queryset
             .values()
-            .order_by("type_id", "id")  # Order ensures images are grouped
+            .order_by("type__order")  # Order ensures images are grouped
         )
 
         # Track image count per category
