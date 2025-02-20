@@ -403,6 +403,19 @@ class GalleryViewSet(DynamicDepthViewSet):
 
         if image_type:
             queryset = queryset.filter(type__text=image_type)
+            # Return by pagination if image_type is used
+            
+            # Get page number from request
+            page_number = request.GET.get("page", 1)  # Default to page 1
+            
+            # Paginate results
+            paginator_images = Paginator(queryset, NUM_PER_PAGE)
+            
+            try:
+                queryset = paginator_images.page(page_number)
+            except EmptyPage:
+                queryset = []  # Return empty if page number is out of range
+
         else:
             # Apply categorization if bbox or search_type is used
             if box or search_type or site:
