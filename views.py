@@ -413,34 +413,35 @@ class GalleryViewSet(DynamicDepthViewSet):
         return Response(self.get_serializer(queryset, many=True).data)
 
     def categorize_by_type(self, queryset):
-        """Groups queryset results by `type__text` with counts and limits images to 5 per type."""
         
+        """Groups queryset results by `type__text` with counts and limits images to 5 per type."""
+
         # Step 1: Group data by type with translation and count
         grouped_data = (
             queryset
-            .annotate(img_count=Count("id"))
-            .values("type__id", "type__text", "type__english_translation", "img_count")
-            .order_by("type__order")
-        )
+            .values("type__id", "type__text", "type__english_translation")  
+            .annotate(img_count=Count("id", distinct=True))  # Ensure unique counting
+            .order_by("type__id"))
 
+        # Step 2: Prepare dictionary for categories
         category_dict = {
             entry["type__id"]: {
                 "type": entry["type__text"],
                 "type_translation": entry.get("type__english_translation", "Unknown"),
-                "count": entry["img_count"],
+                "count": entry["img_count"],  
                 "images": [],
             }
             for entry in grouped_data
         }
 
-        # Step 2: Fetch images but limit 5 per type
+        # Step 3: Fetch images but limit to 5 per type
         limited_images = (
             queryset
-            .values()
-            .order_by("type__order")  # Order ensures images are grouped
+            .values()  
+            .order_by("type_id", "id")  
         )
 
-        # Track image count per category
+        # Step 4: Assign images to categories with a limit of 5 per type
         image_count_per_category = defaultdict(int)
 
         for img in limited_images:
