@@ -42,6 +42,8 @@ router.register(rf'{endpoint}/search', views.GeneralSearch, basename='search')
 # urls for the image gallery
 router.register(rf'{endpoint}/gallery',
                 views.GalleryViewSet, basename='gallery')
+router.register(rf'{endpoint}/summary', 
+                views.SummaryViewSet, basename='gallery-summary')
 
 # urls for the 3D models
 router.register(rf'{endpoint}/visualization_groups',

@@ -363,74 +363,6 @@ class GalleryViewSet(DynamicDepthViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
-    # def list(self, request, *args, **kwargs):
-    #     """Handles the GET request for categorized image results."""
-    #     search_type = request.GET.get("search_type")
-    #     box = request.GET.get("in_bbox")  # Check for bbox filtering
-    #     site = request.GET.get("site")
-    #     image_type = request.GET.get("image_type")
-
-    #     # If no search_type and no filtering (like bbox), return an empty response
-    #     if not search_type and not box and not site:
-    #         return Response([])
-
-    #     queryset = self.queryset
-
-    #     # Handle site filtering if provided
-    #     if site:
-    #         queryset = queryset.filter(site_id=site)
-
-    #     # Handle bbox filtering if provided
-    #     if box:
-    #         box = box.strip().split(',')
-    #         bbox_coords = [
-    #             float(box[0]), float(box[1]),
-    #             float(box[2]), float(box[3]),
-    #         ]
-    #         bounding_box = Polygon.from_bbox((bbox_coords))
-    #         bounding_box = Envelope((bbox_coords))
-    #         sites = models.Site.objects.filter(
-    #             coordinates__intersects=bounding_box.wkt)
-    #         queryset = queryset.filter(site_id__in=sites)
-                                                
-    #     # Handle different search types
-    #     elif search_type == "advanced":
-    #         queryset = self.get_advanced_search_queryset()
-    #     elif search_type == "general":
-    #         queryset = self.get_general_search_queryset()
-    #     else:
-    #         queryset = self.filter_queryset(self.get_queryset())  # Apply default filters
-
-    #     # Apply pagination for image_type filter
-    #     if image_type:
-    #         queryset = queryset.filter(type__text=image_type)
-    #     else:
-    #         # Apply categorization if bbox or search_type is used
-    #         if box or search_type or site:
-    #             categorized_data = self.categorize_by_type(queryset)
-    #             return Response(categorized_data)
-            
-    #     # Generate summary BEFORE pagination
-    #     summary_data = self.summarize_results(queryset)
-
-    #     # Apply pagination
-    #     page = self.paginate_queryset(queryset)
-    #     if page is not None:
-    #         serializer = self.get_serializer(page, many=True)
-    #         paginated_response = self.get_paginated_response(serializer.data)
-
-    #         # Add the summary to the paginated response
-    #         paginated_response.data["summary"] = summary_data
-    #         return paginated_response
-
-    #     # If pagination is disabled, return full results with summary
-    #     serializer = self.get_serializer(queryset, many=True)
-    #     return Response({
-    #         "results": serializer.data,
-    #         "summary": summary_data
-    #     })
-        
-
     def list(self, request, *args, **kwargs):
         """Handles GET requests, returning paginated image results with summary by creator and institution."""
 
@@ -597,7 +529,8 @@ class GalleryViewSet(DynamicDepthViewSet):
 
         summary = {
             "creators": [],
-            "institutions": []
+            "institutions": [],
+            "year": []
         }
 
         # Count images per creator
@@ -616,6 +549,78 @@ class GalleryViewSet(DynamicDepthViewSet):
             .order_by("-count")
         )
 
+        # Show number of images for each year - probably as a chart?
+        year_counts = (
+            queryset
+            .values("year")
+            .annotate(count=Count("id", distinct=True))
+            .order_by("year")
+        )
+
+        # Count of documentation types by site 
+        type_counts = (
+            queryset
+            .values("type__text")
+            .annotate(count=Count("id", distinct=True))
+            .order_by("-count")
+        )
+
+        # Summarise search results by motif type 
+        motif_counts = (
+            queryset
+            .values("keywords__text")
+            .annotate(count=Count("id", distinct=True))
+            .order_by("-count")
+        )
+        # Summarise by ADM0, ADM1, ADM2, socken, kommun, landskap/län
+        # ADM0
+        # ADM1
+        # ADM2
+        # socken
+        # kommun
+        # landskap/län
+        # adm0_counts = (
+        #     queryset
+        #     .values("site__adm0")
+        #     .annotate(count=Count("id", distinct=True))
+        #     .order_by("-count")
+        # )
+        # adm1_counts = (
+        #     queryset
+        #     .values("site__adm1")
+        #     .annotate(count=Count("id", distinct=True)) 
+        #     .order_by("-count")
+        # )
+        # adm2_counts = (
+        #     queryset
+        #     .values("site__adm2")
+        #     .annotate(count=Count("id", distinct=True))
+        #     .order_by("-count")
+        # )
+        # socken_counts = (
+        #     queryset
+        #     .values("site__socken")
+        #     .annotate(count=Count("id", distinct=True))
+        #     .order_by("-count")
+        # )
+        # kommun_counts = (
+        #     queryset
+        #     .values("site__kommun")
+        #     .annotate(count=Count("id", distinct=True))
+        #     .order_by("-count")
+        # )
+        # landskap_counts = (
+        #     queryset
+        #     .values("site__landskap")
+        #     .annotate(count=Count("id", distinct=True))
+        #     .order_by("-count")
+        # )
+
+
+        summary["year"] = [
+            {"year": entry["year"], "count": entry["count"]}
+            for entry in year_counts if entry["year"]
+        ]
         # Format summary
         summary["creators"] = [
             {"creator": entry["people__name"], "count": entry["count"]}
@@ -626,9 +631,123 @@ class GalleryViewSet(DynamicDepthViewSet):
             {"institution": entry["institution__name"], "count": entry["count"]}
             for entry in institution_counts if entry["institution__name"]
         ]
+        summary["types"] = [
+            {"type": entry["type__text"], "count": entry["count"]}
+            for entry in type_counts if entry["type__text"]
+        ]
+        summary["motifs"] = [
+            {"motif": entry["keywords__text"], "count": entry["count"]}
+            for entry in motif_counts
+            if "figures" in "image__keywords__category_translation" 
+            and entry["keywords__text"] not in ["Cupmarks", "Line", "Indeterminate figure", 
+                                                "Memorial inscription", "Historic carving", 
+                                                "Brev", "Later carving"]
+        ]
 
+        # summary["adm0"] = [
+        #     {"adm0": entry["site__adm0"], "count": entry["count"]}
+        #     for entry in adm0_counts if entry["site__adm0"]
+        # ]
+        # summary["adm1"] = [
+        #     {"adm1": entry["site__adm1"], "count": entry["count"]}
+        #     for entry in adm1_counts if entry["site__adm1"]
+        # ]
+        # summary["adm2"] = [
+        #     {"adm2": entry["site__adm2"], "count": entry["count"]}
+        #     for entry in adm2_counts if entry["site__adm2"]
+        # ]
         return summary
 
+class SummaryViewSet(viewsets.ViewSet):
+    """A separate viewset to return summary data for images grouped by creator and institution and etc."""
+
+    def list(self, request, *args, **kwargs):
+        """Handles GET requests, returning summary of images by creator and institution."""
+        queryset = models.Image.objects.filter(published=True)
+
+        # Apply filters similar to SummaryViewSet
+        site = request.GET.get("site")
+        category_type = request.GET.get("category_type")
+
+        if site:
+            queryset = queryset.filter(site_id=site)
+
+        if category_type:
+            queryset = queryset.filter(type__text=category_type)
+
+        summary = {
+            "creators": [],
+            "institutions": [],
+            "year": [],
+            "types": [],
+            "motifs": [],
+
+        }
+
+        # Count images per creator
+        creator_counts = (
+            queryset
+            .values("people__name")
+            .annotate(count=Count("id", distinct=True))
+            .order_by("-count")
+        )
+
+        # Count images per institution
+        institution_counts = (
+            queryset
+            .values("institution__name")
+            .annotate(count=Count("id", distinct=True))
+            .order_by("-count")
+        )
+        # Count of documentation types by site
+        type_counts = (
+            queryset
+            .values("type__text")
+            .annotate(count=Count("id", distinct=True))
+            .order_by("-count")
+        )
+        # Summarise search results by motif type
+        motif_counts = (
+            queryset
+            .values("keywords__text")
+            .annotate(count=Count("id", distinct=True))
+            .order_by("-count")
+        )
+        # Show number of images for each year 
+        year_counts = (
+            queryset
+            .values("year")
+            .annotate(count=Count("id", distinct=True))
+            .order_by("year")
+        )
+        # Format summary
+        summary["creators"] = [
+            {"creator": entry["people__name"], "count": entry["count"]}
+            for entry in creator_counts if entry["people__name"]
+        ]
+
+        summary["institutions"] = [
+            {"institution": entry["institution__name"], "count": entry["count"]}
+            for entry in institution_counts if entry["institution__name"]
+        ]   
+        summary["types"] = [
+            {"type": entry["type__text"], "count": entry["count"]}
+            for entry in type_counts if entry["type__text"]
+        ]
+        summary["motifs"] = [
+            {"motif": entry["keywords__text"], "count": entry["count"]}
+            for entry in motif_counts
+            if "figures" in "image__keywords__category_translation" 
+            and entry["keywords__text"] not in ["Cupmarks", "Line", "Indeterminate figure", 
+                                                "Memorial inscription", "Historic carving", 
+                                                "Brev", "Later carving"]
+        ]
+        summary["year"] = [
+            {"year": entry["year"], "count": entry["count"]}
+            for entry in year_counts if entry["year"]
+        ]
+
+        return Response(summary)
 
 # VIEW FOR OAI_CAT
 @csrf_exempt
