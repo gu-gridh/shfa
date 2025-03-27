@@ -401,10 +401,8 @@ class GalleryViewSet(DynamicDepthViewSet):
         else:
             # Categorize images by type
             categorized_data = self.categorize_by_type(queryset)
-            summerized_data = self.summarize_results(queryset)
             return Response({
                 "results": categorized_data,
-                "summary": summerized_data
             })
 
         # Generate summary BEFORE pagination
@@ -416,15 +414,12 @@ class GalleryViewSet(DynamicDepthViewSet):
             serializer = self.get_serializer(page, many=True)
             paginated_response = self.get_paginated_response(serializer.data)
 
-            # Add the summary to the paginated response
-            paginated_response.data["summary"] = summary_data
             return paginated_response
 
         # If pagination is disabled, return full results with summary
         serializer = self.get_serializer(queryset, many=True)
         return Response({
             "results": serializer.data,
-            "summary": summary_data
         })
 
     
@@ -524,164 +519,55 @@ class GalleryViewSet(DynamicDepthViewSet):
         ).filter(published=True).order_by('-id', 'type__order').distinct()
 
 
-    def summarize_results(self, queryset):
-        """Summarizes search results by creator and institution."""
-
-        summary = {
-            "creators": [],
-            "institutions": [],
-            "year": []
-        }
-
-        # Count images per creator
-        creator_counts = (
-            queryset
-            .values("people__name")
-            .annotate(count=Count("id", distinct=True))
-            .order_by("-count")
-        )
-
-        # Count images per institution
-        institution_counts = (
-            queryset
-            .values("institution__name")
-            .annotate(count=Count("id", distinct=True))
-            .order_by("-count")
-        )
-
-        # Show number of images for each year - probably as a chart?
-        year_counts = (
-            queryset
-            .values("year")
-            .annotate(count=Count("id", distinct=True))
-            .order_by("year")
-        )
-
-        # Count of documentation types by site 
-        type_counts = (
-            queryset
-            .values("type__text")
-            .annotate(count=Count("id", distinct=True))
-            .order_by("-count")
-        )
-
-        # Summarise search results by motif type 
-        motif_counts = (
-            queryset
-            .values("keywords__text")
-            .annotate(count=Count("id", distinct=True))
-            .order_by("-count")
-        )
-        # Summarise by ADM0, ADM1, ADM2, socken, kommun, landskap/län
-        # ADM0
-        # ADM1
-        # ADM2
-        # socken
-        # kommun
-        # landskap/län
-        # adm0_counts = (
-        #     queryset
-        #     .values("site__adm0")
-        #     .annotate(count=Count("id", distinct=True))
-        #     .order_by("-count")
-        # )
-        # adm1_counts = (
-        #     queryset
-        #     .values("site__adm1")
-        #     .annotate(count=Count("id", distinct=True)) 
-        #     .order_by("-count")
-        # )
-        # adm2_counts = (
-        #     queryset
-        #     .values("site__adm2")
-        #     .annotate(count=Count("id", distinct=True))
-        #     .order_by("-count")
-        # )
-        # socken_counts = (
-        #     queryset
-        #     .values("site__socken")
-        #     .annotate(count=Count("id", distinct=True))
-        #     .order_by("-count")
-        # )
-        # kommun_counts = (
-        #     queryset
-        #     .values("site__kommun")
-        #     .annotate(count=Count("id", distinct=True))
-        #     .order_by("-count")
-        # )
-        # landskap_counts = (
-        #     queryset
-        #     .values("site__landskap")
-        #     .annotate(count=Count("id", distinct=True))
-        #     .order_by("-count")
-        # )
-
-
-        summary["year"] = [
-            {"year": entry["year"], "count": entry["count"]}
-            for entry in year_counts if entry["year"]
-        ]
-        # Format summary
-        summary["creators"] = [
-            {"creator": entry["people__name"], "count": entry["count"]}
-            for entry in creator_counts if entry["people__name"]
-        ]
-
-        summary["institutions"] = [
-            {"institution": entry["institution__name"], "count": entry["count"]}
-            for entry in institution_counts if entry["institution__name"]
-        ]
-        summary["types"] = [
-            {"type": entry["type__text"], "count": entry["count"]}
-            for entry in type_counts if entry["type__text"]
-        ]
-        summary["motifs"] = [
-            {"motif": entry["keywords__text"], "count": entry["count"]}
-            for entry in motif_counts
-            if "figures" in "image__keywords__category_translation" 
-            and entry["keywords__text"] not in ["Cupmarks", "Line", "Indeterminate figure", 
-                                                "Memorial inscription", "Historic carving", 
-                                                "Brev", "Later carving"]
-        ]
-
-        # summary["adm0"] = [
-        #     {"adm0": entry["site__adm0"], "count": entry["count"]}
-        #     for entry in adm0_counts if entry["site__adm0"]
-        # ]
-        # summary["adm1"] = [
-        #     {"adm1": entry["site__adm1"], "count": entry["count"]}
-        #     for entry in adm1_counts if entry["site__adm1"]
-        # ]
-        # summary["adm2"] = [
-        #     {"adm2": entry["site__adm2"], "count": entry["count"]}
-        #     for entry in adm2_counts if entry["site__adm2"]
-        # ]
-        return summary
-
-class SummaryViewSet(viewsets.ViewSet):
+class SummaryViewSet(DynamicDepthViewSet):
     """A separate viewset to return summary data for images grouped by creator and institution and etc."""
+    queryset = models.Image.objects.filter(published=True).order_by('type__order')
+    serializer_class = serializers.TIFFImageSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
     def list(self, request, *args, **kwargs):
-        """Handles GET requests, returning summary of images by creator and institution."""
-        queryset = models.Image.objects.filter(published=True)
+        """Handles GET requests, returning paginated image results with summary by creator and institution."""
 
-        # Apply filters similar to SummaryViewSet
+        search_type = request.GET.get("search_type")
+        box = request.GET.get("in_bbox")
         site = request.GET.get("site")
-        category_type = request.GET.get("category_type")
 
+
+        queryset = self.queryset
+
+        # Apply site filter
         if site:
             queryset = queryset.filter(site_id=site)
 
-        if category_type:
-            queryset = queryset.filter(type__text=category_type)
+        # Apply bbox filter
+        if box:
+            box = list(map(float, box.strip().split(',')))
+            bounding_box = Envelope(box)  # Assuming spatial filtering
+            sites = models.Site.objects.filter(coordinates__intersects=bounding_box.wkt)
+            queryset = queryset.filter(site_id__in=sites)
 
+        # Apply search types
+        elif search_type == "advanced":
+            queryset = self.get_advanced_search_queryset()
+        elif search_type == "general":
+            queryset = self.get_general_search_queryset()
+        else:
+            queryset = self.filter_queryset(self.get_queryset())
+
+        # Generate summary BEFORE pagination
+        summary_data = self.summarize_results(queryset)
+        
+        return Response(summary_data)
+
+    def summarize_results(self, queryset):
+        """Summarizes search results by creator and institution."""
         summary = {
             "creators": [],
             "institutions": [],
             "year": [],
             "types": [],
             "motifs": [],
-
         }
 
         # Count images per creator
@@ -747,8 +633,63 @@ class SummaryViewSet(viewsets.ViewSet):
             for entry in year_counts if entry["year"]
         ]
 
-        return Response(summary)
+        return summary
 
+
+    def get_advanced_search_queryset(self):
+        """Handles advanced search with query parameters."""
+        query_params = self.request.GET
+        query_conditions = []
+
+        field_mapping = {
+            "site_name": ["site__raa_id", "site__lamning_id", "site__askeladden_id",
+                          "site__lokalitet_id", "site__placename", "site__ksamsok_id"],
+            "keyword": ["keywords__text", "keywords__english_translation", "keywords__category", "keywords__category_translation"],
+            "author_name": ["people__name", "people__english_translation"],
+            "dating_tag": ["dating_tags__text", "dating_tags__english_translation"],
+            "image_type": ["type__text", "type__english_translation"],
+            "institution_name": ["institution__name"]
+        }
+
+        for param, fields in field_mapping.items():
+            if param in query_params:
+                value = query_params[param]
+                or_conditions = [Q(**{f"{field}__icontains": value}) for field in fields]
+                query_conditions.append(reduce(lambda x, y: x | y, or_conditions))
+
+        if not query_conditions:
+            return self.queryset.none()
+
+        return self.queryset.filter(reduce(lambda x, y: x & y, query_conditions), published=True).order_by('type__order')
+
+    def get_general_search_queryset(self):
+        """Handles general search with 'q' parameter."""
+        q = self.request.GET.get("q", "")
+
+        if not q:
+            return self.queryset.none()
+
+        return self.queryset.filter(
+            Q(dating_tags__text__icontains=q)
+            | Q(dating_tags__english_translation__icontains=q)
+            | Q(people__name__icontains=q)
+            | Q(people__english_translation__icontains=q)
+            | Q(type__text__icontains=q)
+            | Q(type__english_translation__icontains=q)
+            | Q(site__raa_id__icontains=q)
+            | Q(site__lamning_id__icontains=q)
+            | Q(site__askeladden_id__icontains=q)
+            | Q(site__lokalitet_id__icontains=q)
+            | Q(site__placename__icontains=q)
+            | Q(keywords__text__icontains=q)
+            | Q(keywords__english_translation__icontains=q)
+            | Q(keywords__category__icontains=q)
+            | Q(keywords__category_translation__icontains=q)
+            | Q(rock_carving_object__name__icontains=q)
+            | Q(institution__name__icontains=q)
+        ).filter(published=True).order_by('-id', 'type__order').distinct()
+
+    
 # VIEW FOR OAI_CAT
 @csrf_exempt
 def oai(request):
