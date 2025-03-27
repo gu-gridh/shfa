@@ -564,10 +564,9 @@ class SummaryViewSet(DynamicDepthViewSet):
         # we should add Summarise search results by geographic data too: TODO
         # Summarise by ADM0, ADM1, ADM2, socken, kommun, landskap/län: TODO
         # motif: Two level summary with keyword categories and subcategories: Done
-        # Count of documentation types by site: TODO
+        # Count of documentation types by site: Done
         # Show number of images for each year: Done
         # Summarise search results by creator and institution : Done
-
 
         summary = {
             "creators": [],
