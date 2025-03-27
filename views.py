@@ -565,7 +565,7 @@ class SummaryViewSet(DynamicDepthViewSet):
         # Summarise by ADM0, ADM1, ADM2, socken, kommun, landskap/län: TODO
         # motif: Two level summary with keyword categories and subcategories: Done
         # Count of documentation types by site: TODO
-        # Show number of images for each year - probably as a chart?: TODO
+        # Show number of images for each year: Done
         # Summarise search results by creator and institution : Done
 
 
@@ -575,7 +575,8 @@ class SummaryViewSet(DynamicDepthViewSet):
             "year": [],
             "types": [],
             "motifs": [],
-            "geographic": []
+            "geographic": [],
+            "site": []
         }
 
         # Count images per creator
@@ -615,6 +616,14 @@ class SummaryViewSet(DynamicDepthViewSet):
             .order_by("year")
         )
 
+        site_counts = (
+            queryset
+            .values("site__raa_id", "site__lamning_id", "site__askeladden_id",
+                    "site__lokalitet_id", "site__placename", "site__ksamsok_id")
+            .annotate(count=Count("id", distinct=True))
+            .order_by("-count")
+        )
+
         # Gorgraphic summary can be a json object with counts for each level of geographic data
         # ADM0, ADM1, ADM2, socken, kommun, landskap/län
 
@@ -629,6 +638,11 @@ class SummaryViewSet(DynamicDepthViewSet):
         summary["creators"] = [
             {"creator": entry["people__name"], "count": entry["count"]}
             for entry in creator_counts if entry["people__name"]
+        ]
+
+        summary["site"] = [
+            {"site": entry["site__raa_id"], "count": entry["count"]}
+            for entry in site_counts if entry["site__raa_id"]
         ]
 
         summary["institutions"] = [
