@@ -522,7 +522,7 @@ class GalleryViewSet(DynamicDepthViewSet):
 class SummaryViewSet(DynamicDepthViewSet):
     """A separate viewset to return summary data for images grouped by creator and institution and etc."""
     queryset = models.Image.objects.filter(published=True).order_by('type__order')
-    serializer_class = serializers.TIFFImageSerializer
+    serializer_class = serializers.SummarySerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
@@ -532,7 +532,6 @@ class SummaryViewSet(DynamicDepthViewSet):
         search_type = request.GET.get("search_type")
         box = request.GET.get("in_bbox")
         site = request.GET.get("site")
-
 
         queryset = self.queryset
 
@@ -562,12 +561,21 @@ class SummaryViewSet(DynamicDepthViewSet):
 
     def summarize_results(self, queryset):
         """Summarizes search results by creator and institution."""
+        # we should add Summarise search results by geographic data too: TODO
+        # Summarise by ADM0, ADM1, ADM2, socken, kommun, landskap/län: TODO
+        # motif: Two level summary with keyword categories and subcategories: Done
+        # Count of documentation types by site: TODO
+        # Show number of images for each year - probably as a chart?: TODO
+        # Summarise search results by creator and institution : Done
+
+
         summary = {
             "creators": [],
             "institutions": [],
             "year": [],
             "types": [],
             "motifs": [],
+            "geographic": []
         }
 
         # Count images per creator
@@ -606,6 +614,17 @@ class SummaryViewSet(DynamicDepthViewSet):
             .annotate(count=Count("id", distinct=True))
             .order_by("year")
         )
+
+        # Gorgraphic summary can be a json object with counts for each level of geographic data
+        # ADM0, ADM1, ADM2, socken, kommun, landskap/län
+
+        geographic_counts = (
+            queryset
+            .values("site__municipality__name", "site__parish__name", "site__province__name", "site__province__country__name")
+            .annotate(count=Count("id", distinct=True))
+            .order_by("-count")
+        )
+
         # Format summary
         summary["creators"] = [
             {"creator": entry["people__name"], "count": entry["count"]}
@@ -631,6 +650,17 @@ class SummaryViewSet(DynamicDepthViewSet):
         summary["year"] = [
             {"year": entry["year"], "count": entry["count"]}
             for entry in year_counts if entry["year"]
+        ]
+
+        summary["geographic"] = [
+            {
+                "municipality": entry["site__municipality__name"], 
+                "parish": entry["site__parish__name"], 
+                "province": entry["site__province__name"], 
+                "country": entry["site__province__country__name"],
+                "count": entry["count"]
+            }
+            for entry in geographic_counts
         ]
 
         return summary

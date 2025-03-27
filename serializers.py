@@ -11,6 +11,13 @@ class TIFFImageSerializer(DynamicDepthSerializer):
         model = Image
         fields = ['id']+get_fields(Image, exclude=['created_at', 'updated_at'])
 
+
+class SummarySerializer(DynamicDepthSerializer):
+
+    class Meta:
+        model = Image
+        fields = ['id']+get_fields(Image, exclude=['created_at', 'updated_at', 'iiif_file', 'file', 'uuid'])
+
 class SiteSerializer(DynamicDepthSerializer):
 
     class Meta:
