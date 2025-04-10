@@ -405,8 +405,6 @@ class GalleryViewSet(DynamicDepthViewSet):
                 "results": categorized_data,
             })
 
-        # Generate summary BEFORE pagination
-        summary_data = self.summarize_results(queryset)
 
         # Apply pagination
         page = self.paginate_queryset(queryset)
