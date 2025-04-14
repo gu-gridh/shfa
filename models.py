@@ -33,6 +33,24 @@ lamning_validator = RegexValidator(r"(L\d+)(:)(\d+)")
 #         return str(self)
 
 
+class GettyAATVocab(abstract.AbstractBaseModel):
+
+    term = models.CharField(max_length=128, unique=True, verbose_name=_(
+        "Term"), help_text=_("English term for match in Getty AAT"))
+    link = models.URLField(max_length=512, null=True, blank=True, verbose_name=_(
+        "Link"), help_text=_("URL to the term in Getty AAT"))
+    skos_match = models.URLField(max_length=512, null=True, blank=True, verbose_name=_(
+        "Link"), help_text=_("URL to the match type between original keyword and vocab term"))
+    class Meta:
+        verbose_name = _("GettyAATVocab")
+        verbose_name_plural = _("GettyAATVocabs")
+
+    def __str__(self) -> str:
+        return self.term
+
+    def __repr__(self) -> str:
+        return str(self)
+
 class KeywordTag(abstract.AbstractTagModel):
     # Keywords relating to the image
     pass
@@ -45,7 +63,10 @@ class KeywordTag(abstract.AbstractTagModel):
         "Category"), help_text=_("Category of the keyword, e.g. 'Djurfigur', 'Skeppfigur', etc."))
     category_translation = models.CharField(max_length=128, null=True, blank=True, verbose_name=_("Category translation"), help_text=_(
         "English translation of the category of the keyword, e.g. 'Animal figure', 'Ship figure', etc."))
-
+    att_vocab = models.ForeignKey(GettyAATVocab, null=True, blank=True, on_delete=models.SET_NULL, verbose_name=_(
+            "Getty AAT Vocab"), help_text=_("Term which most closely relates to the keyword."))
+    figurative = models.BooleanField(null=True, blank=True, default=True, help_text=_(
+            'Select if the keyword is for a figurative motif (e.g., human, animal, etc.)'))
     class Meta:
         verbose_name = _("Image keyword")
         verbose_name_plural = _("Image keywords")
@@ -55,7 +76,6 @@ class KeywordTag(abstract.AbstractTagModel):
 
     def __repr__(self) -> str:
         return str(self)
-
 
 class DatingTag(abstract.AbstractTagModel):
     # A tag model, of which a site can have many
