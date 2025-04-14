@@ -677,8 +677,6 @@ class SummaryViewSet(DynamicDepthViewSet):
             for entry in geographic_counts
         ]
 
-        print("Summary data:", summary)
-
         return summary
 
 
