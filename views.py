@@ -652,12 +652,12 @@ class SummaryViewSet(DynamicDepthViewSet):
         ]
         summary["motifs"] = [
             {"motif": entry["keywords__text"], "count": entry["count"]}
-            for entry in motif_counts
-            if "figures" in "image__keywords__category_translation" 
-            and entry["keywords__text"] not in ["Cupmarks", "Line", "Indeterminate figure", 
-                                                "Memorial inscription", "Historic carving", 
-                                                "Brev", "Later carving"]
+            for entry in motif_counts if "figures" in "image__keywords__category_translation"
+        ] + [
+            {"figurative motif": entry["keywords__text"], "count": entry["count"]}
+            for entry in motif_counts if "image__keywords__figurative"
         ]
+        
         summary["year"] = [
             {"year": entry["year"], "count": entry["count"]}
             for entry in year_counts if entry["year"]
