@@ -601,7 +601,7 @@ class SummaryViewSet(DynamicDepthViewSet):
         # Summarise search results by motif type
         motif_counts = (
             queryset
-            .values("keywords__text")
+            .values("keywords__text", "keywords__category_translation", "keywords__figurative")
             .annotate(count=Count("id", distinct=True))
             .order_by("-count")
         )
@@ -654,19 +654,13 @@ class SummaryViewSet(DynamicDepthViewSet):
         summary["motifs"] = [
             {"motif": entry["keywords__text"], "count": entry["count"]}
             for entry in motif_counts
-            if entry.get("image__keywords__category_translation") == "figures"
+            if "figure" in (entry.get("keywords__category_translation") or "").lower()
         ] + [
             {"figurative motif": entry["keywords__text"], "count": entry["count"]}
             for entry in motif_counts
-            if entry.get("image__keywords__figurative")
+            if entry.get("keywords__figurative") is True
         ]
 
-
-        summary["figurative motifs"] = [
-            {"figurative motif": entry["keywords__text"], "count": entry["count"]}
-            for entry in motif_counts if "image__keywords__figurative"
-        ]
-        
         summary["year"] = [
             {"year": entry["year"], "count": entry["count"]}
             for entry in year_counts if entry["year"]
@@ -682,6 +676,8 @@ class SummaryViewSet(DynamicDepthViewSet):
             }
             for entry in geographic_counts
         ]
+
+        print("Summary data:", summary)
 
         return summary
 
