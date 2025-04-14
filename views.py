@@ -638,8 +638,24 @@ class SummaryViewSet(DynamicDepthViewSet):
         ]
 
         summary["site"] = [
-            {"site": entry["site__raa_id"], "count": entry["count"]}
-            for entry in site_counts if entry["site__raa_id"]
+            {
+                "raa_id": entry.get("site__raa_id"),
+                "lamning_id": entry.get("site__lamning_id"),
+                "askeladden_id": entry.get("site__askeladden_id"),
+                "lokalitet_id": entry.get("site__lokalitet_id"),
+                "placename": entry.get("site__placename"),
+                "ksamsok_id": entry.get("site__ksamsok_id"),
+                "count": entry["count"]
+            }
+            for entry in site_counts
+            if any([
+                entry.get("site__raa_id"),
+                entry.get("site__lamning_id"),
+                entry.get("site__askeladden_id"),
+                entry.get("site__lokalitet_id"),
+                entry.get("site__placename"),
+                entry.get("site__ksamsok_id")
+            ])
         ]
 
         summary["institutions"] = [
