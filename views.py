@@ -650,10 +650,19 @@ class SummaryViewSet(DynamicDepthViewSet):
             {"type": entry["type__text"], "count": entry["count"]}
             for entry in type_counts if entry["type__text"]
         ]
+        
         summary["motifs"] = [
             {"motif": entry["keywords__text"], "count": entry["count"]}
-            for entry in motif_counts if "figures" in "image__keywords__category_translation"
+            for entry in motif_counts
+            if entry.get("image__keywords__category_translation") == "figures"
         ] + [
+            {"figurative motif": entry["keywords__text"], "count": entry["count"]}
+            for entry in motif_counts
+            if entry.get("image__keywords__figurative")
+        ]
+
+
+        summary["figurative motifs"] = [
             {"figurative motif": entry["keywords__text"], "count": entry["count"]}
             for entry in motif_counts if "image__keywords__figurative"
         ]
