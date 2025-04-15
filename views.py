@@ -594,14 +594,14 @@ class SummaryViewSet(DynamicDepthViewSet):
         # Count of documentation types by site
         type_counts = (
             queryset
-            .values("type__text")
+            .values("type__text", "type__english_translation")
             .annotate(count=Count("id", distinct=True))
             .order_by("-count")
         )
         # Summarise search results by motif type
         motif_counts = (
             queryset
-            .values("keywords__text", "keywords__category_translation", "keywords__figurative")
+            .values("keywords__text", "keywords__english_translation" ,"keywords__category_translation", "keywords__figurative")
             .annotate(count=Count("id", distinct=True))
             .order_by("-count")
         )
@@ -662,17 +662,30 @@ class SummaryViewSet(DynamicDepthViewSet):
             {"institution": entry["institution__name"], "count": entry["count"]}
             for entry in institution_counts if entry["institution__name"]
         ]   
+
         summary["types"] = [
-            {"type": entry["type__text"], "count": entry["count"]}
+            {
+                "type": entry["type__text"],
+                "translation": entry.get("type__english_translation"),
+                "count": entry["count"]
+            }
             for entry in type_counts if entry["type__text"]
         ]
         
         summary["motifs"] = [
-            {"motif": entry["keywords__text"], "count": entry["count"]}
+            {
+                "motif": entry["keywords__text"],
+                "translation": entry.get("keywords__english_translation"),
+                "count": entry["count"]
+            }
             for entry in motif_counts
             if "figure" in (entry.get("keywords__category_translation") or "").lower()
         ] + [
-            {"figurative motif": entry["keywords__text"], "count": entry["count"]}
+            {
+                "figurative motif": entry["keywords__text"],
+                "translation": entry.get("keywords__english_translation"),
+                "count": entry["count"]
+            }
             for entry in motif_counts
             if entry.get("keywords__figurative") is True
         ]
