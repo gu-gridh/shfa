@@ -507,16 +507,17 @@ class GalleryViewSet(DynamicDepthViewSet):
 
         return self.queryset.filter(reduce(lambda x, y: x & y, query_conditions), published=True).order_by('type__order')
 
-    def get_queryset(self):
-        q = self.request.GET.get("q", "").strip()
-        if not q:
-            return models.Image.objects.none()
+    def get_general_search_queryset(self):
+        """Handles general search with 'q' parameter."""
+        q = self.request.GET.get("q", "")
 
-        queryset = models.Image.objects.select_related(
-            'institution', 'type'
-        ).prefetch_related(
-            'dating_tags', 'people', 'keywords', 'rock_carving_object'
-        ).filter(
+        if not q:
+            return self.queryset.none()
+
+        return self.queryset.select_related(
+            "institution", "type").prefetch_related(
+            "dating_tags", "people", "keywords", "rock_carving_object"
+            ).filter(
             Q(dating_tags__text__icontains=q)
             | Q(dating_tags__english_translation__icontains=q)
             | Q(people__name__icontains=q)
