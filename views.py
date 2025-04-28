@@ -415,53 +415,52 @@ class GalleryViewSet(DynamicDepthViewSet):
 
         # If pagination is disabled, return full results with summary
         serializer = self.get_serializer(queryset, many=True)
-        
+
 
         return Response({
             "results": serializer.data,
         })
 
     def categorize_by_type(self, queryset):
-        
-        """Groups queryset results by `type__text` with counts and limits images to 5 per type."""
+        """Groups queryset results by `type__text` with counts and limits images to 5 per type, with proper depth."""
 
         # Step 1: Group data by type with translation and count
         grouped_data = (
             queryset
-            .values("type__id", "type__text", "type__english_translation")  
-            .annotate(img_count=Count("id", distinct=True))  # Ensure unique counting
-            .order_by("type__id"))
+            .values("type__id", "type__text", "type__english_translation")
+            .annotate(img_count=Count("id", distinct=True))
+            .order_by("type__id")
+        )
 
         # Step 2: Prepare dictionary for categories
         category_dict = {
             entry["type__id"]: {
                 "type": entry["type__text"],
                 "type_translation": entry.get("type__english_translation", "Unknown"),
-                "count": entry["img_count"],  
+                "count": entry["img_count"],
                 "images": [],
             }
             for entry in grouped_data
         }
 
-        # Step 3: Fetch images but limit to 5 per type
-        limited_images = (
-            queryset
-            .values()  
-            .order_by("type_id", "id")  
-        )
+        # Step 3: Fetch real model instances, ordered
+        limited_images = queryset.order_by("type_id", "id")
 
         # Step 4: Assign images to categories with a limit of 5 per type
         image_count_per_category = defaultdict(int)
 
         for img in limited_images:
-            type_id = img["type_id"]
+            type_id = img.type_id
 
             if type_id in category_dict and image_count_per_category[type_id] < 5:
-                category_dict[type_id]["images"].append(img)
+                # Serialize the image properly
+                serializer = self.get_serializer(img)
+                category_dict[type_id]["images"].append(serializer.data)
                 image_count_per_category[type_id] += 1
 
-        # Step 3: Convert dictionary to list format
+        # Step 5: Convert dictionary to list format
         return list(category_dict.values())
+
 
     def get_advanced_search_queryset(self):
         """Handles advanced search with query parameters."""
