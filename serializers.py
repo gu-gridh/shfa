@@ -196,3 +196,20 @@ class DynamicDepthModelSerializer(serializers.ModelSerializer):
         else:
             self.Meta.depth = 0
         super().__init__(*args, **kwargs)
+
+
+class SiteCoordinatesExcludeSerializer(DynamicDepthModelSerializer):
+    parish = serializers.CharField(source='parish.name', default=None)
+    municipality = serializers.CharField(source='municipality.name', default=None)
+    province = serializers.CharField(source='province.name', default=None)
+
+    class Meta:
+        model = Site
+        fields = ['id'] + get_fields(Site, exclude=['coordinates'])
+
+
+class GallerySerializer(DynamicDepthModelSerializer):
+    site = SiteCoordinatesExcludeSerializer()
+    class Meta:
+        model = Image
+        fields = ['id']+get_fields(Image, exclude=DEFAULT_FIELDS)

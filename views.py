@@ -359,7 +359,7 @@ class AdvancedSearch(DynamicDepthViewSet):
 class GalleryViewSet(DynamicDepthViewSet):  
 
     queryset = models.Image.objects.filter(published=True).order_by('type__order')
-    serializer_class = serializers.TIFFImageSerializer
+    serializer_class = serializers.GallerySerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
