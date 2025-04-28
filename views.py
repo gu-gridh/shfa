@@ -288,29 +288,42 @@ class GeneralSearch(DynamicDepthViewSet):
     serializer_class = serializers.TIFFImageSerializer
 
     def get_queryset(self):
-        q = self.request.GET["q"]
-        queryset = models.Image.objects.filter(Q(dating_tags__text__icontains=q)
-                                               | Q(dating_tags__english_translation__icontains=q)
-                                               | Q(people__name__icontains=q)
-                                               | Q(people__english_translation__icontains=q)
-                                               | Q(type__text__icontains=q)
-                                               | Q(type__english_translation__icontains=q)
-                                               | Q(site__raa_id__icontains=q)
-                                               | Q(site__lamning_id__icontains=q)
-                                               | Q(site__askeladden_id__icontains=q)
-                                               | Q(site__lokalitet_id__icontains=q)
-                                               | Q(site__placename__icontains=q)
-                                               | Q(keywords__text__icontains=q)
-                                               | Q(keywords__english_translation__icontains=q)
-                                               | Q(keywords__category__icontains=q)
-                                               | Q(keywords__category_translation__icontains=q)
-                                               | Q(rock_carving_object__name__icontains=q)
-                                               | Q(institution__name__icontains=q)
-                                               ).filter(published=True).distinct().order_by('-id', 'type__order')
+        q = self.request.GET.get("q", "").strip()
+        if not q:
+            return models.Image.objects.none()
+
+        queryset = models.Image.objects.select_related(
+            'site__parish', 'site__municipality', 'site__province', 'institution', 'type'
+        ).prefetch_related(
+            'dating_tags', 'people', 'keywords', 'rock_carving_object'
+        ).filter(
+            Q(dating_tags__text__icontains=q) |
+            Q(dating_tags__english_translation__icontains=q) |
+            Q(people__name__icontains=q) |
+            Q(people__english_translation__icontains=q) |
+            Q(type__text__icontains=q) |
+            Q(type__english_translation__icontains=q) |
+            Q(site__raa_id__icontains=q) |
+            Q(site__lamning_id__icontains=q) |
+            Q(site__askeladden_id__icontains=q) |
+            Q(site__lokalitet_id__icontains=q) |
+            Q(site__placename__icontains=q) |
+            Q(keywords__text__icontains=q) |
+            Q(keywords__english_translation__icontains=q) |
+            Q(keywords__category__icontains=q) |
+            Q(keywords__category_translation__icontains=q) |
+            Q(rock_carving_object__name__icontains=q) |
+            Q(institution__name__icontains=q) |
+            Q(site__parish__name__icontains=q) |
+            Q(site__municipality__name__icontains=q) |
+            Q(site__province__name__icontains=q)
+        ).filter(
+            published=True
+        ).distinct().order_by('-id', 'type__order')
+
         return queryset
 
-    filterset_fields = [
-        'id']+get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
+    filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
 
 class AdvancedSearch(DynamicDepthViewSet):
@@ -329,7 +342,10 @@ class AdvancedSearch(DynamicDepthViewSet):
             "author_name": ["people__name", "people__english_translation"],
             "dating_tag": ["dating_tags__text", "dating_tags__english_translation"],
             "image_type": ["type__text", "type__english_translation"],
-            "institution_name": ["institution__name"]
+            "institution_name": ["institution__name"],
+            "parish": ["site__parish__name"],
+            "municipality": ["site__municipality__name"],
+            "province": ["site__province__name"],
         }
 
         for param, fields in field_mapping.items():
@@ -474,7 +490,10 @@ class GalleryViewSet(DynamicDepthViewSet):
             "author_name": ["people__name", "people__english_translation"],
             "dating_tag": ["dating_tags__text", "dating_tags__english_translation"],
             "image_type": ["type__text", "type__english_translation"],
-            "institution_name": ["institution__name"]
+            "institution_name": ["institution__name"],
+            "parish": ["site__parish__name"],
+            "municipality": ["site__municipality__name"],
+            "province": ["site__province__name"],
         }
 
         for param, fields in field_mapping.items():
@@ -488,14 +507,16 @@ class GalleryViewSet(DynamicDepthViewSet):
 
         return self.queryset.filter(reduce(lambda x, y: x & y, query_conditions), published=True).order_by('type__order')
 
-    def get_general_search_queryset(self):
-        """Handles general search with 'q' parameter."""
-        q = self.request.GET.get("q", "")
-
+    def get_queryset(self):
+        q = self.request.GET.get("q", "").strip()
         if not q:
-            return self.queryset.none()
+            return models.Image.objects.none()
 
-        return self.queryset.filter(
+        queryset = models.Image.objects.select_related(
+            'institution', 'type'
+        ).prefetch_related(
+            'dating_tags', 'people', 'keywords', 'rock_carving_object'
+        ).filter(
             Q(dating_tags__text__icontains=q)
             | Q(dating_tags__english_translation__icontains=q)
             | Q(people__name__icontains=q)
@@ -513,6 +534,9 @@ class GalleryViewSet(DynamicDepthViewSet):
             | Q(keywords__category_translation__icontains=q)
             | Q(rock_carving_object__name__icontains=q)
             | Q(institution__name__icontains=q)
+            | Q(site__parish__name__icontains=q)
+            | Q(site__municipality__name__icontains=q)
+            | Q(site__province__name__icontains=q)
         ).filter(published=True).order_by('-id', 'type__order').distinct()
 
 
