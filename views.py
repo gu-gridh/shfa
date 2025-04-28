@@ -356,7 +356,8 @@ class AdvancedSearch(DynamicDepthViewSet):
         'id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
 # Add gallery view
-class GalleryViewSet(DynamicDepthViewSet):
+class GalleryViewSet(DynamicDepthViewSet):  
+
     queryset = models.Image.objects.filter(published=True).order_by('type__order')
     serializer_class = serializers.TIFFImageSerializer
     filter_backends = [DjangoFilterBackend]
@@ -364,12 +365,16 @@ class GalleryViewSet(DynamicDepthViewSet):
 
     def list(self, request, *args, **kwargs):
         """Handles GET requests, returning paginated image results with summary by creator and institution."""
-        queryset = self.filter_queryset(self.get_queryset())
 
         search_type = request.GET.get("search_type")
         box = request.GET.get("in_bbox")
         site = request.GET.get("site")
         category_type = request.GET.get("category_type")
+
+        if not search_type and not box and not site and not category_type:
+            return Response([])
+
+        queryset = self.get_queryset()
 
         # Apply site filter
         if site:
@@ -378,80 +383,88 @@ class GalleryViewSet(DynamicDepthViewSet):
         # Apply bbox filter
         if box:
             box = list(map(float, box.strip().split(',')))
-            bounding_box = Envelope(box)
+            bounding_box = Envelope(box)  # Assuming spatial filtering
             sites = models.Site.objects.filter(coordinates__intersects=bounding_box.wkt)
             queryset = queryset.filter(site_id__in=sites)
 
-        # Apply search filters
-        if search_type == "advanced":
+        # Apply search types
+        elif search_type == "advanced":
             queryset = self.get_advanced_search_queryset()
         elif search_type == "general":
             queryset = self.get_general_search_queryset()
+        else:
+            queryset = self.filter_queryset(self.get_queryset())
 
-        # Apply category filter
+        # Apply image type filter
         if category_type:
             queryset = queryset.filter(type__text=category_type)
-
-        # Check if absolutely no filtering is applied
-        if not (site or box or search_type or category_type or request.GET.get("q") or request.GET.get("site_name") or request.GET.get("keyword") or request.GET.get("author_name") or request.GET.get("dating_tag") or request.GET.get("image_type") or request.GET.get("institution_name")):
-            return Response([])
-
-        # Special: if category_type is NOT given, but you want to categorize images
-        if not category_type and not search_type:
+        else:
+            # Categorize images by type
             categorized_data = self.categorize_by_type(queryset)
             return Response({
                 "results": categorized_data,
             })
 
-        # Paginate
+        # Apply pagination
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            paginated_response = self.get_paginated_response(serializer.data)
 
-        # Serialize normally
+            return paginated_response
+
+        # If pagination is disabled, return full results with summary
         serializer = self.get_serializer(queryset, many=True)
+        
+
         return Response({
             "results": serializer.data,
         })
 
     def categorize_by_type(self, queryset):
+        
+        """Groups queryset results by `type__text` with counts and limits images to 5 per type."""
 
+        # Step 1: Group data by type with translation and count
         grouped_data = (
             queryset
-            .values("type__id", "type__text", "type__english_translation")
-            .annotate(img_count=Count("id", distinct=True))
-            .order_by("type__id")
-        )
+            .values("type__id", "type__text", "type__english_translation")  
+            .annotate(img_count=Count("id", distinct=True))  # Ensure unique counting
+            .order_by("type__id"))
 
+        # Step 2: Prepare dictionary for categories
         category_dict = {
             entry["type__id"]: {
                 "type": entry["type__text"],
                 "type_translation": entry.get("type__english_translation", "Unknown"),
-                "count": entry["img_count"],
+                "count": entry["img_count"],  
                 "images": [],
             }
             for entry in grouped_data
         }
 
+        # Step 3: Fetch images but limit to 5 per type
         limited_images = (
             queryset
-            .values()
-            .order_by("type_id", "id")
+            .values()  
+            .order_by("type_id", "id")  
         )
 
+        # Step 4: Assign images to categories with a limit of 5 per type
         image_count_per_category = defaultdict(int)
 
         for img in limited_images:
             type_id = img["type_id"]
+
             if type_id in category_dict and image_count_per_category[type_id] < 5:
                 category_dict[type_id]["images"].append(img)
                 image_count_per_category[type_id] += 1
 
+        # Step 3: Convert dictionary to list format
         return list(category_dict.values())
 
     def get_advanced_search_queryset(self):
-
+        """Handles advanced search with query parameters."""
         query_params = self.request.GET
         query_conditions = []
 
@@ -477,7 +490,7 @@ class GalleryViewSet(DynamicDepthViewSet):
         return self.queryset.filter(reduce(lambda x, y: x & y, query_conditions), published=True).order_by('type__order')
 
     def get_general_search_queryset(self):
-
+        """Handles general search with 'q' parameter."""
         q = self.request.GET.get("q", "")
 
         if not q:
