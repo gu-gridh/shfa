@@ -182,3 +182,17 @@ class VisualizationGroupSerializer(DynamicDepthSerializer):
                 images_nested_data.append(nested_representation)
             representation['colour_images'] = images_nested_data
         return representation
+
+class DynamicDepthModelSerializer(serializers.ModelSerializer):
+    def __init__(self, *args, **kwargs):
+        # Grab the depth from context
+        request = kwargs.get('context', {}).get('request', None)
+        if request:
+            depth = request.query_params.get('depth', 0)
+            try:
+                self.Meta.depth = int(depth)
+            except ValueError:
+                self.Meta.depth = 0
+        else:
+            self.Meta.depth = 0
+        super().__init__(*args, **kwargs)
