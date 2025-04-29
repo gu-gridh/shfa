@@ -36,6 +36,8 @@ router.register(rf'{endpoint}/search/dating',
                 views.SearchDatinTag, basename='dating Tag')
 router.register(rf'{endpoint}/search/advance',
                 views.AdvancedSearch, basename='advanced search')
+router.register(rf'{endpoint}/search/region',
+                views.RegionSearchViewSet, basename='region search')
 # General search url
 router.register(rf'{endpoint}/search', views.GeneralSearch, basename='search')
 

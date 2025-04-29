@@ -15,7 +15,6 @@ from diana.forms import ContactForm
 from django.core.mail import send_mail
 from django.conf import settings
 
-
 class SiteViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteGeoSerializer
     queryset = models.Site.objects.all()
@@ -283,6 +282,19 @@ class TypeSearchViewSet(DynamicDepthViewSet):
         return queryset
 
 
+class RegionSearchViewSet(DynamicDepthViewSet):
+    serializer_class = serializers.SiteCoordinatesExcludeSerializer
+
+    def get_queryset(self):
+        q = self.request.GET["region_name"]
+        # Search amoung parishes, municipalities and provinces names    
+        queryset = models.Site.objects.filter(
+            Q(parish__name__icontains=q) | Q(municipality__name__icontains=q) | Q(province__name__icontains=q)
+        )
+        return queryset
+    filterset_fields = get_fields(
+        models.Site, exclude=DEFAULT_FIELDS + ['coordinates'])
+
 # Add general search query
 class GeneralSearch(DynamicDepthViewSet):
     serializer_class = serializers.TIFFImageSerializer
@@ -343,9 +355,7 @@ class AdvancedSearch(DynamicDepthViewSet):
             "dating_tag": ["dating_tags__text", "dating_tags__english_translation"],
             "image_type": ["type__text", "type__english_translation"],
             "institution_name": ["institution__name"],
-            "parish": ["site__parish__name"],
-            "municipality": ["site__municipality__name"],
-            "province": ["site__province__name"],
+            "region_name": ["site__parish__name", "site__municipality__name", "site__province__name"],
         }
 
         for param, fields in field_mapping.items():
@@ -491,9 +501,7 @@ class GalleryViewSet(DynamicDepthViewSet):
             "dating_tag": ["dating_tags__text", "dating_tags__english_translation"],
             "image_type": ["type__text", "type__english_translation"],
             "institution_name": ["institution__name"],
-            "parish": ["site__parish__name"],
-            "municipality": ["site__municipality__name"],
-            "province": ["site__province__name"],
+            "region_name": ["site__parish__name", "site__municipality__name", "site__province__name"],
         }
 
         for param, fields in field_mapping.items():
@@ -745,7 +753,8 @@ class SummaryViewSet(DynamicDepthViewSet):
             "author_name": ["people__name", "people__english_translation"],
             "dating_tag": ["dating_tags__text", "dating_tags__english_translation"],
             "image_type": ["type__text", "type__english_translation"],
-            "institution_name": ["institution__name"]
+            "institution_name": ["institution__name"],
+            "region_name": ["site__parish__name", "site__municipality__name", "site__province__name"],
         }
 
         for param, fields in field_mapping.items():
@@ -784,6 +793,9 @@ class SummaryViewSet(DynamicDepthViewSet):
             | Q(keywords__category_translation__icontains=q)
             | Q(rock_carving_object__name__icontains=q)
             | Q(institution__name__icontains=q)
+            | Q(site__parish__name__icontains=q)
+            | Q(site__municipality__name__icontains=q)
+            | Q(site__province__name__icontains=q)
         ).filter(published=True).order_by('-id', 'type__order').distinct()
 
     

@@ -5,8 +5,31 @@ from .models import *
 from rest_framework import serializers
 
 
-class TIFFImageSerializer(DynamicDepthSerializer):
+class DynamicDepthModelSerializer(serializers.ModelSerializer):
+    def __init__(self, *args, **kwargs):
+        # Grab the depth from context
+        request = kwargs.get('context', {}).get('request', None)
+        if request:
+            depth = request.query_params.get('depth', 0)
+            try:
+                self.Meta.depth = int(depth)
+            except ValueError:
+                self.Meta.depth = 0
+        else:
+            self.Meta.depth = 0
+        super().__init__(*args, **kwargs)
 
+class SiteCoordinatesExcludeSerializer(DynamicDepthModelSerializer):
+    parish = serializers.CharField(source='parish.name', default=None)
+    municipality = serializers.CharField(source='municipality.name', default=None)
+    province = serializers.CharField(source='province.name', default=None)
+
+    class Meta:
+        model = Site
+        fields = ['id'] + get_fields(Site, exclude=['coordinates'])
+
+class TIFFImageSerializer(DynamicDepthSerializer):
+    site = SiteCoordinatesExcludeSerializer()
     class Meta:
         model = Image
         fields = ['id']+get_fields(Image, exclude=['created_at', 'updated_at'])
@@ -19,13 +42,18 @@ class SummarySerializer(DynamicDepthSerializer):
         fields = ['id']+get_fields(Image, exclude=['created_at', 'updated_at', 'iiif_file', 'file', 'uuid'])
 
 class SiteSerializer(DynamicDepthSerializer):
-
+    parish = serializers.CharField(source='parish.name', default=None)
+    municipality = serializers.CharField(source='municipality.name', default=None)
+    province = serializers.CharField(source='province.name', default=None)
     class Meta:
         model = Site
         fields = ['id']+get_fields(Site, exclude=DEFAULT_FIELDS)
 
 class SiteGeoSerializer(GeoFeatureModelSerializer):
-
+    parish = serializers.CharField(source='parish.name', default=None)
+    municipality = serializers.CharField(source='municipality.name', default=None)
+    province = serializers.CharField(source='province.name', default=None)
+    
     class Meta:
         model = Site
         fields = ['id']+get_fields(Site, exclude=DEFAULT_FIELDS)
@@ -183,33 +211,10 @@ class VisualizationGroupSerializer(DynamicDepthSerializer):
             representation['colour_images'] = images_nested_data
         return representation
 
-class DynamicDepthModelSerializer(serializers.ModelSerializer):
-    def __init__(self, *args, **kwargs):
-        # Grab the depth from context
-        request = kwargs.get('context', {}).get('request', None)
-        if request:
-            depth = request.query_params.get('depth', 0)
-            try:
-                self.Meta.depth = int(depth)
-            except ValueError:
-                self.Meta.depth = 0
-        else:
-            self.Meta.depth = 0
-        super().__init__(*args, **kwargs)
-
-
-class SiteCoordinatesExcludeSerializer(DynamicDepthModelSerializer):
-    parish = serializers.CharField(source='parish.name', default=None)
-    municipality = serializers.CharField(source='municipality.name', default=None)
-    province = serializers.CharField(source='province.name', default=None)
-
-    class Meta:
-        model = Site
-        fields = ['id'] + get_fields(Site, exclude=['coordinates'])
-
 
 class GallerySerializer(DynamicDepthModelSerializer):
     site = SiteCoordinatesExcludeSerializer()
     class Meta:
         model = Image
         fields = ['id']+get_fields(Image, exclude=DEFAULT_FIELDS)
+
