@@ -29,7 +29,7 @@ class SiteCoordinatesExcludeSerializer(DynamicDepthModelSerializer):
         fields = ['id'] + get_fields(Site, exclude=['coordinates'])
 
 class TIFFImageSerializer(DynamicDepthSerializer):
-    site = SiteCoordinatesExcludeSerializer()
+    # site = SiteCoordinatesExcludeSerializer()
     class Meta:
         model = Image
         fields = ['id']+get_fields(Image, exclude=['created_at', 'updated_at'])
@@ -42,17 +42,17 @@ class SummarySerializer(DynamicDepthSerializer):
         fields = ['id']+get_fields(Image, exclude=['created_at', 'updated_at', 'iiif_file', 'file', 'uuid'])
 
 class SiteSerializer(DynamicDepthSerializer):
-    parish = serializers.CharField(source='parish.name', default=None)
-    municipality = serializers.CharField(source='municipality.name', default=None)
-    province = serializers.CharField(source='province.name', default=None)
+    # parish = serializers.CharField(source='parish.name', default=None)
+    # municipality = serializers.CharField(source='municipality.name', default=None)
+    # province = serializers.CharField(source='province.name', default=None)
     class Meta:
         model = Site
         fields = ['id']+get_fields(Site, exclude=DEFAULT_FIELDS)
 
 class SiteGeoSerializer(GeoFeatureModelSerializer):
-    parish = serializers.CharField(source='parish.name', default=None)
-    municipality = serializers.CharField(source='municipality.name', default=None)
-    province = serializers.CharField(source='province.name', default=None)
+    # parish = serializers.CharField(source='parish.name', default=None)
+    # municipality = serializers.CharField(source='municipality.name', default=None)
+    # province = serializers.CharField(source='province.name', default=None)
     
     class Meta:
         model = Site
