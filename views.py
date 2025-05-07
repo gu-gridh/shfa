@@ -14,6 +14,7 @@ from collections import defaultdict
 from diana.forms import ContactForm
 from django.core.mail import send_mail
 from django.conf import settings
+from django.contrib.gis.db.models import Extent
 
 class SiteViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteGeoSerializer
@@ -436,6 +437,12 @@ class GalleryViewSet(DynamicDepthViewSet):
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             paginated_response = self.get_paginated_response(serializer.data)
+
+            bbox = queryset.aggregate(Extent('site__coordinates'))['site__coordinates__extent']
+            if bbox:
+                paginated_response.data['bbox'] = [bbox[0], bbox[1], bbox[2], bbox[3]]
+            else:
+                paginated_response.data['bbox'] = None
 
             return paginated_response
 
