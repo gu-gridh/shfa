@@ -604,7 +604,7 @@ class GeneralSearchAutocomplete(ViewSet):
     """Return suggestions for search autocomplete."""
 
     def list(self, request, *args, **kwargs):
-        q = request.GET.get("q", "").strip()
+        q = request.GET.get("q", "").strip().lower()
 
         if not q:
             return Response([])
@@ -612,6 +612,7 @@ class GeneralSearchAutocomplete(ViewSet):
         suggestions = set()
         limit = 5
 
+        # Fetch suggestions from various fields
         suggestions.update(
             models.Image.objects.filter(
                 Q(keywords__text__icontains=q) |
@@ -647,9 +648,10 @@ class GeneralSearchAutocomplete(ViewSet):
             ).values_list("type__text", flat=True).distinct()[:limit]
         )
 
-        suggestions = list(filter(None, suggestions))
-        return Response(sorted(suggestions)[:20])
-
+        # Clean up: remove None, enforce substring match, lowercase for comparison
+        cleaned = filter(None, suggestions)
+        filtered = [s for s in cleaned if q in s.lower()]
+        return Response(sorted(filtered)[:20])
 
 class SummaryViewSet(DynamicDepthViewSet):
     """A separate viewset to return summary data for images grouped by creator and institution and etc."""
