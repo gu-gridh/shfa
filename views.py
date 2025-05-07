@@ -495,8 +495,7 @@ class GalleryViewSet(DynamicDepthViewSet):
 
         field_mapping = {
             "site_name": ["site__raa_id", "site__lamning_id", "site__askeladden_id",
-                          "site__lokalitet_id", "site__placename", "site__ksamsok_id"],
-            "keyword": ["keywords__text", "keywords__english_translation", "keywords__category", "keywords__category_translation"],
+                        "site__lokalitet_id", "site__placename", "site__ksamsok_id"],
             "author_name": ["people__name", "people__english_translation"],
             "dating_tag": ["dating_tags__text", "dating_tags__english_translation"],
             "image_type": ["type__text", "type__english_translation"],
@@ -504,16 +503,48 @@ class GalleryViewSet(DynamicDepthViewSet):
             "region_name": ["site__parish__name", "site__municipality__name", "site__province__name"],
         }
 
+        # Handle all fields except keywords
         for param, fields in field_mapping.items():
             if param in query_params:
                 value = query_params[param]
                 or_conditions = [Q(**{f"{field}__icontains": value}) for field in fields]
                 query_conditions.append(reduce(lambda x, y: x | y, or_conditions))
 
-        if not query_conditions:
-            return self.queryset.none()
+        # Handle multiple keywords
+        raw_keywords = query_params.getlist("keyword")
+        keywords = []
 
-        return self.queryset.filter(reduce(lambda x, y: x & y, query_conditions), published=True).order_by('type__order')
+        for item in raw_keywords:
+            if "," in item:
+                keywords.extend([k.strip() for k in item.split(",") if k.strip()])
+            else:
+                keywords.append(item.strip())
+
+        # Remove duplicates if needed
+        keywords = list(set(keywords))
+
+        if keywords:
+            queryset = self.queryset
+            queryset = self.multiple_keyword_search(queryset, keywords)
+        else:
+            queryset = self.queryset
+
+        if query_conditions:
+            queryset = queryset.filter(reduce(lambda x, y: x & y, query_conditions))
+
+        return queryset.filter(published=True).order_by('type__order')
+
+    def multiple_keyword_search(self, queryset, keywords):
+        """Handles multiple keyword search."""
+        if not keywords:
+            return queryset
+
+        keyword_conditions = Q()
+        for keyword in keywords:
+            keyword_conditions |= Q(keywords__text__icontains=keyword) | Q(keywords__english_translation__icontains=keyword)
+
+        return queryset.filter(keyword_conditions).distinct()
+    
 
     def get_general_search_queryset(self):
         """Handles general search with 'q' parameter."""
