@@ -8,6 +8,7 @@ from django.contrib.gis.geos import Polygon
 from django.contrib.gis.gdal.envelope import Envelope
 from functools import reduce
 from rest_framework import viewsets, status
+from rest_framework.viewsets import ViewSet
 from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.response import Response
@@ -599,29 +600,24 @@ class GalleryViewSet(DynamicDepthViewSet):
 
 
 # Add autocomplete for general search box
-class GeneralSearchAutocomplete(APIView):
+class GeneralSearchAutocomplete(ViewSet):
     """Return suggestions for search autocomplete."""
-    
-    def get(self, request, *args, **kwargs):
 
+    def list(self, request, *args, **kwargs):
         q = request.GET.get("q", "").strip()
 
         if not q:
             return Response([])
 
         suggestions = set()
-
-        # You can limit number of results per field for performance
         limit = 5
 
-        # Collect partial matches from different fields
         suggestions.update(
             models.Image.objects.filter(
                 Q(keywords__text__icontains=q) |
                 Q(keywords__english_translation__icontains=q) |
                 Q(keywords__category__icontains=q) |
                 Q(keywords__category_translation__icontains=q)
-
             ).values_list("keywords__text", flat=True).distinct()[:limit]
         )
         suggestions.update(
@@ -645,18 +641,15 @@ class GeneralSearchAutocomplete(APIView):
                 Q(type__text__icontains=q) |
                 Q(type__english_translation__icontains=q) |
                 Q(institution__name__icontains=q) |
-                Q(institution__english_translation__icontains=q) |
                 Q(dating_tags__text__icontains=q) |
                 Q(dating_tags__english_translation__icontains=q) |
-                Q(rock_carving_object__name__icontains=q) |
-                Q(rock_carving_object__english_translation__icontains=q)
+                Q(rock_carving_object__name__icontains=q)
             ).values_list("type__text", flat=True).distinct()[:limit]
-        )            
+        )
 
-        # Clean and return
         suggestions = list(filter(None, suggestions))
-        print("#######################", suggestions, "#########################")
         return Response(sorted(suggestions)[:20])
+
 
 class SummaryViewSet(DynamicDepthViewSet):
     """A separate viewset to return summary data for images grouped by creator and institution and etc."""

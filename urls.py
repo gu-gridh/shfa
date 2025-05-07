@@ -38,8 +38,8 @@ router.register(rf'{endpoint}/search/advance',
                 views.AdvancedSearch, basename='advanced search')
 router.register(rf'{endpoint}/search/region',
                 views.RegionSearchViewSet, basename='region search')
-# router.register(rf'{endpoint}/search/autocomplete',
-#                 views.GeneralSearchAutocomplete, basename='general search autocomplete')
+router.register(rf'{endpoint}/search/autocomplete',
+                views.GeneralSearchAutocomplete, basename='general search autocomplete')
 
 # General search url
 router.register(rf'{endpoint}/search', views.GeneralSearch, basename='search')
@@ -69,8 +69,6 @@ router.register(rf'{contact_endpoint}', views.ContactFormViewSet, basename='cont
 
 urlpatterns = [
     path('', include(router.urls)),
-    path(rf'{endpoint}/search/autocomplete',
-         views.GeneralSearchAutocomplete.as_view(), name='autocomplete'),
     # add oai-pmh end points
     path(rf'{endpoint}/OAICat/', views.oai, name="oai"),
     # Automatically generated views
