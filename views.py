@@ -8,6 +8,7 @@ from django.contrib.gis.geos import Polygon
 from django.contrib.gis.gdal.envelope import Envelope
 from functools import reduce
 from rest_framework import viewsets, status
+from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.response import Response
 from collections import defaultdict
@@ -15,6 +16,7 @@ from diana.forms import ContactForm
 from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib.gis.db.models import Extent
+from django.db.models.query import QuerySet
 
 class SiteViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteGeoSerializer
@@ -438,13 +440,22 @@ class GalleryViewSet(DynamicDepthViewSet):
             serializer = self.get_serializer(page, many=True)
             paginated_response = self.get_paginated_response(serializer.data)
 
-            bbox = queryset.aggregate(Extent('site__coordinates'))['site__coordinates__extent']
-            if bbox:
-                paginated_response.data['bbox'] = [bbox[0], bbox[1], bbox[2], bbox[3]]
+            # Get bbox from current page only
+            if isinstance(page, QuerySet):
+                bbox = page.aggregate(Extent('site__coordinates'))['site__coordinates__extent']
             else:
-                paginated_response.data['bbox'] = None
+                # If page is a list (e.g., DRF pagination can return a plain list), fallback to IDs
+                image_ids = [img.id for img in page]
+                bbox = models.Image.objects.filter(id__in=image_ids).aggregate(
+                    Extent('site__coordinates')
+                )['site__coordinates__extent']
 
-            return paginated_response
+        if bbox:
+            paginated_response.data['bbox'] = [bbox[0], bbox[1], bbox[2], bbox[3]]
+        else:
+            paginated_response.data['bbox'] = None
+
+        return paginated_response
 
         # If pagination is disabled, return full results with summary
         serializer = self.get_serializer(queryset, many=True)
@@ -586,6 +597,66 @@ class GalleryViewSet(DynamicDepthViewSet):
             | Q(site__province__name__icontains=q)
         ).filter(published=True).order_by('-id', 'type__order').distinct()
 
+
+# Add autocomplete for general search box
+class GeneralSearchAutocomplete(APIView):
+    """Return suggestions for search autocomplete."""
+    
+    def get(self, request, *args, **kwargs):
+
+        q = request.GET.get("q", "").strip()
+
+        if not q:
+            return Response([])
+
+        suggestions = set()
+
+        # You can limit number of results per field for performance
+        limit = 5
+
+        # Collect partial matches from different fields
+        suggestions.update(
+            models.Image.objects.filter(
+                Q(keywords__text__icontains=q) |
+                Q(keywords__english_translation__icontains=q) |
+                Q(keywords__category__icontains=q) |
+                Q(keywords__category_translation__icontains=q)
+
+            ).values_list("keywords__text", flat=True).distinct()[:limit]
+        )
+        suggestions.update(
+            models.Image.objects.filter(
+                Q(people__name__icontains=q) |
+                Q(people__english_translation__icontains=q)
+            ).values_list("people__name", flat=True).distinct()[:limit]
+        )
+        suggestions.update(
+            models.Image.objects.filter(
+                Q(site__placename__icontains=q) |
+                Q(site__raa_id__icontains=q) |
+                Q(site__lamning_id__icontains=q) |
+                Q(site__askeladden_id__icontains=q) |
+                Q(site__lokalitet_id__icontains=q) |
+                Q(site__ksamsok_id__icontains=q)
+            ).values_list("site__placename", flat=True).distinct()[:limit]
+        )
+        suggestions.update(
+            models.Image.objects.filter(
+                Q(type__text__icontains=q) |
+                Q(type__english_translation__icontains=q) |
+                Q(institution__name__icontains=q) |
+                Q(institution__english_translation__icontains=q) |
+                Q(dating_tags__text__icontains=q) |
+                Q(dating_tags__english_translation__icontains=q) |
+                Q(rock_carving_object__name__icontains=q) |
+                Q(rock_carving_object__english_translation__icontains=q)
+            ).values_list("type__text", flat=True).distinct()[:limit]
+        )            
+
+        # Clean and return
+        suggestions = list(filter(None, suggestions))
+        print("#######################", suggestions, "#########################")
+        return Response(sorted(suggestions)[:20])
 
 class SummaryViewSet(DynamicDepthViewSet):
     """A separate viewset to return summary data for images grouped by creator and institution and etc."""
