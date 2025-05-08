@@ -599,9 +599,9 @@ class GalleryViewSet(DynamicDepthViewSet):
         ).filter(published=True).order_by('-id', 'type__order').distinct()
 
 
-# Add autocomplete for general search box
+# Add autocomplete for general search 
 class GeneralSearchAutocomplete(ViewSet):
-    """Return suggestions for search autocomplete."""
+    """Return suggestions for search autocomplete with source info."""
 
     def list(self, request, *args, **kwargs):
         q = request.GET.get("q", "").strip().lower()
@@ -609,49 +609,76 @@ class GeneralSearchAutocomplete(ViewSet):
         if not q:
             return Response([])
 
-        suggestions = set()
         limit = 5
+        suggestions = []
 
-        # Fetch suggestions from various fields
-        suggestions.update(
-            models.Image.objects.filter(
-                Q(keywords__text__icontains=q) |
-                Q(keywords__english_translation__icontains=q) |
-                Q(keywords__category__icontains=q) |
-                Q(keywords__category_translation__icontains=q)
-            ).values_list("keywords__text", flat=True).distinct()[:limit]
-        )
-        suggestions.update(
-            models.Image.objects.filter(
-                Q(people__name__icontains=q) |
-                Q(people__english_translation__icontains=q)
-            ).values_list("people__name", flat=True).distinct()[:limit]
-        )
-        suggestions.update(
-            models.Image.objects.filter(
-                Q(site__placename__icontains=q) |
-                Q(site__raa_id__icontains=q) |
-                Q(site__lamning_id__icontains=q) |
-                Q(site__askeladden_id__icontains=q) |
-                Q(site__lokalitet_id__icontains=q) |
-                Q(site__ksamsok_id__icontains=q)
-            ).values_list("site__placename", flat=True).distinct()[:limit]
-        )
-        suggestions.update(
-            models.Image.objects.filter(
-                Q(type__text__icontains=q) |
-                Q(type__english_translation__icontains=q) |
-                Q(institution__name__icontains=q) |
-                Q(dating_tags__text__icontains=q) |
-                Q(dating_tags__english_translation__icontains=q) |
-                Q(rock_carving_object__name__icontains=q)
-            ).values_list("type__text", flat=True).distinct()[:limit]
-        )
+        def add_suggestions(queryset, label):
+            for item in queryset:
+                if item and q in item.lower():
+                    suggestions.append({"value": item, "source": label})
 
-        # Clean up: remove None, enforce substring match, lowercase for comparison
-        cleaned = filter(None, suggestions)
-        filtered = [s for s in cleaned if q in s.lower()]
-        return Response(sorted(filtered)[:20])
+        # Keywords
+        keywords_qs = models.Image.objects.filter(
+            Q(keywords__text__icontains=q) |
+            Q(keywords__english_translation__icontains=q) |
+            Q(keywords__category__icontains=q) |
+            Q(keywords__category_translation__icontains=q)
+        ).values_list("keywords__text", flat=True).distinct()[:limit]
+        add_suggestions(keywords_qs, "keywords")
+
+        # People
+        people_qs = models.Image.objects.filter(
+            Q(people__name__icontains=q) |
+            Q(people__english_translation__icontains=q)
+        ).values_list("people__name", flat=True).distinct()[:limit]
+        add_suggestions(people_qs, "people")
+
+        # Site
+        site_qs = models.Image.objects.filter(
+            Q(site__placename__icontains=q) |
+            Q(site__raa_id__icontains=q) |
+            Q(site__lamning_id__icontains=q) |
+            Q(site__askeladden_id__icontains=q) |
+            Q(site__lokalitet_id__icontains=q) |
+            Q(site__ksamsok_id__icontains=q)
+        ).values_list("site__placename", flat=True).distinct()[:limit]
+        add_suggestions(site_qs, "site")
+
+        # Type
+        type_qs = models.Image.objects.filter(
+            Q(type__text__icontains=q) |
+            Q(type__english_translation__icontains=q)
+        ).values_list("type__text", flat=True).distinct()[:limit]
+        add_suggestions(type_qs, "type")
+
+        # Institution
+        institution_qs = models.Image.objects.filter(
+            institution__name__icontains=q
+        ).values_list("institution__name", flat=True).distinct()[:limit]
+        add_suggestions(institution_qs, "institution")
+
+        # Dating Tags
+        tags_qs = models.Image.objects.filter(
+            Q(dating_tags__text__icontains=q) |
+            Q(dating_tags__english_translation__icontains=q)
+        ).values_list("dating_tags__text", flat=True).distinct()[:limit]
+        add_suggestions(tags_qs, "dating tag")
+
+        # Rock Carving
+        rc_qs = models.Image.objects.filter(
+            rock_carving_object__name__icontains=q
+        ).values_list("rock_carving_object__name", flat=True).distinct()[:limit]
+        add_suggestions(rc_qs, "rock carving")
+
+        # Sort and deduplicate
+        unique_suggestions = {(s["value"], s["source"]) for s in suggestions}
+        sorted_suggestions = sorted(
+            [{"value": v, "source": s} for v, s in unique_suggestions],
+            key=lambda x: x["value"]
+        )[:20]
+
+        return Response(sorted_suggestions)
+
 
 class SummaryViewSet(DynamicDepthViewSet):
     """A separate viewset to return summary data for images grouped by creator and institution and etc."""
