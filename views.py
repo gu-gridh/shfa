@@ -556,7 +556,7 @@ class GalleryViewSet(DynamicDepthViewSet):
                 )
             query_conditions.append(keyword_condition)
 
-        # Combine all conditions with AND
+        # Combine all conditions with OR
         if query_conditions:
             queryset = queryset.filter(reduce(lambda x, y: x | y, query_conditions))
 
