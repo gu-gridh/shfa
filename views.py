@@ -400,6 +400,7 @@ class GalleryViewSet(DynamicDepthViewSet):
         box = request.GET.get("in_bbox")
         site = request.GET.get("site")
         category_type = request.GET.get("category_type")
+        opertor = request.GET.get("operator")
 
         if not search_type and not box and not site and not category_type:
             return Response([])
@@ -556,8 +557,14 @@ class GalleryViewSet(DynamicDepthViewSet):
                 )
             query_conditions.append(keyword_condition)
 
-        # Combine all conditions with OR
-        if query_conditions:
+        # Combine all conditions with correct operator
+        if query_conditions and "operator" in query_params:
+            operator = query_params["operator"]
+            if operator == "AND":
+                queryset = queryset.filter(reduce(lambda x, y: x & y, query_conditions))
+            elif operator == "OR":
+                queryset = queryset.filter(reduce(lambda x, y: x | y, query_conditions))
+        else:
             queryset = queryset.filter(reduce(lambda x, y: x | y, query_conditions))
 
         return queryset.filter(published=True).distinct().order_by('type__order')
