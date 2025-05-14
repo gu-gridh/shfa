@@ -427,7 +427,8 @@ class GalleryViewSet(DynamicDepthViewSet):
 
         # Apply image type filter
         if category_type:
-            queryset = queryset.filter(type__text=category_type)
+            queryset = queryset.filter(Q(type__text=category_type) |
+                                       Q(type__english_translation=category_type))
         else:
             # Categorize images by type
             categorized_data = self.categorize_by_type(queryset)
@@ -522,47 +523,44 @@ class GalleryViewSet(DynamicDepthViewSet):
             "region_name": ["site__parish__name", "site__municipality__name", "site__province__name"],
         }
 
-        # Handle all fields except keywords
+        # Handle all fields including support for multi-value query params
         for param, fields in field_mapping.items():
-            if param in query_params:
-                value = query_params[param]
-                or_conditions = [Q(**{f"{field}__icontains": value}) for field in fields]
-                query_conditions.append(reduce(lambda x, y: x | y, or_conditions))
+            raw_values = query_params.getlist(param)
+            values = []
+            for val in raw_values:
+                values.extend([v.strip() for v in val.split(",") if v.strip()])
+            values = list(set(values))
 
-        # Handle multiple keywords
+            if values:
+                field_condition = Q()
+                for value in values:
+                    or_conditions = [Q(**{f"{field}__icontains": value}) for field in fields]
+                    field_condition |= reduce(lambda x, y: x | y, or_conditions)
+                query_conditions.append(field_condition)
+
+        # Handle keywords similarly
         raw_keywords = query_params.getlist("keyword")
         keywords = []
-
         for item in raw_keywords:
-            if "," in item:
-                keywords.extend([k.strip() for k in item.split(",") if k.strip()])
-            else:
-                keywords.append(item.strip())
-
-        # Remove duplicates if needed
+            keywords.extend([k.strip() for k in item.split(",") if k.strip()])
         keywords = list(set(keywords))
 
-        if keywords:
-            queryset = self.queryset
-            queryset = self.multiple_keyword_search(queryset, keywords)
-        else:
-            queryset = self.queryset
+        queryset = self.queryset
 
+        if keywords:
+            keyword_condition = Q()
+            for keyword in keywords:
+                keyword_condition |= (
+                    Q(keywords__text__icontains=keyword) |
+                    Q(keywords__english_translation__icontains=keyword)
+                )
+            query_conditions.append(keyword_condition)
+
+        # Combine all conditions with AND
         if query_conditions:
             queryset = queryset.filter(reduce(lambda x, y: x & y, query_conditions))
 
-        return queryset.filter(published=True).order_by('type__order')
-
-    def multiple_keyword_search(self, queryset, keywords):
-        """Handles multiple keyword search."""
-        if not keywords:
-            return queryset
-
-        keyword_conditions = Q()
-        for keyword in keywords:
-            keyword_conditions |= Q(keywords__text__icontains=keyword) | Q(keywords__english_translation__icontains=keyword)
-
-        return queryset.filter(keyword_conditions).distinct()
+        return queryset.filter(published=True).distinct().order_by('type__order')
     
 
     def get_general_search_queryset(self):
@@ -605,36 +603,54 @@ class GeneralSearchAutocomplete(ViewSet):
 
     def list(self, request, *args, **kwargs):
         q = request.GET.get("q", "").strip().lower()
-
         if not q:
             return Response([])
 
-        limit = 5
+        limit = 5  # per field limit for matching values
+        max_all_values = 10  # limit for full value suggestions per field
         suggestions = []
 
-        def add_suggestions(queryset, label):
-            for item in queryset:
-                if item and q in item.lower():
-                    suggestions.append({"value": item, "source": label})
+        def add_suggestions(filtered_qs, all_values_qs, label):
+            seen = set()
+            for item in filtered_qs:
+                if item and (v := item.strip()) and v.lower() not in seen:
+                    if q in v.lower():
+                        suggestions.append({"value": v, "source": label})
+                        seen.add(v.lower())
+
+            for item in all_values_qs:
+                if item and (v := item.strip()) and v.lower() not in seen:
+                    suggestions.append({"value": v, "source": label})
+                    seen.add(v.lower())
 
         # Keywords
-        keywords_qs = models.Image.objects.filter(
+        keywords_filtered = models.Image.objects.filter(
             Q(keywords__text__icontains=q) |
             Q(keywords__english_translation__icontains=q) |
             Q(keywords__category__icontains=q) |
             Q(keywords__category_translation__icontains=q)
         ).values_list("keywords__text", flat=True).distinct()[:limit]
-        add_suggestions(keywords_qs, "keywords")
+
+        keywords_all = models.Image.objects.values_list(
+            "keywords__text", flat=True
+        ).distinct()[:max_all_values]
+
+        add_suggestions(keywords_filtered, keywords_all, "keywords")
 
         # People
-        people_qs = models.Image.objects.filter(
+        people_filtered = models.Image.objects.filter(
             Q(people__name__icontains=q) |
             Q(people__english_translation__icontains=q)
         ).values_list("people__name", flat=True).distinct()[:limit]
-        add_suggestions(people_qs, "people")
+
+        people_all = models.Image.objects.values_list(
+            "people__name", flat=True
+        ).distinct()[:max_all_values]
+
+        add_suggestions(people_filtered, people_all, "people")
 
         # Site
-        site_qs = models.Image.objects.filter(
+        site_filtered = models.Image.objects.filter(
             Q(site__placename__icontains=q) |
             Q(site__raa_id__icontains=q) |
             Q(site__lamning_id__icontains=q) |
@@ -642,35 +658,60 @@ class GeneralSearchAutocomplete(ViewSet):
             Q(site__lokalitet_id__icontains=q) |
             Q(site__ksamsok_id__icontains=q)
         ).values_list("site__placename", flat=True).distinct()[:limit]
-        add_suggestions(site_qs, "site")
+
+        site_all = models.Image.objects.values_list(
+            "site__placename", flat=True
+        ).distinct()[:max_all_values]
+
+        add_suggestions(site_filtered, site_all, "site")
 
         # Type
-        type_qs = models.Image.objects.filter(
+        type_filtered = models.Image.objects.filter(
             Q(type__text__icontains=q) |
             Q(type__english_translation__icontains=q)
         ).values_list("type__text", flat=True).distinct()[:limit]
-        add_suggestions(type_qs, "type")
+
+        type_all = models.Image.objects.values_list(
+            "type__text", flat=True
+        ).distinct()[:max_all_values]
+
+        add_suggestions(type_filtered, type_all, "type")
 
         # Institution
-        institution_qs = models.Image.objects.filter(
+        institution_filtered = models.Image.objects.filter(
             institution__name__icontains=q
         ).values_list("institution__name", flat=True).distinct()[:limit]
-        add_suggestions(institution_qs, "institution")
+
+        institution_all = models.Image.objects.values_list(
+            "institution__name", flat=True
+        ).distinct()[:max_all_values]
+
+        add_suggestions(institution_filtered, institution_all, "institution")
 
         # Dating Tags
-        tags_qs = models.Image.objects.filter(
+        tags_filtered = models.Image.objects.filter(
             Q(dating_tags__text__icontains=q) |
             Q(dating_tags__english_translation__icontains=q)
         ).values_list("dating_tags__text", flat=True).distinct()[:limit]
-        add_suggestions(tags_qs, "dating tag")
+
+        tags_all = models.Image.objects.values_list(
+            "dating_tags__text", flat=True
+        ).distinct()[:max_all_values]
+
+        add_suggestions(tags_filtered, tags_all, "dating tag")
 
         # Rock Carving
-        rc_qs = models.Image.objects.filter(
+        rc_filtered = models.Image.objects.filter(
             rock_carving_object__name__icontains=q
         ).values_list("rock_carving_object__name", flat=True).distinct()[:limit]
-        add_suggestions(rc_qs, "rock carving")
 
-        # Sort and deduplicate
+        rc_all = models.Image.objects.values_list(
+            "rock_carving_object__name", flat=True
+        ).distinct()[:max_all_values]
+
+        add_suggestions(rc_filtered, rc_all, "rock carving")
+
+        # Deduplicate and sort
         unique_suggestions = {(s["value"], s["source"]) for s in suggestions}
         sorted_suggestions = sorted(
             [{"value": v, "source": s} for v, s in unique_suggestions],
