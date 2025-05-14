@@ -643,14 +643,17 @@ class GeneralSearchAutocomplete(ViewSet):
         # Site
         site_filtered = models.Image.objects.filter(
             Q(site__placename__icontains=q) |
-            Q(site__raa_id__icontains=q) |
-            Q(site__lamning_id__icontains=q) |
-            Q(site__askeladden_id__icontains=q) |
-            Q(site__lokalitet_id__icontains=q) |
-            Q(site__ksamsok_id__icontains=q)
+            Q(site__raa_id__icontains=q) 
+            # Q(site__lamning_id__icontains=q) |
+            # Q(site__askeladden_id__icontains=q) |
+            # Q(site__lokalitet_id__icontains=q) |
+            # Q(site__ksamsok_id__icontains=q)
+        # ).values_list(
+        #     "site__placename", "site__raa_id", "site__lamning_id",
+        #     "site__askeladden_id", "site__lokalitet_id", "site__ksamsok_id"
+        # ).distinct()[:limit]
         ).values_list(
-            "site__placename", "site__raa_id", "site__lamning_id",
-            "site__askeladden_id", "site__lokalitet_id", "site__ksamsok_id"
+            "site__placename", "site__raa_id"
         ).distinct()[:limit]
 
         add_suggestions(site_filtered, "site")
@@ -685,7 +688,18 @@ class GeneralSearchAutocomplete(ViewSet):
 
         add_suggestions(rc_filtered, "rock carving")
 
-        # Deduplicate and sort
+        # Region
+        region_filtered = models.Image.objects.filter(
+            Q(site__parish__name__icontains=q) |
+            Q(site__municipality__name__icontains=q) |
+            Q(site__province__name__icontains=q)
+        ).values_list(
+            "site__parish__name", "site__municipality__name", "site__province__name"
+        ).distinct()[:limit]
+
+        add_suggestions(region_filtered, "region")
+
+        # duplicate and sort
         unique_suggestions = {(s["value"], s["source"]) for s in suggestions}
         sorted_suggestions = sorted(
             [{"value": v, "source": s} for v, s in unique_suggestions],
