@@ -597,7 +597,7 @@ class GalleryViewSet(DynamicDepthViewSet):
         ).filter(published=True).order_by('-id', 'type__order').distinct()
 
 
-# Add autocomplete for general search 
+# Add autocomplete for general search from rest_framework.viewsets import ViewSet
 class GeneralSearchAutocomplete(ViewSet):
     """Return suggestions for search autocomplete with source info."""
 
@@ -607,16 +607,17 @@ class GeneralSearchAutocomplete(ViewSet):
             return Response([])
 
         limit = 5
-        max_all_values = 10
         suggestions = []
 
-        def add_suggestions(filtered_qs, all_values_qs, label):
+        def add_suggestions(filtered_qs, label):
             seen = set()
-            for row in list(filtered_qs) + list(all_values_qs):
+            for row in filtered_qs:
                 for val in row if isinstance(row, (tuple, list)) else [row]:
-                    if val and (v := str(val).strip()) and v.lower() not in seen:
-                        suggestions.append({"value": v, "source": label})
-                        seen.add(v.lower())
+                    if val:
+                        val_str = str(val).strip()
+                        if q in val_str.lower() and val_str.lower() not in seen:
+                            suggestions.append({"value": val_str, "source": label})
+                            seen.add(val_str.lower())
 
         # Keywords
         keywords_filtered = models.Image.objects.filter(
@@ -625,14 +626,11 @@ class GeneralSearchAutocomplete(ViewSet):
             Q(keywords__category__icontains=q) |
             Q(keywords__category_translation__icontains=q)
         ).values_list(
-            "keywords__text", "keywords__english_translation", "keywords__category", "keywords__category_translation"
+            "keywords__text", "keywords__english_translation",
+            "keywords__category", "keywords__category_translation"
         ).distinct()[:limit]
 
-        keywords_all = models.Image.objects.values_list(
-            "keywords__text", "keywords__english_translation", "keywords__category", "keywords__category_translation"
-        ).distinct()[:max_all_values]
-
-        add_suggestions(keywords_filtered, keywords_all, "keywords")
+        add_suggestions(keywords_filtered, "keywords")
 
         # People
         people_filtered = models.Image.objects.filter(
@@ -640,11 +638,7 @@ class GeneralSearchAutocomplete(ViewSet):
             Q(people__english_translation__icontains=q)
         ).values_list("people__name", "people__english_translation").distinct()[:limit]
 
-        people_all = models.Image.objects.values_list(
-            "people__name", "people__english_translation"
-        ).distinct()[:max_all_values]
-
-        add_suggestions(people_filtered, people_all, "people")
+        add_suggestions(people_filtered, "people")
 
         # Site
         site_filtered = models.Image.objects.filter(
@@ -659,12 +653,7 @@ class GeneralSearchAutocomplete(ViewSet):
             "site__askeladden_id", "site__lokalitet_id", "site__ksamsok_id"
         ).distinct()[:limit]
 
-        site_all = models.Image.objects.values_list(
-            "site__placename", "site__raa_id", "site__lamning_id",
-            "site__askeladden_id", "site__lokalitet_id", "site__ksamsok_id"
-        ).distinct()[:max_all_values]
-
-        add_suggestions(site_filtered, site_all, "site")
+        add_suggestions(site_filtered, "site")
 
         # Type
         type_filtered = models.Image.objects.filter(
@@ -672,22 +661,14 @@ class GeneralSearchAutocomplete(ViewSet):
             Q(type__english_translation__icontains=q)
         ).values_list("type__text", "type__english_translation").distinct()[:limit]
 
-        type_all = models.Image.objects.values_list(
-            "type__text", "type__english_translation"
-        ).distinct()[:max_all_values]
-
-        add_suggestions(type_filtered, type_all, "type")
+        add_suggestions(type_filtered, "type")
 
         # Institution
         institution_filtered = models.Image.objects.filter(
             institution__name__icontains=q
         ).values_list("institution__name", flat=True).distinct()[:limit]
 
-        institution_all = models.Image.objects.values_list(
-            "institution__name", flat=True
-        ).distinct()[:max_all_values]
-
-        add_suggestions(institution_filtered, institution_all, "institution")
+        add_suggestions(institution_filtered, "institution")
 
         # Dating Tags
         tags_filtered = models.Image.objects.filter(
@@ -695,22 +676,14 @@ class GeneralSearchAutocomplete(ViewSet):
             Q(dating_tags__english_translation__icontains=q)
         ).values_list("dating_tags__text", "dating_tags__english_translation").distinct()[:limit]
 
-        tags_all = models.Image.objects.values_list(
-            "dating_tags__text", "dating_tags__english_translation"
-        ).distinct()[:max_all_values]
-
-        add_suggestions(tags_filtered, tags_all, "dating tag")
+        add_suggestions(tags_filtered, "dating tag")
 
         # Rock Carving
         rc_filtered = models.Image.objects.filter(
             rock_carving_object__name__icontains=q
         ).values_list("rock_carving_object__name", flat=True).distinct()[:limit]
 
-        rc_all = models.Image.objects.values_list(
-            "rock_carving_object__name", flat=True
-        ).distinct()[:max_all_values]
-
-        add_suggestions(rc_filtered, rc_all, "rock carving")
+        add_suggestions(rc_filtered, "rock carving")
 
         # Deduplicate and sort
         unique_suggestions = {(s["value"], s["source"]) for s in suggestions}
@@ -720,6 +693,7 @@ class GeneralSearchAutocomplete(ViewSet):
         )[:20]
 
         return Response(sorted_suggestions)
+
 
 
 
