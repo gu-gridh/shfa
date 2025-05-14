@@ -558,7 +558,7 @@ class GalleryViewSet(DynamicDepthViewSet):
 
         # Combine all conditions with AND
         if query_conditions:
-            queryset = queryset.filter(reduce(lambda x, y: x & y, query_conditions))
+            queryset = queryset.filter(reduce(lambda x, y: x | y, query_conditions))
 
         return queryset.filter(published=True).distinct().order_by('type__order')
     
@@ -707,8 +707,6 @@ class GeneralSearchAutocomplete(ViewSet):
         )[:20]
 
         return Response(sorted_suggestions)
-
-
 
 
 class SummaryViewSet(DynamicDepthViewSet):
