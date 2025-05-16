@@ -624,6 +624,25 @@ class MetadataFormat(abstract.AbstractBaseModel):
         verbose_name_plural = _("Metadata formats")
 
 
+class Set(abstract.AbstractBaseModel):
+    spec = models.CharField(
+        max_length=256, unique=True, verbose_name=_("Set spec"))
+    name = models.CharField(
+        max_length=256, unique=True, verbose_name=_("Set name"))
+    description = models.TextField(
+        max_length=2048, verbose_name=_("Set description"))
+    
+    def __str__(self):
+        """Name."""
+        return self.name
+    
+    class Meta:
+        """Meta."""
+
+        ordering = ("name",)
+        verbose_name = _("Set")
+        verbose_name_plural = _("Sets")
+
 class ResumptionToken(abstract.AbstractBaseModel):
     """ResumptionToken Model."""
 

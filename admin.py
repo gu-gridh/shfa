@@ -322,6 +322,12 @@ class MetadataFormatAdmin(admin.ModelAdmin):
     list_display = ["prefix"]
 
 
+@admin.register(Set)
+class SetAdmin(admin.ModelAdmin):
+    list_display = ["spec", "name", "description"]
+    search_fields = ["spec", "name", "description"]
+    ordering = ('name',)
+
 @admin.register(ResumptionToken)
 class ResumptionTokenAdmin(admin.ModelAdmin):
     list_display = ["token"]

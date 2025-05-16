@@ -171,6 +171,49 @@ def get_list_metadata(request, params):
         )
     return xml_output
 
+def get_list_set(request, params):
+    template = "../templates/listsets.xml"
+    error_template = "../templates/error.xml"
+    errors = []
+
+    # OAI-PMH specification: ListSets may use resumptionToken, but no other params are allowed if it is present
+    if "resumptionToken" in params:
+        resumption_token = params.pop("resumptionToken")[-1]
+        # You would need to implement logic for paginated set listing via resumption token
+        errors.append(_error("noSetHierarchy"))  # Placeholder for your use case
+    else:
+        # No resumptionToken, regular set listing
+        if not models.Set.objects.exists():
+            errors.append(_error("noSetHierarchy"))
+        else:
+            sets = models.Set.objects.all()
+            paginator = Paginator(sets, NUM_PER_PAGE)
+            page_number = int(params.get("page", ["1"])[-1])  # Support page param if desired
+            try:
+                sets_page = paginator.page(page_number)
+            except EmptyPage:
+                sets_page = paginator.page(paginator.num_pages)
+
+    _check_bad_arguments(errors, params)
+
+    if errors:
+        return render(
+            request,
+            template_name=error_template,
+            context={"errors": errors},
+            content_type="text/xml",
+        )
+
+    return render(
+        request,
+        template_name=template,
+        context={
+            "sets": sets_page,
+            "paginator": paginator,
+            "page_number": page_number,
+        },
+        content_type="text/xml",
+    )
 
 
 def _do_resumption_token(params, errors):

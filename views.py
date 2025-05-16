@@ -982,6 +982,8 @@ def oai(request):
             output = get_list_records(verb, request, params)
         elif verb == "ListMetadataFormats":
             output = get_list_metadata(request, params)
+        elif verb == "ListSets":
+            output = get_list_set(request, params)
         else:
             output = verb_error(request)
 
