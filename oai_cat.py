@@ -73,12 +73,19 @@ def get_identify(request):
 
 
 def get_list_records(verb, request, params):
-    template = "../templates/listrecords.xml"
+    template_ksamsok = "../templates/listrecords.xml"
+    template_ariande = "../templates/listrecords_ariadne.xml"
     error_template = "../templates/error.xml"
     errors = []
 
+    paginator_images = None
+    images = None
+    resumption_token = None
+    metadata_prefix = None
+    from_timestamp = None
+    until_timestamp = None
+
     if "resumptionToken" in params:
-        # Generate resumptionToken
         (
             paginator_images,
             images,
@@ -92,52 +99,54 @@ def get_list_records(verb, request, params):
         metadata_prefix = params.pop("metadataPrefix")
         if len(metadata_prefix) == 1:
             metadata_prefix = metadata_prefix[0]
-            if not models.MetadataFormat.objects.filter(
-                prefix=metadata_prefix
-            ).exists():
-                errors.append(_error(
-                    "cannotDisseminateFormat", metadata_prefix))
+            if not models.MetadataFormat.objects.filter(prefix=metadata_prefix).exists():
+                errors.append(_error("cannotDisseminateFormat", metadata_prefix))
             else:
-                from_timestamp, until_timestamp = _check_timestamps(
-                    errors, params)
-                
-                images_data = models.Image.objects
-                if from_timestamp is not None:
+                from_timestamp, until_timestamp = _check_timestamps(errors, params)
+
+                images_data = models.Image.objects.all()
+                if from_timestamp:
                     images_data = images_data.filter(created_at__gte=from_timestamp)
-                if until_timestamp is not None:
-                    images_data = images_data.filter(updated_at__gte=until_timestamp)
+                if until_timestamp:
+                    images_data = images_data.filter(updated_at__lte=until_timestamp)
 
-                paginator_images = Paginator(images_data.all(), NUM_PER_PAGE)
+                paginator_images = Paginator(images_data, NUM_PER_PAGE)
                 images = paginator_images.page(1)
-
         else:
-            errors.append(_error(
-                "badArgument_single", ";".join(metadata_prefix)))
+            errors.append(_error("badArgument_single", ";".join(metadata_prefix)))
             metadata_prefix = None
     else:
-        errors.append(_error(
-            "badArgument", "metadataPrefix"))
+        errors.append(_error("badArgument", "metadataPrefix"))
 
     if errors:
-        xml_output = render(
+        return render(
             request,
             template_name=error_template,
-            context={'errors': errors},
-            content_type='text/xml'
-        )
-    else:
-        xml_output = render(
-            request,
-            template,
-            context={'images': images,
-                    'verb': verb,
-                    'paginator': paginator_images,
-                    'metadata_prefix': metadata_prefix,
-                    'from_timestamp': from_timestamp,
-                    'until_timestamp': until_timestamp},
+            context={"errors": errors},
             content_type="text/xml",
+        )
+
+    if metadata_prefix == "ksamsok-rdf":
+        template = template_ksamsok
+    elif metadata_prefix == "ariande-rdf":
+        template = template_ariande
+    else:
+        template = template_ksamsok  # fallback default
+
+    return render(
+        request,
+        template_name=template,
+        context={
+            "images": images,
+            "paginator": paginator_images,
+            "resumption_token": resumption_token,
+            "metadata_prefix": metadata_prefix,
+            "from_timestamp": from_timestamp,
+            "until_timestamp": until_timestamp,
+        },
+        content_type="text/xml",
     )
-    return xml_output
+
 
 
 def get_list_metadata(request, params):
