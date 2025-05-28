@@ -128,7 +128,7 @@ def get_list_records(verb, request, params):
 
     if metadata_prefix == "ksamsok-rdf":
         template = template_ksamsok
-    elif metadata_prefix == "ariande-rdf":
+    elif metadata_prefix == "ariadne-rdf":
         template = template_ariande
     else:
         template = template_ksamsok  # fallback default
