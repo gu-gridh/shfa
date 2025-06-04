@@ -9,7 +9,7 @@ NUM_PER_PAGE = 25
 
 def get_records(params, request):
     template_ksmsak = "../templates/bild.template.xml"
-    template_ariande = "../templates/bild_ariande.template.xml"
+    template_ariande = "../templates/records_ariadne.xml"
     error_template = "../templates/error.xml"
     errors = []
     
