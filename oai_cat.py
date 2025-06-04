@@ -8,7 +8,8 @@ NUM_PER_PAGE = 25
 
 
 def get_records(params, request):
-    template = "../templates/bild.template.xml"
+    template_ksmsak = "../templates/bild.template.xml"
+    template_ariande = "../templates/bild_ariande.template.xml"
     error_template = "../templates/error.xml"
     errors = []
     
@@ -51,6 +52,14 @@ def get_records(params, request):
             content_type='text/xml'
         )
     else:
+
+        if metadata_prefix == "ksamsok-rdf":
+            template = template_ksmsak
+        elif metadata_prefix == "ariadne-rdf":
+            template = template_ariande
+        else:
+            template = template_ksmsak
+
         xml_output = render(
             request,
             template_name=template,
