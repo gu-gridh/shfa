@@ -20,7 +20,7 @@ from django.contrib.gis.db.models import Extent
 from django.db.models.query import QuerySet
 
 class SiteViewSet(DynamicDepthViewSet):
-    serializer_class = serializers.SiteGeoSerializer
+    serializer_class = serializers.SiteSerializer
     queryset = models.Site.objects.all()
 
     filterset_fields = get_fields(
@@ -822,10 +822,11 @@ class SummaryViewSet(DynamicDepthViewSet):
 
         # Gorgraphic summary can be a json object with counts for each level of geographic data
         # ADM0, ADM1, ADM2, socken, kommun, landskap/län
-
+    
         geographic_counts = (
             queryset
-            .values("site__municipality__name", "site__parish__name", "site__province__name", "site__province__country__name")
+            .values("site__municipality__name", "site__parish__name", "site__province__name", 
+                    "site__province__country__name", "site__municipality__superregion__superregion__superregion__superregion__name")
             .annotate(count=Count("id", distinct=True))
             .order_by("-count")
         )
@@ -894,12 +895,41 @@ class SummaryViewSet(DynamicDepthViewSet):
             for entry in year_counts if entry["year"]
         ]
 
+        # Geographic summary 
+        summary["province"] = [
+            {
+                "province": entry["site__province__name"],
+                "country": entry["site__province__country__name"],
+                "count": entry["count"]
+            }
+            for entry in geographic_counts if entry["site__province__name"]
+        ]
+
+        summary["municipality"] = [
+            {
+                "municipality": entry["site__municipality__name"],
+                "country": entry["site__province__country__name"] or entry["site__municipality__superregion__superregion__superregion__superregion__name"],
+                "count": entry["count"]
+            } 
+            for entry in geographic_counts if entry["site__municipality__name"]
+        ]
+
+        summary["parish"] = [
+            {
+                "parish": entry["site__parish__name"],
+                "province": entry["site__province__name"],
+                "country": entry["site__province__country__name"],
+                "count": entry["count"]
+            }
+            for entry in geographic_counts if entry["site__parish__name"]
+        ]
+        
         summary["geographic"] = [
             {
                 "municipality": entry["site__municipality__name"], 
                 "parish": entry["site__parish__name"], 
                 "province": entry["site__province__name"], 
-                "country": entry["site__province__country__name"],
+                "country": entry["site__province__country__name"] or entry["site__municipality__superregion__superregion__superregion__superregion__name"],
                 "count": entry["count"]
             }
             for entry in geographic_counts
