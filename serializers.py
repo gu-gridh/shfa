@@ -215,22 +215,31 @@ class GallerySerializer(DynamicDepthModelSerializer):
     height = serializers.SerializerMethodField()
 
     def get_width(self, obj):
-        return self.get_iiif_info(obj).get('width')
+        return self.get_iiif_info(obj).get("width")
 
     def get_height(self, obj):
-        return self.get_iiif_info(obj).get('height')
+        return self.get_iiif_info(obj).get("height")
 
     def get_iiif_info(self, obj):
         import requests
+
+        if not obj.iiif_file:
+            return {}
+
+        info_url = f"{obj.iiif_file}/info.json"
+
         try:
-            response = requests.get(f"{obj.iiif_url}/info.json")
+            response = requests.get(info_url, timeout=2)
             if response.status_code == 200:
                 return response.json()
-        except Exception:
+        except Exception as e:
+            # Optional: log the error
             pass
-        return {"width": None, "height": None}
+
+        return {}
 
     class Meta:
         model = Image
         fields = ['id', 'width', 'height'] + get_fields(Image, exclude=DEFAULT_FIELDS)
+
 
