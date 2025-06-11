@@ -225,15 +225,29 @@ class GallerySerializer(DynamicDepthModelSerializer):
     def get_iiif_info(self, obj):
         import requests
 
+        base_url = "https://img.dh.gu.se/diana/static/"
+
         if not obj.iiif_file:
             return {}
 
-        info_url = f"{obj.iiif_file}/info.json"
+        # Convert to URL string
+        iiif_file_url = getattr(obj.iiif_file, 'url', None)
+        if not iiif_file_url:
+            return {}
+
+        # Fix relative paths
+        if not iiif_file_url.startswith("http"):
+            iiif_file_url = base_url + iiif_file_url.lstrip("/")
+
+        info_url = f"{iiif_file_url}/info.json"
+
         response = requests.get(info_url, timeout=3)
         if response.status_code == 200:
             return response.json()
 
         return {}
+
+
 
     class Meta:
         model = Image
