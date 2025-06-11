@@ -33,8 +33,6 @@ class TIFFImageSerializer(DynamicDepthSerializer):
     class Meta:
         model = Image
         fields = ['id']+get_fields(Image, exclude=['created_at', 'updated_at'])
-
-
 class SummarySerializer(DynamicDepthSerializer):
 
     class Meta:
@@ -211,10 +209,28 @@ class VisualizationGroupSerializer(DynamicDepthSerializer):
             representation['colour_images'] = images_nested_data
         return representation
 
-
 class GallerySerializer(DynamicDepthModelSerializer):
     site = SiteCoordinatesExcludeSerializer()
+    width = serializers.SerializerMethodField()
+    height = serializers.SerializerMethodField()
+
+    def get_width(self, obj):
+        return self.get_iiif_info(obj).get('width')
+
+    def get_height(self, obj):
+        return self.get_iiif_info(obj).get('height')
+
+    def get_iiif_info(self, obj):
+        import requests
+        try:
+            response = requests.get(f"{obj.iiif_url}/info.json")
+            if response.status_code == 200:
+                return response.json()
+        except Exception:
+            pass
+        return {"width": None, "height": None}
+
     class Meta:
         model = Image
-        fields = ['id']+get_fields(Image, exclude=DEFAULT_FIELDS)
+        fields = ['id', 'width', 'height'] + get_fields(Image, exclude=DEFAULT_FIELDS)
 
