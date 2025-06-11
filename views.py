@@ -430,12 +430,12 @@ class GalleryViewSet(DynamicDepthViewSet):
         if category_type:
             queryset = queryset.filter(Q(type__text=category_type) |
                                        Q(type__english_translation=category_type))
-        # else:
-        #     # Categorize images by type
-        #     categorized_data = self.categorize_by_type(queryset)
-        #     return Response({
-        #         "results": categorized_data,
-        #     })
+        else:
+            # Categorize images by type
+            categorized_data = self.categorize_by_type(queryset)
+            return Response({
+                "results": categorized_data,
+            })
 
         # Apply pagination
         page = self.paginate_queryset(queryset)
@@ -468,8 +468,9 @@ class GalleryViewSet(DynamicDepthViewSet):
             "results": serializer.data,
         })
 
+
     def categorize_by_type(self, queryset):
-        """Groups queryset results by `type__text` with counts and limits images to 5 per type, with proper depth."""
+        """Groups queryset results by `type__text` with counts and paginates images per type."""
 
         # Step 1: Group data by type with translation and count
         grouped_data = (
@@ -490,39 +491,31 @@ class GalleryViewSet(DynamicDepthViewSet):
             for entry in grouped_data
         }
 
-        # Step 3: Fetch real model instances, ordered
-        limited_images = queryset.order_by("type_id", "id")
+        # Step 3: Get pagination params
+        try:
+            limit = int(self.request.GET.get("limit", 25))
+            page = int(self.request.GET.get("page", 1))
+            if limit < 1 or page < 1:
+                raise ValueError
+        except ValueError:
+            limit = 25
+            page = 1
 
+        start = (page - 1) * limit
+        end = start + limit
 
-        # Step 4: Limit images based on limit number in api 
-        # and assign them to the corresponding categories
-        limit = self.request.GET.get("limit", 25)
+        # Step 4: Fetch real model instances ordered by type and ID
+        images_by_type = defaultdict(list)
+        for img in queryset.order_by("type_id", "id"):
+            images_by_type[img.type_id].append(img)
 
-        for img in limited_images:
-            type_id = img.type_id
-            if type_id in category_dict and len(category_dict[type_id]["images"]) < int(limit):
-                # Serialize the image properly
-                serializer = self.get_serializer(img)
-                category_dict[type_id]["images"].append(serializer.data)
-            else:
-                # if it's less than limit, get all of them
-                serializer = self.get_serializer(img)
-                if type_id in category_dict:
-                    category_dict[type_id]["images"].append(serializer.data)
+        # Step 5: Paginate images per type
+        for type_id, images in images_by_type.items():
+            paginated_images = images[start:end]
+            serialized = self.get_serializer(paginated_images, many=True).data
+            if type_id in category_dict:
+                category_dict[type_id]["images"] = serialized
 
-        # Step 4: Assign images to categories with a limit of 5 per type
-        # image_count_per_category = defaultdict(int)
-
-        # for img in limited_images:
-        #     type_id = img.type_id
-
-        #     if type_id in category_dict and image_count_per_category[type_id] < 5:
-        #         # Serialize the image properly
-        #         serializer = self.get_serializer(img)
-        #         category_dict[type_id]["images"].append(serializer.data)
-        #         image_count_per_category[type_id] += 1
-
-        # Step 5: Convert dictionary to list format
         return list(category_dict.values())
 
 
