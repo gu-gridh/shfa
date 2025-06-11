@@ -18,6 +18,13 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib.gis.db.models import Extent
 from django.db.models.query import QuerySet
+# myapp/pagination.py
+from rest_framework.pagination import PageNumberPagination
+
+# Custom pagination class to allow dynamic page size
+class CustomPageNumberPagination(PageNumberPagination):
+    page_size_query_param = 'limit'  # allow dynamic page size via ?limit=25
+    max_page_size = 100  # optional: prevent excessive queries
 
 class SiteViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteSerializer
@@ -392,6 +399,7 @@ class GalleryViewSet(DynamicDepthViewSet):
     serializer_class = serializers.GallerySerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
+    pagination_class = CustomPageNumberPagination
 
     def list(self, request, *args, **kwargs):
         """Handles GET requests, returning paginated image results with summary by creator and institution."""
@@ -401,6 +409,7 @@ class GalleryViewSet(DynamicDepthViewSet):
         site = request.GET.get("site")
         category_type = request.GET.get("category_type")
         opertor = request.GET.get("operator")
+        limit = request.GET.get("limit", 25)
 
         if not search_type and not box and not site and not category_type:
             return Response([])
@@ -437,7 +446,8 @@ class GalleryViewSet(DynamicDepthViewSet):
                 "results": categorized_data,
             })
 
-        # Apply pagination
+        # Apply pagination and limit it bases on limit parameter
+
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -447,18 +457,14 @@ class GalleryViewSet(DynamicDepthViewSet):
             if isinstance(page, QuerySet):
                 bbox = page.aggregate(Extent('site__coordinates'))['site__coordinates__extent']
             else:
-                # If page is a list (e.g., DRF pagination can return a plain list), fallback to IDs
                 image_ids = [img.id for img in page]
                 bbox = models.Image.objects.filter(id__in=image_ids).aggregate(
                     Extent('site__coordinates')
                 )['site__coordinates__extent']
 
-        if bbox:
-            paginated_response.data['bbox'] = [bbox[0], bbox[1], bbox[2], bbox[3]]
-        else:
-            paginated_response.data['bbox'] = None
+            paginated_response.data['bbox'] = [*bbox] if bbox else None
+            return paginated_response
 
-        return paginated_response
 
         # If pagination is disabled, return full results with summary
         serializer = self.get_serializer(queryset, many=True)
@@ -467,7 +473,6 @@ class GalleryViewSet(DynamicDepthViewSet):
         return Response({
             "results": serializer.data,
         })
-
 
     def categorize_by_type(self, queryset):
         """Groups queryset results by `type__text` with counts and paginates images per type."""
@@ -486,35 +491,35 @@ class GalleryViewSet(DynamicDepthViewSet):
                 "type": entry["type__text"],
                 "type_translation": entry.get("type__english_translation", "Unknown"),
                 "count": entry["img_count"],
-                "images": [],
+                # "images": [],
             }
             for entry in grouped_data
         }
 
-        # Step 3: Get pagination params
-        try:
-            limit = int(self.request.GET.get("limit", 25))
-            page = int(self.request.GET.get("page", 1))
-            if limit < 1 or page < 1:
-                raise ValueError
-        except ValueError:
-            limit = 25
-            page = 1
+        # # Step 3: Get pagination params
+        # try:
+        #     limit = int(self.request.GET.get("limit", 25))
+        #     page = int(self.request.GET.get("page", 1))
+        #     if limit < 1 or page < 1:
+        #         raise ValueError
+        # except ValueError:
+        #     limit = 25
+        #     page = 1
 
-        start = (page - 1) * limit
-        end = start + limit
+        # start = (page - 1) * limit
+        # end = start + limit
 
-        # Step 4: Fetch real model instances ordered by type and ID
-        images_by_type = defaultdict(list)
-        for img in queryset.order_by("type_id", "id"):
-            images_by_type[img.type_id].append(img)
+        # # Step 4: Fetch real model instances ordered by type and ID
+        # images_by_type = defaultdict(list)
+        # for img in queryset.order_by("type_id", "id"):
+        #     images_by_type[img.type_id].append(img)
 
-        # Step 5: Paginate images per type
-        for type_id, images in images_by_type.items():
-            paginated_images = images[start:end]
-            serialized = self.get_serializer(paginated_images, many=True).data
-            if type_id in category_dict:
-                category_dict[type_id]["images"] = serialized
+        # # Step 5: Paginate images per type
+        # for type_id, images in images_by_type.items():
+        #     paginated_images = images[start:end]
+        #     serialized = self.get_serializer(paginated_images, many=True).data
+        #     if type_id in category_dict:
+        #         category_dict[type_id]["images"] = serialized
 
         return list(category_dict.values())
 
