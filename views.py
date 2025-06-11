@@ -430,12 +430,12 @@ class GalleryViewSet(DynamicDepthViewSet):
         if category_type:
             queryset = queryset.filter(Q(type__text=category_type) |
                                        Q(type__english_translation=category_type))
-        else:
-            # Categorize images by type
-            categorized_data = self.categorize_by_type(queryset)
-            return Response({
-                "results": categorized_data,
-            })
+        # else:
+        #     # Categorize images by type
+        #     categorized_data = self.categorize_by_type(queryset)
+        #     return Response({
+        #         "results": categorized_data,
+        #     })
 
         # Apply pagination
         page = self.paginate_queryset(queryset)
@@ -539,7 +539,7 @@ class GalleryViewSet(DynamicDepthViewSet):
             "image_type": ["type__text", "type__english_translation"],
             "institution_name": ["institution__name"],
             "region_name": ["site__parish__name", "site__municipality__name", "site__province__name"],
-            "visualization_group": ["group__name"],
+            # "visualization_group": ["group__name"],
         }
 
         # Handle all fields including support for multi-value query params
