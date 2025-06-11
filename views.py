@@ -493,17 +493,34 @@ class GalleryViewSet(DynamicDepthViewSet):
         # Step 3: Fetch real model instances, ordered
         limited_images = queryset.order_by("type_id", "id")
 
-        # Step 4: Assign images to categories with a limit of 5 per type
-        image_count_per_category = defaultdict(int)
+
+        # Step 4: Limit images based on limit number in api 
+        # and assign them to the corresponding categories
+        limit = self.request.GET.get("limit", 25)
 
         for img in limited_images:
             type_id = img.type_id
-
-            if type_id in category_dict and image_count_per_category[type_id] < 5:
+            if type_id in category_dict and len(category_dict[type_id]["images"]) < int(limit):
                 # Serialize the image properly
                 serializer = self.get_serializer(img)
                 category_dict[type_id]["images"].append(serializer.data)
-                image_count_per_category[type_id] += 1
+            else:
+                # if it's less than limit, get all of them
+                serializer = self.get_serializer(img)
+                if type_id in category_dict:
+                    category_dict[type_id]["images"].append(serializer.data)
+
+        # Step 4: Assign images to categories with a limit of 5 per type
+        # image_count_per_category = defaultdict(int)
+
+        # for img in limited_images:
+        #     type_id = img.type_id
+
+        #     if type_id in category_dict and image_count_per_category[type_id] < 5:
+        #         # Serialize the image properly
+        #         serializer = self.get_serializer(img)
+        #         category_dict[type_id]["images"].append(serializer.data)
+        #         image_count_per_category[type_id] += 1
 
         # Step 5: Convert dictionary to list format
         return list(category_dict.values())
@@ -522,6 +539,7 @@ class GalleryViewSet(DynamicDepthViewSet):
             "image_type": ["type__text", "type__english_translation"],
             "institution_name": ["institution__name"],
             "region_name": ["site__parish__name", "site__municipality__name", "site__province__name"],
+            "visualization_group": ["group__name"],
         }
 
         # Handle all fields including support for multi-value query params
