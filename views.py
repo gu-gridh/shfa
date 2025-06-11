@@ -23,8 +23,10 @@ from rest_framework.pagination import PageNumberPagination
 
 # Custom pagination class to allow dynamic page size
 class CustomPageNumberPagination(PageNumberPagination):
-    page_size_query_param = 'limit'  # allow dynamic page size via ?limit=25
-    max_page_size = 100  # optional: prevent excessive queries
+    page_size = 25  # default limit if not provided
+    page_size_query_param = 'limit'  # allows ?limit=50
+    max_page_size = 100  # optional: prevent abuse
+
 
 class SiteViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteSerializer
