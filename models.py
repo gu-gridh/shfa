@@ -110,6 +110,10 @@ class ImageTypeTag(abstract.AbstractTagModel):
         "orders"), help_text=_("Types order"))
     english_translation = models.CharField(max_length=5000, null=True, blank=True, verbose_name=_(
         'translation'), help_text=("English translation for tag"))
+    description = models.CharField(max_length=500, null=True, blank=True, verbose_name=_(
+        'description'), help_text=("Description of the image type"))
+    english_description = models.CharField(max_length=500, null=True, blank=True, verbose_name=_(
+        'description translation'), help_text=("English translation for the image type description"))
 
     class Meta:
         verbose_name = _("Image Type")
