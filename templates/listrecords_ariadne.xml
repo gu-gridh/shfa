@@ -23,155 +23,76 @@
                         xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
                         xmlns:fn="http://www.w3.org/2005/xpath-functions#">
 
-                        <rdf:Description rdf:about="https://shfa.dh.gu.se/image/{{ image.id }}">
-                            <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/AO_Individual_Data_Resource"/>
+                        <Entity rdf:about="https://shfa.dh.gu.se/image/{{ image.id }}">
                             <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/AO_Entity"/>
-                            <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/AO_Data_Resource"/>
-                            <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/AO_Resource"/>
                             <rdfs:label>Record SHFA {{ image.id }}</rdfs:label>
-
-                            <has_ARIADNE_subject xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" rdf:resource="https://ariadne-infrastructure.eu/aocat/Concept/AO_Subject/Rock%20Art"/>
-                            <has_contributor xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" rdf:resource="https://ariadne-infrastructure.eu/aocat/Agent/NOTPROVIDED"/>
                             <has_publisher xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" rdf:resource="https://ariadne-infrastructure.eu/aocat/Agent/Swedish%20Rock%20Art%20Research%20Archives"/>
-
-                            <has_type>{{image.type.english_translation}}</has_type>
-                            {% if image.subtype %}
-                            <has_type>{{image.subtype.english_translation}}</has_type>
-                            {% endif %}
                             <has_title>{% get_image_title image %}</has_title>
                             <was_modified xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">{{image.updated_at|date:"Y-m-d"}}</was_modified>
                             <was_issued xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">{{image.created_at|date:"Y-m-d"}}</was_issued>
-                            <has_owner xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" rdf:resource="https://ariadne-infrastructure.eu/aocat/Agent/SHFA"/>
-                            {% for person in image.people.all %}
-                            <has_creator>{{ person.english_translation }}</has_creator>
-                            {% endfor %}
-                            <has_description xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" xml:lang="en">{{image.type.english_translation}} of {{image.rock_carving_object.name}}, {{image.site.placename}}, created by {% get_image_creators image %} at {{image.institution.name}} ({{image.year}}).</has_description>
-                            <has_description xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" xml:lang="sv">{{image.type.text}} of {{image.rock_carving_object.name}}, {{image.site.placename}}, created by {% get_image_creators image %} at {{image.institution.name}} ({{image.year}}).</has_description>
+                            <affiliation>SHFA</affiliation>
+                            <description_en xml:lang="en">{{image.type.english_translation}} of {{image.rock_carving_object.name}}, {{image.site.placename}}, created by {% get_image_creators image %} at {{image.institution.name}} ({{image.year}}).</description_en>
+                            <description_sv xml:lang="sv">{{image.type.text}} av {{image.rock_carving_object.name}}, {{image.site.placename}}, skapad av {% get_image_creators image %} på {{image.institution.name}} ({{image.year}}).</description_sv>
                             <has_access_rights xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" rdf:resource="https://creativecommons.org/licenses/by/4.0/" />
                             <has_responsible xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" rdf:resource="https://ariadne-infrastructure.eu/aocat/Agent/SHFA"/>
-                            <has_original_id xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/">{{image.id}}</has_original_id>
-                            <has_identifier xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/">SHFA Legacy ID: {{image.legacy_id}}</has_identifier>
+                            
+                            <image_id>{{image.id}}</image_id>
+                            <shfa_archive_id>{{image.legacy_id}}</shfa_archive_id>
                             {% if image.site.raa_id %}
-                            <has_identifier xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" xml:lang="sv">RAÄ-nummer: {{image.site.raa_id}}</has_identifier>
+                                <RAÄ_nr>{{image.site.raa_id}}</RAÄ_nr>
                             {% endif %}
                             {% if image.site.lamning_id %}
-                            <has_identifier xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" xml:lang="sv">Lämningsnummer: {{image.site.lamning_id}}</has_identifier>
+                                <lamningsnummer>{{image.site.lamning_id}}</lamningsnummer>
                             {% endif %}
                             {% if image.site.askeladden_id %}
-                            <has_identifier xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" xml:lang="no">Askeladden ID: {{image.site.askeladden_id}}</has_identifier>
+                                <askeladden_id>{{image.site.askeladden_id}}</askeladden_id>
                             {% endif %}
                             {% if image.site.lokalitet_id %}
-                            <has_identifier xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" xml:lang="da">Lokalitet ID: {{image.site.lokalitet_id}}</has_identifier>
+                                <lokalitet_id>{{image.site.lokalitet_id}}</lokalitet_id>
                             {% endif %}
-                            <is_part_of xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" rdf:resource="https://ariadne-infrastructure.eu/aocat/Collection/SND/3875697E-69CC-342B-9AAD-5B11A89E99D8"/>
+                            {% if image.rock_carving_object.name %}
+                            <site_name>{{image.rock_carving_object.name}}</site_name>
+                            {% else %}
+                            <site_name>{{image.site.placename}}</site_name>
+                            {% endif %}
                             
-                            {% if image.site.coordinates.coordinates %}
-                            <has_spatial_coverage>
-                            <rdf:Description >
-                                <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/AO_Spatial_Region"/>
-                                <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/AO_Spatial_Region_Point"/>
-                                <rdf:type rdf:resource="http://www.cidoc-crm.org/cidoc-crm/E53_Place"/>
-                                <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/AO_Entity"/>
-                                <rdf:type rdf:resource="http://www.cidoc-crm.org/cidoc-crm/E1_CRM_Entity"/>
-                                <rdfs:label>Long, Lat: {{image.site.coordinates.coordinates}}</rdfs:label>
-                                <has_place_name>{{image.site.placename}}</has_place_name>
-                                <has_latitude xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" rdf:datatype="http://www.w3.org/2001/XMLSchema#decimal">{{ image.site.coordinates.coordinates|get_coord_at:1 }}</has_latitude>
-                                <has_longitude xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" rdf:datatype="http://www.w3.org/2001/XMLSchema#decimal">{{ image.site.coordinates.coordinates|get_coord_at:0 }}</has_longitude>
-                            </rdf:Description>
-                            </has_spatial_coverage>
-                            {% endif %}
+                            <country>{{image.site.municipality.superregion.country.name}}</country>
+                            <province></province>
+                            <parish>{{image.site.parish.name}}</parish>
+                            <county>{{image.site.province.name}}</county>
+                            <municipality>{{image.site.municipality.name}}</municipality>
+                            <latitude>{{ data.site.coordinates.coordinates|get_coord_at:1 }}</latitude>
+                            <longitude>{{ data.site.coordinates.coordinates|get_coord_at:0 }}</longitude>
+                            <imageURL>{{image.file}}</imageURL>
+                            <URL>https://shfa.dh.gu.se/image/{{image.id}}</URL>
+                            <iiifFile>{{image.iiif_file}}</iiifFile>
+                            <iiifManifest>{{image.iiif_file}}/info.json</iiifManifest>
+                            <copyright>CC-BY</copyright>
 
-                            <has_landing_page xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" rdf:resource="https://shfa.dh.gu.se/image/{{ image.id }}"/>
+                            {% for person in image.people.all %}
+                                <originator>{{ person.english_translation }}</originator>
+                            {% endfor %}
+
+                            <type>{{image.type.text}}</type>
+                            {% if image.subtype %}
+                            <subtype>{{image.subtype.english_translation}}</subtype>
+                            {% endif %}
+                            <year>{{image.year}}</year>
 
                             {% for period in image.dating_tags.all %}
-                                <has_temporal_coverage xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/">{{ period.english_translation }}</has_temporal_coverage>
+                                <period>{{ period.text }}</period>
                             {% endfor %}
-
 
                             {% for tag in image.keywords.all %}
-                                <has_native_subject xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" xml:lang="sv">
-                                <rdf:Description >
-                                    <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/AO_Concept"/>
-                                    <rdf:type rdf:resource="http://www.w3.org/2004/02/skos/core#Concept"/>
-                                    <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/ΑΟ_Concept"/>
-                                    <rdf:type rdf:resource="http://www.cidoc-crm.org/cidoc-crm/E55_Type"/>
-                                    <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/AO_Entity"/>
-                                    <rdf:type rdf:resource="http://www.cidoc-crm.org/cidoc-crm/E1_CRM_Entity"/>
-                                    <owl:sameAs rdf:resource="http://tempuri/aat-mappings-shfa/{{ tag.text }}" />
-                                    <prefLabel xmlns="http://www.w3.org/2004/02/skos/core#" xml:lang="sv">{{tag.text}}</prefLabel>
-                                </rdf:Description>
-                                </has_native_subject>
-                                <has_native_subject xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" xml:lang="en">
-                                <rdf:Description >
-                                    <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/AO_Concept"/>
-                                    <rdf:type rdf:resource="http://www.w3.org/2004/02/skos/core#Concept"/>
-                                    <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/ΑΟ_Concept"/>
-                                    <rdf:type rdf:resource="http://www.cidoc-crm.org/cidoc-crm/E55_Type"/>
-                                    <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/AO_Entity"/>
-                                    <rdf:type rdf:resource="http://www.cidoc-crm.org/cidoc-crm/E1_CRM_Entity"/>
-                                    <owl:sameAs rdf:resource="http://tempuri/aat-mappings-shfa/{{ tag.text }}" />
-                                    <prefLabel xmlns="http://www.w3.org/2004/02/skos/core#" xml:lang="en">{{tag.english_translation}}</prefLabel>
-                                </rdf:Description>
-                                </has_native_subject>
-
-                                <is_about xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" xml:lang="sv">
-                                <rdf:Description >
-                                    <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/AO_Concept"/>
-                                    <rdf:type rdf:resource="http://www.w3.org/2004/02/skos/core#Concept"/>
-                                    <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/ΑΟ_Concept"/>
-                                    <rdf:type rdf:resource="http://www.cidoc-crm.org/cidoc-crm/E55_Type"/>
-                                    <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/AO_Entity"/>
-                                    <rdf:type rdf:resource="http://www.cidoc-crm.org/cidoc-crm/E1_CRM_Entity"/>
-                                    <owl:sameAs rdf:resource="http://tempuri/aat-mappings-shfa/{{ tag.text }}" />
-                                    <prefLabel xmlns="http://www.w3.org/2004/02/skos/core#" xml:lang="sv">{{tag.text}}</prefLabel>
-                                </rdf:Description>
-                                </is_about>
-                                <is_about xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" xml:lang="en">
-                                <rdf:Description >
-                                    <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/AO_Concept"/>
-                                    <rdf:type rdf:resource="http://www.w3.org/2004/02/skos/core#Concept"/>
-                                    <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/ΑΟ_Concept"/>
-                                    <rdf:type rdf:resource="http://www.cidoc-crm.org/cidoc-crm/E55_Type"/>
-                                    <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/AO_Entity"/>
-                                    <rdf:type rdf:resource="http://www.cidoc-crm.org/cidoc-crm/E1_CRM_Entity"/>
-                                    <owl:sameAs rdf:resource="http://tempuri/aat-mappings-shfa/{{ tag.text }}" />
-                                    <prefLabel xmlns="http://www.w3.org/2004/02/skos/core#" xml:lang="en">{{tag.english_translation}}</prefLabel>
-                                </rdf:Description>
-                                </is_about>
-
-                                <refers_to xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" xml:lang="sv">
-                                <rdf:Description >
-                                    <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/AO_Concept"/>
-                                    <rdf:type rdf:resource="http://www.w3.org/2004/02/skos/core#Concept"/>
-                                    <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/ΑΟ_Concept"/>
-                                    <rdf:type rdf:resource="http://www.cidoc-crm.org/cidoc-crm/E55_Type"/>
-                                    <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/AO_Entity"/>
-                                    <rdf:type rdf:resource="http://www.cidoc-crm.org/cidoc-crm/E1_CRM_Entity"/>
-                                    <owl:sameAs rdf:resource="http://tempuri/aat-mappings-shfa/{{ tag.text }}" />
-                                    <prefLabel xmlns="http://www.w3.org/2004/02/skos/core#" xml:lang="sv">{{tag.text}}</prefLabel>
-                                </rdf:Description>
-                                </refers_to>
-                                <refers_to xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" xml:lang="en">
-                                <rdf:Description >
-                                    <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/AO_Concept"/>
-                                    <rdf:type rdf:resource="http://www.w3.org/2004/02/skos/core#Concept"/>
-                                    <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/ΑΟ_Concept"/>
-                                    <rdf:type rdf:resource="http://www.cidoc-crm.org/cidoc-crm/E55_Type"/>
-                                    <rdf:type rdf:resource="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/AO_Entity"/>
-                                    <rdf:type rdf:resource="http://www.cidoc-crm.org/cidoc-crm/E1_CRM_Entity"/>
-                                    <owl:sameAs rdf:resource="http://tempuri/aat-mappings-shfa/{{ tag.text }}" />
-                                    <prefLabel xmlns="http://www.w3.org/2004/02/skos/core#" xml:lang="en">{{tag.english_translation}}</prefLabel>
-                                </rdf:Description>
-                                </refers_to>
+                                <keywords>
+                                    <sourceLabel>{{tag.text}}</sourceLabel>
+                                    <sourceLabelLanguage>sv</sourceLabelLanguage>
+                                    <matchURI>{{tag.aat_vocab.skos_match}}</matchURI>
+                                    <targetLabel>{{tag.aat_vocab.terms}}</targetLabel>
+                                    <targetURI>{{tag.aat_vocab.link}}</targetURI>
+                                </keywords>
                             {% endfor %}
-
-                            <is_about xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" rdf:resource="https://ariadne-infrastructure.eu/aocat/Concept/AO_Subject/Rock%20Art"/>
-                            <refers_to xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" rdf:resource="https://ariadne-infrastructure.eu/aocat/Concept/AO_Subject/Rock%20Art"/>
-                            <P67_refers_to xmlns="http://www.cidoc-crm.org/cidoc-crm/" rdf:resource="https://ariadne-infrastructure.eu/aocat/Concept/AO_Subject/Rock%20Art"/>
-                            <has_primary_visual_component xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" rdf:resource="{{ image.file }}"/>
-                            <has_visual_component xmlns="https://www.ariadne-infrastructure.eu/resource/ao/cat/1.1/" rdf:resource="{{ image.iiif_file }}"/>
-                            <PP20i_is_persistent_dataset_part_of xmlns="http://parthenos.d4science.org/CRMext/CRMpe.rdfs/" rdf:resource="https://ariadne-infrastructure.eu/aocat/Collection/SND/3875697E-69CC-342B-9AAD-5B11A89E99D8"/>
-                        </rdf:Description>
+                        </Entity>
                     </rdf:RDF>
                 </metadata>
             </record>
