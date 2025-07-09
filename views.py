@@ -398,36 +398,37 @@ class AdvancedSearch(DynamicDepthViewSet):
 class GalleryViewSet(DynamicDepthViewSet):  
 
     """A viewset to return images in a gallery format with advanced search capabilities."""
-    queryset = (
-        models.Image.objects
-        .filter(published=True)
-        .select_related('type', 'institution', 'site__province')
-        .prefetch_related('keywords', 'people')
-        .defer('iiif_file', 'file')
-        .order_by('type__order')
-    )
+
 
     serializer_class = serializers.GallerySerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
     pagination_class = CustomPageNumberPagination
 
+    def get_queryset(self):
+        return (
+            models.Image.objects
+            .filter(published=True)
+            .select_related('type', 'institution', 'site__province')
+            .prefetch_related('keywords', 'people')
+            .defer('iiif_file', 'file')
+            .order_by('type__order')
+        )
+
+
     def list(self, request, *args, **kwargs):
         """Handles GET requests, returning paginated image results with summary by creator and institution."""
 
+        params = request.GET
         search_type = request.GET.get("search_type")
         box = request.GET.get("in_bbox")
         site = request.GET.get("site")
         category_type = request.GET.get("category_type")
-        opertor = request.GET.get("operator")
-        try:
-            limit = int(request.GET.get("limit", 25))
-        except ValueError:
-            limit = 25
+        # opertor = request.GET.get("operator")
 
         if not search_type and not box and not site and not category_type:
             return Response([])
-
+        
         queryset = self.get_queryset()
 
         # Apply site filter
@@ -455,9 +456,8 @@ class GalleryViewSet(DynamicDepthViewSet):
                                        Q(type__english_translation=category_type))
         else:
             # Categorize images by type
-            categorized_data = self.categorize_by_type(queryset)
             return Response({
-                "results": categorized_data,
+                "results": self.categorize_by_type(queryset),
             })
 
         # Apply pagination and limit it bases on limit parameter
@@ -513,7 +513,8 @@ class GalleryViewSet(DynamicDepthViewSet):
 
     def get_advanced_search_queryset(self):
         """Handles advanced search with query parameters."""
-        query_params = self.request.GET
+        params = self.request.GET
+        operator = params.get("operator", "OR")
         query_conditions = []
 
         field_mapping = {
@@ -529,7 +530,7 @@ class GalleryViewSet(DynamicDepthViewSet):
 
         # Handle all fields including support for multi-value query params
         for param, fields in field_mapping.items():
-            raw_values = self.parse_multi_values(query_params.getlist("keyword"))
+            raw_values = self.parse_multi_values(params.getlist("keyword"))
 
             values = []
             for val in raw_values:
@@ -544,7 +545,7 @@ class GalleryViewSet(DynamicDepthViewSet):
                 query_conditions.append(field_condition)
 
         # Handle keywords similarly
-        raw_keywords =values = self.parse_multi_values(query_params.getlist("keyword"))
+        raw_keywords =values = self.parse_multi_values(params.getlist("keyword"))
 
         keywords = []
         for item in raw_keywords:
@@ -561,8 +562,8 @@ class GalleryViewSet(DynamicDepthViewSet):
             query_conditions.append(keyword_condition)
 
         # Combine all conditions with correct operator
-        if query_conditions and "operator" in query_params:
-            operator = query_params["operator"]
+        if query_conditions and "operator" in params:
+            operator = params["operator"]
             if operator == "AND":
                 queryset = queryset.filter(reduce(lambda x, y: x & y, query_conditions))
             elif operator == "OR":
