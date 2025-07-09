@@ -579,11 +579,12 @@ class GalleryViewSet(DynamicDepthViewSet):
     def get_general_search_queryset(self):
         """Handles general search with 'q' parameter."""
         q = self.request.GET.get("q", "")
+        queryset = self.get_queryset()
 
         if not q:
             return self.queryset.none()
 
-        return self.queryset.select_related(
+        return queryset.select_related(
             "institution", "type").prefetch_related(
             "dating_tags", "people", "keywords", "rock_carving_object"
             ).filter(
