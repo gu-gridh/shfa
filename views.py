@@ -516,6 +516,7 @@ class GalleryViewSet(DynamicDepthViewSet):
         params = self.request.GET
         operator = params.get("operator", "OR")
         query_conditions = []
+        queryset = self.get_queryset()
 
         field_mapping = {
             "site_name": ["site__raa_id", "site__lamning_id", "site__askeladden_id",
@@ -530,7 +531,7 @@ class GalleryViewSet(DynamicDepthViewSet):
 
         # Handle all fields including support for multi-value query params
         for param, fields in field_mapping.items():
-            raw_values = self.parse_multi_values(params.getlist("keyword"))
+            raw_values = self.parse_multi_values(params.getlist(param))
 
             values = []
             for val in raw_values:
@@ -544,8 +545,8 @@ class GalleryViewSet(DynamicDepthViewSet):
                     field_condition |= reduce(lambda x, y: x | y, or_conditions)
                 query_conditions.append(field_condition)
 
-        # Handle keywords similarly
-        raw_keywords =values = self.parse_multi_values(params.getlist("keyword"))
+        # Handle keywords
+        raw_keywords = self.parse_multi_values(params.getlist("keyword"))
 
         keywords = []
         for item in raw_keywords:
@@ -562,19 +563,18 @@ class GalleryViewSet(DynamicDepthViewSet):
             query_conditions.append(keyword_condition)
 
         # Combine all conditions with correct operator
-        if query_conditions and "operator" in params:
-            operator = params["operator"]
+        if query_conditions:
             if operator == "AND":
                 queryset = queryset.filter(reduce(lambda x, y: x & y, query_conditions))
-            elif operator == "OR":
+            else:  # Default to OR
                 queryset = queryset.filter(reduce(lambda x, y: x | y, query_conditions))
-        else:
-            queryset = queryset.filter(reduce(lambda x, y: x | y, query_conditions))
 
         return queryset.filter(published=True).distinct()
 
-    def parse_multi_values(param_list):
+    def parse_multi_values(self, param_list):
         return list(set(v.strip() for val in param_list for v in val.split(",") if v.strip()))
+
+
 
     def get_general_search_queryset(self):
         """Handles general search with 'q' parameter."""
