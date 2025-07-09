@@ -395,145 +395,106 @@ class AdvancedSearch(DynamicDepthViewSet):
         'id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
 # Add gallery view
-class GalleryViewSet(DynamicDepthViewSet):  
-
-    queryset = models.Image.objects.filter(published=True).order_by('type__order')
+class GalleryViewSet(DynamicDepthViewSet):
+    """Optimized viewset to return images in a gallery format with advanced search capabilities."""
+    
     serializer_class = serializers.GallerySerializer
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
+    filterset_fields = ['id'] + get_fields(
+        models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file']
+    )
     pagination_class = CustomPageNumberPagination
 
+    def get_queryset(self):
+        return (
+            models.Image.objects
+            .filter(published=True)
+            .select_related('type', 'institution', 'site__province')
+            .prefetch_related('keywords', 'people')
+            .defer('iiif_file', 'file')
+            .order_by('type__order')
+        )
+
     def list(self, request, *args, **kwargs):
-        """Handles GET requests, returning paginated image results with summary by creator and institution."""
+        params = request.GET
+        search_type = params.get("search_type")
+        box = params.get("in_bbox")
+        site = params.get("site")
+        category_type = params.get("category_type")
 
-        search_type = request.GET.get("search_type")
-        box = request.GET.get("in_bbox")
-        site = request.GET.get("site")
-        category_type = request.GET.get("category_type")
-        opertor = request.GET.get("operator")
-        limit = request.GET.get("limit", 25)
-
-        if not search_type and not box and not site and not category_type:
+        if not (search_type or box or site or category_type):
             return Response([])
 
         queryset = self.get_queryset()
 
-        # Apply site filter
         if site:
             queryset = queryset.filter(site_id=site)
 
-        # Apply bbox filter
         if box:
-            box = list(map(float, box.strip().split(',')))
-            bounding_box = Envelope(box)  # Assuming spatial filtering
-            sites = models.Site.objects.filter(coordinates__intersects=bounding_box.wkt)
-            queryset = queryset.filter(site_id__in=sites)
+            bbox = Envelope(map(float, box.strip().split(',')))
+            site_ids = models.Site.objects.filter(
+                coordinates__intersects=bbox.wkt
+            ).values_list("id", flat=True)
+            queryset = queryset.filter(site_id__in=site_ids)
 
-        # Apply search types
-        elif search_type == "advanced":
-            queryset = self.get_advanced_search_queryset()
+        if search_type == "advanced":
+            queryset = self.get_advanced_search_queryset(queryset)
         elif search_type == "general":
             queryset = self.get_general_search_queryset()
         else:
-            queryset = self.filter_queryset(self.get_queryset())
+            queryset = self.filter_queryset(queryset)
 
-        # Apply image type filter
         if category_type:
-            queryset = queryset.filter(Q(type__text=category_type) |
-                                       Q(type__english_translation=category_type))
+            queryset = queryset.filter(
+                Q(type__text=category_type) |
+                Q(type__english_translation=category_type)
+            )
         else:
-            # Categorize images by type
-            categorized_data = self.categorize_by_type(queryset)
-            return Response({
-                "results": categorized_data,
-            })
-
-        # Apply pagination and limit it bases on limit parameter
+            return Response({"results": self.categorize_by_type(queryset)})
 
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
-            paginated_response = self.get_paginated_response(serializer.data)
+            response = self.get_paginated_response(serializer.data)
 
-            # Get bbox from current page only
-            if isinstance(page, QuerySet):
-                bbox = page.aggregate(Extent('site__coordinates'))['site__coordinates__extent']
-            else:
-                image_ids = [img.id for img in page]
-                bbox = models.Image.objects.filter(id__in=image_ids).aggregate(
-                    Extent('site__coordinates')
-                )['site__coordinates__extent']
+            bbox = self.get_extent_for_page(page)
+            response.data['bbox'] = bbox if bbox else None
+            return response
 
-            paginated_response.data['bbox'] = [*bbox] if bbox else None
-            return paginated_response
-
-
-        # If pagination is disabled, return full results with summary
         serializer = self.get_serializer(queryset, many=True)
+        return Response({"results": serializer.data})
 
-
-        return Response({
-            "results": serializer.data,
-        })
+    def get_extent_for_page(self, page):
+        if isinstance(page, QuerySet):
+            return list(page.aggregate(Extent('site__coordinates'))['site__coordinates__extent'] or [])
+        image_ids = [img.id for img in page]
+        return list(models.Image.objects.filter(id__in=image_ids).aggregate(
+            Extent('site__coordinates')
+        )['site__coordinates__extent'] or [])
 
     def categorize_by_type(self, queryset):
-        """Groups queryset results by `type__text` with counts and paginates images per type."""
-
-        # Step 1: Group data by type with translation and count
         grouped_data = (
             queryset
             .values("type__id", "type__text", "type__english_translation")
             .annotate(img_count=Count("id", distinct=True))
             .order_by("type__id")
         )
-
-        # Step 2: Prepare dictionary for categories
-        category_dict = {
-            entry["type__id"]: {
+        return [
+            {
                 "type": entry["type__text"],
                 "type_translation": entry.get("type__english_translation", "Unknown"),
                 "count": entry["img_count"],
-                # "images": [],
             }
             for entry in grouped_data
-        }
+        ]
 
-        # # Step 3: Get pagination params
-        # try:
-        #     limit = int(self.request.GET.get("limit", 25))
-        #     page = int(self.request.GET.get("page", 1))
-        #     if limit < 1 or page < 1:
-        #         raise ValueError
-        # except ValueError:
-        #     limit = 25
-        #     page = 1
-
-        # start = (page - 1) * limit
-        # end = start + limit
-
-        # # Step 4: Fetch real model instances ordered by type and ID
-        # images_by_type = defaultdict(list)
-        # for img in queryset.order_by("type_id", "id"):
-        #     images_by_type[img.type_id].append(img)
-
-        # # Step 5: Paginate images per type
-        # for type_id, images in images_by_type.items():
-        #     paginated_images = images[start:end]
-        #     serialized = self.get_serializer(paginated_images, many=True).data
-        #     if type_id in category_dict:
-        #         category_dict[type_id]["images"] = serialized
-
-        return list(category_dict.values())
-
-
-    def get_advanced_search_queryset(self):
-        """Handles advanced search with query parameters."""
-        query_params = self.request.GET
-        query_conditions = []
+    def get_advanced_search_queryset(self, base_queryset):
+        params = self.request.GET
+        operator = params.get("operator", "OR")
+        conditions = []
 
         field_mapping = {
-            "site_name": ["site__raa_id", "site__lamning_id", "site__askeladden_id",
-                        "site__lokalitet_id", "site__placename", "site__ksamsok_id"],
+            "site_name": ["site__raa_id", "site__lamning_id", "site__askeladden_id", "site__lokalitet_id", "site__placename", "site__ksamsok_id"],
             "author_name": ["people__name", "people__english_translation"],
             "dating_tag": ["dating_tags__text", "dating_tags__english_translation"],
             "image_type": ["type__text", "type__english_translation"],
@@ -542,84 +503,68 @@ class GalleryViewSet(DynamicDepthViewSet):
             "visualization_group": ["group__name"],
         }
 
-        # Handle all fields including support for multi-value query params
         for param, fields in field_mapping.items():
-            raw_values = query_params.getlist(param)
-            values = []
-            for val in raw_values:
-                values.extend([v.strip() for v in val.split(",") if v.strip()])
-            values = list(set(values))
-
+            values = self.parse_multi_values(params.getlist(param))
             if values:
-                field_condition = Q()
-                for value in values:
-                    or_conditions = [Q(**{f"{field}__icontains": value}) for field in fields]
-                    field_condition |= reduce(lambda x, y: x | y, or_conditions)
-                query_conditions.append(field_condition)
+                q_obj = Q()
+                for val in values:
+                    q_obj |= reduce(operator.or_, [Q(**{f"{field}__icontains": val}) for field in fields])
+                conditions.append(q_obj)
 
-        # Handle keywords similarly
-        raw_keywords = query_params.getlist("keyword")
-        keywords = []
-        for item in raw_keywords:
-            keywords.extend([k.strip() for k in item.split(",") if k.strip()])
-        keywords = list(set(keywords))
-
-        queryset = self.queryset
-
+        keywords = self.parse_multi_values(params.getlist("keyword"))
         if keywords:
-            keyword_condition = Q()
-            for keyword in keywords:
-                keyword_condition |= (
-                    Q(keywords__text__icontains=keyword) |
-                    Q(keywords__english_translation__icontains=keyword)
-                )
-            query_conditions.append(keyword_condition)
+            kw_q = Q()
+            for kw in keywords:
+                kw_q |= Q(keywords__text__icontains=kw) | Q(keywords__english_translation__icontains=kw)
+            conditions.append(kw_q)
 
-        # Combine all conditions with correct operator
-        if query_conditions and "operator" in query_params:
-            operator = query_params["operator"]
-            if operator == "AND":
-                queryset = queryset.filter(reduce(lambda x, y: x & y, query_conditions))
-            elif operator == "OR":
-                queryset = queryset.filter(reduce(lambda x, y: x | y, query_conditions))
-        else:
-            queryset = queryset.filter(reduce(lambda x, y: x | y, query_conditions))
+        if not conditions:
+            return base_queryset.none()
 
-        return queryset.filter(published=True).distinct().order_by('type__order')
-    
+        combined_condition = reduce(
+            operator.and_ if operator == "AND" else operator.or_, conditions
+        )
+
+        return base_queryset.filter(combined_condition).distinct()
 
     def get_general_search_queryset(self):
-        """Handles general search with 'q' parameter."""
         q = self.request.GET.get("q", "")
-
         if not q:
-            return self.queryset.none()
+            return self.get_queryset().none()
 
-        return self.queryset.select_related(
-            "institution", "type").prefetch_related(
-            "dating_tags", "people", "keywords", "rock_carving_object"
-            ).filter(
-            Q(dating_tags__text__icontains=q)
-            | Q(dating_tags__english_translation__icontains=q)
-            | Q(people__name__icontains=q)
-            | Q(people__english_translation__icontains=q)
-            | Q(type__text__icontains=q)
-            | Q(type__english_translation__icontains=q)
-            | Q(site__raa_id__icontains=q)
-            | Q(site__lamning_id__icontains=q)
-            | Q(site__askeladden_id__icontains=q)
-            | Q(site__lokalitet_id__icontains=q)
-            | Q(site__placename__icontains=q)
-            | Q(keywords__text__icontains=q)
-            | Q(keywords__english_translation__icontains=q)
-            | Q(keywords__category__icontains=q)
-            | Q(keywords__category_translation__icontains=q)
-            | Q(rock_carving_object__name__icontains=q)
-            | Q(institution__name__icontains=q)
-            | Q(site__parish__name__icontains=q)
-            | Q(site__municipality__name__icontains=q)
-            | Q(site__province__name__icontains=q)
-        ).filter(published=True).order_by('-id', 'type__order').distinct()
+        return (
+            self.get_queryset()
+            .select_related("institution", "type")
+            .prefetch_related("dating_tags", "people", "keywords", "rock_carving_object")
+            .filter(
+                Q(dating_tags__text__icontains=q)
+                | Q(dating_tags__english_translation__icontains=q)
+                | Q(people__name__icontains=q)
+                | Q(people__english_translation__icontains=q)
+                | Q(type__text__icontains=q)
+                | Q(type__english_translation__icontains=q)
+                | Q(site__raa_id__icontains=q)
+                | Q(site__lamning_id__icontains=q)
+                | Q(site__askeladden_id__icontains=q)
+                | Q(site__lokalitet_id__icontains=q)
+                | Q(site__placename__icontains=q)
+                | Q(keywords__text__icontains=q)
+                | Q(keywords__english_translation__icontains=q)
+                | Q(keywords__category__icontains=q)
+                | Q(keywords__category_translation__icontains=q)
+                | Q(rock_carving_object__name__icontains=q)
+                | Q(institution__name__icontains=q)
+                | Q(site__parish__name__icontains=q)
+                | Q(site__municipality__name__icontains=q)
+                | Q(site__province__name__icontains=q)
+            )
+            .distinct()
+        )
+
+    @staticmethod
+    def parse_multi_values(param_list):
+        return list(set(v.strip() for val in param_list for v in val.split(",") if v.strip()))
+
 
 
 # Add autocomplete for general search from rest_framework.viewsets import ViewSet
