@@ -512,11 +512,15 @@ class GalleryViewSet(DynamicDepthViewSet):
         return list(category_dict.values())
 
     def get_advanced_search_queryset(self):
-        """Handles advanced search with query parameters."""
         params = self.request.GET
         operator = params.get("operator", "OR")
         query_conditions = []
-        queryset = self.get_queryset()
+
+        queryset = self.get_queryset().select_related(
+            "site__parish", "site__municipality", "site__province", "institution"
+        ).prefetch_related(
+            "people", "dating_tags", "type", "keywords", "group"
+        )
 
         field_mapping = {
             "site_name": ["site__raa_id", "site__lamning_id", "site__askeladden_id",
@@ -529,30 +533,19 @@ class GalleryViewSet(DynamicDepthViewSet):
             "visualization_group": ["group__name"],
         }
 
-        # Handle all fields including support for multi-value query params
         for param, fields in field_mapping.items():
-            raw_values = self.parse_multi_values(params.getlist(param))
-
-            values = []
-            for val in raw_values:
-                values.extend([v.strip() for v in val.split(",") if v.strip()])
-            values = list(set(values))
-
+            values = self.parse_multi_values(params.getlist(param))
             if values:
                 field_condition = Q()
                 for value in values:
-                    or_conditions = [Q(**{f"{field}__icontains": value}) for field in fields]
-                    field_condition |= reduce(lambda x, y: x | y, or_conditions)
+                    or_condition = Q()
+                    for field in fields:
+                        or_condition |= Q(**{f"{field}__icontains": value})
+                    field_condition |= or_condition
                 query_conditions.append(field_condition)
 
         # Handle keywords
-        raw_keywords = self.parse_multi_values(params.getlist("keyword"))
-
-        keywords = []
-        for item in raw_keywords:
-            keywords.extend([k.strip() for k in item.split(",") if k.strip()])
-        keywords = list(set(keywords))
-
+        keywords = self.parse_multi_values(params.getlist("keyword"))
         if keywords:
             keyword_condition = Q()
             for keyword in keywords:
@@ -562,17 +555,18 @@ class GalleryViewSet(DynamicDepthViewSet):
                 )
             query_conditions.append(keyword_condition)
 
-        # Combine all conditions with correct operator
         if query_conditions:
-            if operator == "AND":
-                queryset = queryset.filter(reduce(lambda x, y: x & y, query_conditions))
-            else:  # Default to OR
-                queryset = queryset.filter(reduce(lambda x, y: x | y, query_conditions))
+            combined_condition = reduce(
+                (lambda x, y: x & y) if operator == "AND" else (lambda x, y: x | y),
+                query_conditions
+            )
+            queryset = queryset.filter(combined_condition)
 
         return queryset.filter(published=True).distinct()
 
     def parse_multi_values(self, param_list):
         return list(set(v.strip() for val in param_list for v in val.split(",") if v.strip()))
+
 
 
 
