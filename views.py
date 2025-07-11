@@ -19,6 +19,7 @@ from django.conf import settings
 from django.contrib.gis.db.models import Extent
 from django.db.models.query import QuerySet
 from django.core.cache import cache
+import hashlib
 # myapp/pagination.py
 from rest_framework.pagination import PageNumberPagination
 
@@ -404,8 +405,6 @@ class AdvancedSearch(DynamicDepthViewSet):
 class GalleryViewSet(DynamicDepthViewSet):  
 
     """A viewset to return images in a gallery format with advanced search capabilities."""
-
-
     serializer_class = serializers.GallerySerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
@@ -466,24 +465,31 @@ class GalleryViewSet(DynamicDepthViewSet):
                 "results": self.categorize_by_type(queryset),
             })
 
-        # Apply pagination and limit it bases on limit parameter
+        # Apply pagination
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
+            paginated_response = self.get_paginated_response(serializer.data)
 
-            # Collect image IDs from page
-            image_ids = [item.id for item in page]
-            cache_key = f"bbox_page_{hash(tuple(image_ids))}"
+            page_number = request.query_params.get('page', 1)
+            cache_key = f"gallery_bbox:{hashlib.md5(request.get_full_path().encode()).hexdigest()}:page:{page_number}"
 
             bbox = cache.get(cache_key)
+
             if bbox is None:
+                if isinstance(page, QuerySet):
+                    image_ids = list(page.values_list('id', flat=True))
+                else:
+                    image_ids = [obj.id for obj in page]
+
                 bbox = models.Site.objects.filter(
                     image__id__in=image_ids
                 ).aggregate(Extent('coordinates'))['coordinates__extent']
-                cache.set(cache_key, bbox, timeout=300)  # Cache for 5 minutes
 
-            # Use custom pagination with extra metadata
-            return self.paginator.get_paginated_response(serializer.data, extra_metadata={'bbox': bbox})
+                cache.set(cache_key, bbox, timeout=300)
+
+            paginated_response.data['bbox'] = [*bbox] if bbox else None
+            return paginated_response
 
         serializer = self.get_serializer(queryset, many=True)
         return Response({'results': serializer.data})
