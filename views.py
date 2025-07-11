@@ -448,10 +448,13 @@ class GalleryViewSet(DynamicDepthViewSet):
         return (
             models.Image.objects
             .filter(published=True)
-            .select_related('type', 'institution', 'site__province')
-            .prefetch_related('keywords', 'people')
+            .select_related('type', 'institution', 'site')
+            .prefetch_related(
+                Prefetch('keywords', queryset=models.KeywordTag.objects.only('text', 'english_translation')),
+                Prefetch('people', queryset=models.People.objects.only('name', 'english_translation'))
+            )
             .defer('iiif_file', 'file')
-            .order_by('type__order')
+            .order_by('type__order', 'id')  # Added id for consistent ordering
         )
 
 
@@ -467,6 +470,24 @@ class GalleryViewSet(DynamicDepthViewSet):
         if not search_type and not box and not site and not category_type:
             return Response([])
 
+        # Cache bbox site_ids to avoid repeated spatial queries
+        site_ids = None
+        if box:
+            bbox_cache_key = f"bbox_sites:{hashlib.md5(box.encode()).hexdigest()}"
+            site_ids = cache.get(bbox_cache_key)
+            
+            if site_ids is None:
+                try:
+                    box_coords = list(map(float, box.strip().split(',')))
+                    bounding_box = Envelope(box_coords)
+                    site_ids = list(models.Site.objects.filter(
+                        coordinates__intersects=bounding_box.wkt
+                    ).values_list("id", flat=True))
+                    # Cache bbox results for 10 minutes
+                    cache.set(bbox_cache_key, site_ids, timeout=600)
+                except (ValueError, TypeError) as e:
+                    return Response({'error': 'Invalid bbox coordinates'}, status=400)
+
         # Apply search types first: this defines the base queryset
         if search_type == "advanced":
             queryset = self.get_advanced_search_queryset()
@@ -479,13 +500,10 @@ class GalleryViewSet(DynamicDepthViewSet):
         if site:
             queryset = queryset.filter(site_id=site)
 
-        # Apply bbox filter
-        if box:
-            box_coords = list(map(float, box.strip().split(',')))
-            bounding_box = Envelope(box_coords)
-            site_ids = models.Site.objects.filter(
-                coordinates__intersects=bounding_box.wkt
-            ).values_list("id", flat=True)
+        # Apply bbox filter using cached site_ids
+        if box and site_ids is not None:
+            if not site_ids:  # Empty list means no sites in bbox
+                return Response({'results': [], 'count': 0, 'next': None, 'previous': None})
             queryset = queryset.filter(site_id__in=site_ids)
 
         # Apply category_type filter
@@ -499,23 +517,38 @@ class GalleryViewSet(DynamicDepthViewSet):
                 "results": self.categorize_by_type(queryset),
             })
 
+        # Optimize queryset for pagination
+        queryset = queryset.select_related('site', 'type', 'institution').only(
+            'id', 'site_id', 'type__order', 'type__text', 'type__english_translation',
+            'institution__name', 'site__raa_id', 'site__placename'
+        )
+
         # Apply pagination
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             paginated_response = self.get_paginated_response(serializer.data)
 
+            # Only calculate bbox for first page or if not cached
             page_number = request.query_params.get('page', 1)
             cache_key = f"gallery_bbox:{hashlib.md5(request.get_full_path().encode()).hexdigest()}:page:{page_number}"
 
             bbox = cache.get(cache_key)
 
-            if bbox is None:
-                image_ids = [obj.id for obj in page] if not isinstance(page, QuerySet) else list(page.values_list('id', flat=True))
-                bbox = models.Site.objects.filter(
-                    image__id__in=image_ids
-                ).aggregate(Extent('coordinates'))['coordinates__extent']
-                cache.set(cache_key, bbox, timeout=300)
+            if bbox is None and page_number == '1':  # Only calculate bbox for first page
+                try:
+                    if site_ids:  # Use pre-filtered site_ids for bbox calculation
+                        bbox = models.Site.objects.filter(
+                            id__in=site_ids
+                        ).aggregate(Extent('coordinates'))['coordinates__extent']
+                    else:
+                        image_ids = [obj.id for obj in page] if not isinstance(page, QuerySet) else list(page.values_list('id', flat=True))
+                        bbox = models.Site.objects.filter(
+                            image__id__in=image_ids
+                        ).aggregate(Extent('coordinates'))['coordinates__extent']
+                    cache.set(cache_key, bbox, timeout=300)
+                except Exception:
+                    bbox = None
 
             paginated_response.data['bbox'] = [*bbox] if bbox else None
             return paginated_response
@@ -552,10 +585,13 @@ class GalleryViewSet(DynamicDepthViewSet):
         operator = params.get("operator", "OR")
         query_conditions = []
 
-        queryset = self.get_queryset().select_related(
-            "site__parish", "site__municipality", "site__province", "institution"
-        ).prefetch_related(
-            "people", "dating_tags", "type", "keywords", "group"
+        # Start with optimized base queryset
+        queryset = (
+            models.Image.objects
+            .filter(published=True)
+            .select_related('site', 'institution', 'type')
+            .prefetch_related('keywords', 'people', 'dating_tags')
+            .defer('iiif_file', 'file')
         )
 
         field_mapping = {
@@ -598,7 +634,7 @@ class GalleryViewSet(DynamicDepthViewSet):
             )
             queryset = queryset.filter(combined_condition)
 
-        return queryset.filter(published=True).distinct()
+        return queryset.distinct().order_by('type__order', 'id')
 
     def parse_multi_values(self, param_list):
         return list(set(v.strip() for val in param_list for v in val.split(",") if v.strip()))
@@ -606,36 +642,41 @@ class GalleryViewSet(DynamicDepthViewSet):
     def get_general_search_queryset(self):
         """Handles general search with 'q' parameter."""
         q = self.request.GET.get("q", "")
-        queryset = self.get_queryset()
-
+        
         if not q:
-            return self.queryset.none()
+            return models.Image.objects.none()
 
-        return queryset.select_related(
-            "institution", "type").prefetch_related(
-            "dating_tags", "people", "keywords", "rock_carving_object"
-            ).filter(
-            Q(dating_tags__text__icontains=q)
-            | Q(dating_tags__english_translation__icontains=q)
-            | Q(people__name__icontains=q)
-            | Q(people__english_translation__icontains=q)
-            | Q(type__text__icontains=q)
-            | Q(type__english_translation__icontains=q)
-            | Q(site__raa_id__icontains=q)
-            | Q(site__lamning_id__icontains=q)
-            | Q(site__askeladden_id__icontains=q)
-            | Q(site__lokalitet_id__icontains=q)
-            | Q(site__placename__icontains=q)
-            | Q(keywords__text__icontains=q)
-            | Q(keywords__english_translation__icontains=q)
-            | Q(keywords__category__icontains=q)
-            | Q(keywords__category_translation__icontains=q)
-            | Q(rock_carving_object__name__icontains=q)
-            | Q(institution__name__icontains=q)
-            | Q(site__parish__name__icontains=q)
-            | Q(site__municipality__name__icontains=q)
-            | Q(site__province__name__icontains=q)
-        ).filter(published=True).distinct()
+        return (
+            models.Image.objects
+            .filter(published=True)
+            .select_related('site', 'institution', 'type')
+            .prefetch_related('dating_tags', 'people', 'keywords', 'rock_carving_object')
+            .filter(
+                Q(dating_tags__text__icontains=q)
+                | Q(dating_tags__english_translation__icontains=q)
+                | Q(people__name__icontains=q)
+                | Q(people__english_translation__icontains=q)
+                | Q(type__text__icontains=q)
+                | Q(type__english_translation__icontains=q)
+                | Q(site__raa_id__icontains=q)
+                | Q(site__lamning_id__icontains=q)
+                | Q(site__askeladden_id__icontains=q)
+                | Q(site__lokalitet_id__icontains=q)
+                | Q(site__placename__icontains=q)
+                | Q(keywords__text__icontains=q)
+                | Q(keywords__english_translation__icontains=q)
+                | Q(keywords__category__icontains=q)
+                | Q(keywords__category_translation__icontains=q)
+                | Q(rock_carving_object__name__icontains=q)
+                | Q(institution__name__icontains=q)
+                | Q(site__parish__name__icontains=q)
+                | Q(site__municipality__name__icontains=q)
+                | Q(site__province__name__icontains=q)
+            )
+            .defer('iiif_file', 'file')
+            .distinct()
+            .order_by('type__order', 'id')
+        )
 
 
 # Add autocomplete for general search from rest_framework.viewsets import ViewSet
