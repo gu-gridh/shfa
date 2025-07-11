@@ -652,8 +652,12 @@ class GalleryViewSet(DynamicDepthViewSet):
 
             # Calculate bbox for entire result set BEFORE optimizing queryset for pagination
             # This bbox represents the spatial extent of ALL results, not just the current page
-            bbox = None
-            bbox_cache_key = None
+            # Optimization strategy:
+            # - Spatial searches: reuse bbox from search constraint (no redundant queries)
+            # - Non-spatial searches: calculate once and cache, page bbox only when beneficial
+            full_bbox = None
+            all_image_ids = None
+            full_bbox_cache_key = None
             
             # Create a consistent cache key that doesn't include page parameter
             full_path = request.get_full_path()
@@ -665,42 +669,46 @@ class GalleryViewSet(DynamicDepthViewSet):
             
             if box and site_ids:
                 # For spatial searches: use the bbox of all sites in the spatial filter
-                bbox_cache_key = f"bbox_extent:{hashlib.md5(box.encode()).hexdigest()}"
-                bbox = cache.get(bbox_cache_key)
+                # This is efficient since we already have the site_ids from spatial filtering
+                full_bbox_cache_key = f"bbox_extent:{hashlib.md5(box.encode()).hexdigest()}"
+                full_bbox = cache.get(full_bbox_cache_key)
                 
-                if bbox is None:
+                if full_bbox is None:
                     try:
-                        bbox = models.Site.objects.filter(
+                        full_bbox = models.Site.objects.filter(
                             id__in=site_ids
                         ).aggregate(Extent('coordinates'))['coordinates__extent']
-                        cache.set(bbox_cache_key, bbox, timeout=600)  # Cache for 10 minutes
-                        logger.info(f"Calculated spatial bbox: {bbox} for {len(site_ids)} sites")
+                        cache.set(full_bbox_cache_key, full_bbox, timeout=600)  # Cache for 10 minutes
+                        logger.info(f"Calculated spatial bbox: {full_bbox} for {len(site_ids)} sites")
                     except Exception as e:
                         logger.error(f"Error calculating bbox from site_ids: {e}")
-                        bbox = None
+                        full_bbox = None
+                # For spatial searches, full_bbox = page_bbox since we're filtering by spatial bounds
+                # No need to calculate separate page bbox
             else:
                 # For all other searches: calculate bbox from the entire filtered queryset
-                bbox_cache_key = f"gallery_bbox_full:{hashlib.md5(base_path.encode()).hexdigest()}"
-                bbox = cache.get(bbox_cache_key)
+                full_bbox_cache_key = f"gallery_bbox_full:{hashlib.md5(base_path.encode()).hexdigest()}"
+                full_bbox = cache.get(full_bbox_cache_key)
                 
-                if bbox is None:
+                if full_bbox is None:
                     try:
                         # Get all image IDs from the full queryset (BEFORE applying .only())
+                        # Store this for potential reuse in page bbox calculation
                         all_image_ids = list(queryset.values_list('id', flat=True))
                         if all_image_ids:
                             # Calculate bbox from all sites that have these images
-                            bbox = models.Site.objects.filter(
+                            full_bbox = models.Site.objects.filter(
                                 image__id__in=all_image_ids
                             ).aggregate(Extent('coordinates'))['coordinates__extent']
                         else:
-                            bbox = None
+                            full_bbox = None
                         
                         # Cache for 10 minutes - this bbox applies to all pages of this search
-                        cache.set(bbox_cache_key, bbox, timeout=600)
-                        logger.info(f"Calculated search bbox: {bbox} for {len(all_image_ids)} images")
+                        cache.set(full_bbox_cache_key, full_bbox, timeout=600)
+                        logger.info(f"Calculated search bbox: {full_bbox} for {len(all_image_ids) if all_image_ids else 0} images")
                     except Exception as e:
                         logger.error(f"Error calculating bbox from queryset: {e}")
-                        bbox = None
+                        full_bbox = None
 
             # NOW optimize queryset for pagination (after bbox calculation)
             try:
@@ -719,7 +727,39 @@ class GalleryViewSet(DynamicDepthViewSet):
                 if page is not None:
                     serializer = self.get_serializer(page, many=True)
                     paginated_response = self.get_paginated_response(serializer.data)
-                    paginated_response.data['bbox'] = [*bbox] if bbox else None
+                    
+                    # Calculate page bbox only for non-spatial searches where it adds value
+                    # Skip page bbox for spatial searches since results are already spatially constrained
+                    page_bbox = full_bbox  # Default to full bbox
+                    
+                    # Only calculate separate page bbox for non-spatial searches with many results
+                    # This helps users understand the geographical distribution of the current page
+                    if box is None and full_bbox and len(serializer.data) > 0:
+                        try:
+                            # Only calculate page bbox if we have many pages 
+                            # (to help users understand the current view)
+                            page_info = paginated_response.data
+                            total_results = page_info.get('count', 0)
+                            page_size = len(serializer.data)
+                            
+                            # Calculate page bbox only if we have multiple pages and significant results
+                            if total_results > page_size * 2:  # More than 2 pages worth of data
+                                # Get image IDs from current page
+                                page_image_ids = [obj.id for obj in page]
+                                if page_image_ids:
+                                    # Calculate bbox from sites that have images on this page
+                                    page_bbox = models.Site.objects.filter(
+                                        image__id__in=page_image_ids
+                                    ).aggregate(Extent('coordinates'))['coordinates__extent']
+                                    logger.info(f"Calculated page bbox: {page_bbox} for {len(page_image_ids)} images (page {total_results//page_size + 1})")
+                        except Exception as e:
+                            logger.error(f"Error calculating page bbox: {e}")
+                            # Keep using full bbox as fallback
+                            page_bbox = full_bbox
+                    
+                    # Return bbox info (page bbox for navigation, full bbox for complete context)
+                    paginated_response.data['bbox'] = [*page_bbox] if page_bbox else None
+                    paginated_response.data['full_bbox'] = [*full_bbox] if full_bbox else None
                     return paginated_response
             except Exception as e:
                 logger.error(f"Error during pagination: {e}")
@@ -730,8 +770,8 @@ class GalleryViewSet(DynamicDepthViewSet):
                 serializer = self.get_serializer(queryset, many=True)
                 response_data = {'results': serializer.data}
                 
-                # Always add bbox for consistency (already calculated above)
-                response_data['bbox'] = [*bbox] if bbox else None
+                # For non-paginated, use full bbox since we're showing all results
+                response_data['bbox'] = [*full_bbox] if full_bbox else None
                 
                 return Response(response_data)
             except Exception as e:
