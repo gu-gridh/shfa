@@ -24,18 +24,52 @@ import hashlib
 from rest_framework.pagination import PageNumberPagination
 
 # Custom pagination class to allow dynamic page size
+
 class CustomPageNumberPagination(PageNumberPagination):
     page_size = 25
     page_size_query_param = 'limit'
     max_page_size = 100
-
+    
     def get_paginated_response(self, data, extra_metadata=None):
+        # Use cached count or estimate for better performance
+        try:
+            # Try to get cached count first
+            cache_key = f"pagination_count_{hash(str(self.page.paginator.object_list.query))}"
+            count = cache.get(cache_key)
+            
+            if count is None:
+                # For large datasets, use estimated count instead of exact count
+                if hasattr(self.page.paginator, '_count') and self.page.paginator._count is not None:
+                    count = self.page.paginator._count
+                else:
+                    # Use database estimation for very large tables
+                    queryset = self.page.paginator.object_list
+                    if queryset.model._meta.db_table:
+                        from django.db import connection
+                        with connection.cursor() as cursor:
+                            cursor.execute(
+                                f"SELECT reltuples::BIGINT AS estimate FROM pg_class WHERE relname='{queryset.model._meta.db_table}'"
+                            )
+                            result = cursor.fetchone()
+                            if result and result[0] > 10000:  # Use estimate for large tables
+                                count = int(result[0])
+                            else:
+                                count = self.page.paginator.count  # Fall back to exact count for smaller tables
+                
+                # Cache the count for 5 minutes
+                cache.set(cache_key, count, timeout=300)
+        except:
+            # Fallback to original count method
+            count = self.page.paginator.count
+
         response_data = {
-            'count': self.page.paginator.count,
+            'count': count,
             'next': self.get_next_link(),
             'previous': self.get_previous_link(),
-            'results': data
+            'results': data,
+            'estimated': count != self.page.paginator.count if hasattr(self.page.paginator, '_count') else False
         }
+        
         if extra_metadata:
             response_data.update(extra_metadata)
 
