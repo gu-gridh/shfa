@@ -22,12 +22,28 @@ from django.db.models.query import QuerySet
 from rest_framework.pagination import PageNumberPagination
 
 # Custom pagination class to allow dynamic page size
-class CustomPageNumberPagination(PageNumberPagination):
-    page_size = 25  # default limit if not provided
-    page_size_query_param = 'limit'  # allows ?limit=50
-    max_page_size = 100  # optional: prevent abuse
+class CustomPageNumberPaginationWithBBox(PageNumberPagination):
+    page_size = 25
+    page_size_query_param = 'limit'
+    max_page_size = 100
 
+    def get_paginated_response(self, data):
+        image_ids = [item['id'] for item in data if 'id' in item]
 
+        bbox = None
+        if image_ids:
+            bbox = models.Image.objects.filter(id__in=image_ids).aggregate(
+                Extent('site__coordinates')
+            )['site__coordinates__extent']
+
+        return Response({
+            'count': self.page.paginator.count,
+            'next': self.get_next_link(),
+            'previous': self.get_previous_link(),
+            'bbox': list(bbox) if bbox else None,
+            'results': data
+        })
+    
 class SiteViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteSerializer
     queryset = models.Site.objects.all()
@@ -37,7 +53,6 @@ class SiteViewSet(DynamicDepthViewSet):
     search_fields = ['raa_id', 'lamning_id', 'ksamsok_id', 'placename']
     bbox_filter_field = 'coordinates'
     bbox_filter_include_overlapping = True
-
 
 class SiteGeoViewSet(GeoViewSet):
 
@@ -54,15 +69,12 @@ class SiteGeoViewSet(GeoViewSet):
     bbox_filter_include_overlapping = True
 
 # Add 3D views
-
-
 class SHFA3DViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SHFA3DSerializer
     tree_d_data_group = models.Group.objects.all()
     queryset = models.SHFA3D.objects.filter(
         group_id__in=list(tree_d_data_group.values_list('id', flat=True)))
     filterset_fields = get_fields(models.SHFA3D, exclude=DEFAULT_FIELDS)
-
 
 class VisualizationGroupViewset(DynamicDepthViewSet):
     serializer_class = serializers.VisualizationGroupSerializer
@@ -112,9 +124,8 @@ class CameraSpecificationViewSet(DynamicDepthViewSet):
     filterset_fields = get_fields(
         models.CameraMeta, exclude=DEFAULT_FIELDS)
 
+
   # Search views
-
-
 class SiteSearchViewSet(GeoViewSet):
     serializer_class = serializers.SiteGeoSerializer
 
@@ -140,7 +151,6 @@ class SiteSearchViewSet(GeoViewSet):
     search_fields = ['raa_id', 'lamning_id', 'ksamsok_id', 'placename']
     bbox_filter_field = 'coordinates'
     bbox_filter_include_overlapping = True
-
 
 class IIIFImageViewSet(DynamicDepthViewSet):
     """
@@ -403,7 +413,7 @@ class GalleryViewSet(DynamicDepthViewSet):
     serializer_class = serializers.GallerySerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
-    pagination_class = CustomPageNumberPagination
+    pagination_class = CustomPageNumberPaginationWithBBox
 
     def get_queryset(self):
         return (
@@ -461,32 +471,16 @@ class GalleryViewSet(DynamicDepthViewSet):
             })
 
         # Apply pagination and limit it bases on limit parameter
-
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
-            paginated_response = self.get_paginated_response(serializer.data)
+            return self.get_paginated_response(serializer.data)
 
-            # Get bbox from current page only
-            if isinstance(page, QuerySet):
-                bbox = page.aggregate(Extent('site__coordinates'))['site__coordinates__extent']
-            else:
-                image_ids = [img.id for img in page]
-                bbox = models.Image.objects.filter(id__in=image_ids).aggregate(
-                    Extent('site__coordinates')
-                )['site__coordinates__extent']
-
-            paginated_response.data['bbox'] = [*bbox] if bbox else None
-            return paginated_response
-
-
-        # If pagination is disabled, return full results with summary
         serializer = self.get_serializer(queryset, many=True)
-
-
         return Response({
             "results": serializer.data,
         })
+
 
     def categorize_by_type(self, queryset):
         """Groups queryset results by `type__text` with counts and paginates images per type."""
@@ -566,9 +560,6 @@ class GalleryViewSet(DynamicDepthViewSet):
 
     def parse_multi_values(self, param_list):
         return list(set(v.strip() for val in param_list for v in val.split(",") if v.strip()))
-
-
-
 
     def get_general_search_queryset(self):
         """Handles general search with 'q' parameter."""
