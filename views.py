@@ -18,31 +18,27 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib.gis.db.models import Extent
 from django.db.models.query import QuerySet
+from django.core.cache import cache
 # myapp/pagination.py
 from rest_framework.pagination import PageNumberPagination
 
 # Custom pagination class to allow dynamic page size
-class CustomPageNumberPaginationWithBBox(PageNumberPagination):
+class CustomPageNumberPagination(PageNumberPagination):
     page_size = 25
     page_size_query_param = 'limit'
     max_page_size = 100
 
-    def get_paginated_response(self, data):
-        image_ids = [item['id'] for item in data if 'id' in item]
-
-        bbox = None
-        if image_ids:
-            bbox = models.Image.objects.filter(id__in=image_ids).aggregate(
-                Extent('site__coordinates')
-            )['site__coordinates__extent']
-
-        return Response({
+    def get_paginated_response(self, data, extra_metadata=None):
+        response_data = {
             'count': self.page.paginator.count,
             'next': self.get_next_link(),
             'previous': self.get_previous_link(),
-            'bbox': list(bbox) if bbox else None,
             'results': data
-        })
+        }
+        if extra_metadata:
+            response_data.update(extra_metadata)
+
+        return Response(response_data)
     
 class SiteViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteSerializer
@@ -413,7 +409,7 @@ class GalleryViewSet(DynamicDepthViewSet):
     serializer_class = serializers.GallerySerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
-    pagination_class = CustomPageNumberPaginationWithBBox
+    pagination_class = CustomPageNumberPagination
 
     def get_queryset(self):
         return (
@@ -474,12 +470,23 @@ class GalleryViewSet(DynamicDepthViewSet):
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+
+            # Collect image IDs from page
+            image_ids = [item.id for item in page]
+            cache_key = f"bbox_page_{hash(tuple(image_ids))}"
+
+            bbox = cache.get(cache_key)
+            if bbox is None:
+                bbox = models.Site.objects.filter(
+                    image__id__in=image_ids
+                ).aggregate(Extent('coordinates'))['coordinates__extent']
+                cache.set(cache_key, bbox, timeout=300)  # Cache for 5 minutes
+
+            # Use custom pagination with extra metadata
+            return self.paginator.get_paginated_response(serializer.data, extra_metadata={'bbox': bbox})
 
         serializer = self.get_serializer(queryset, many=True)
-        return Response({
-            "results": serializer.data,
-        })
+        return Response({'results': serializer.data})
 
 
     def categorize_by_type(self, queryset):
