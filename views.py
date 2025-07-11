@@ -425,29 +425,15 @@ class GalleryViewSet(DynamicDepthViewSet):
         """Handles GET requests, returning paginated image results with summary by creator and institution."""
 
         params = request.GET
-        search_type = request.GET.get("search_type")
-        box = request.GET.get("in_bbox")
-        site = request.GET.get("site")
-        category_type = request.GET.get("category_type")
-        # opertor = request.GET.get("operator")
+        search_type = params.get("search_type")
+        box = params.get("in_bbox")
+        site = params.get("site")
+        category_type = params.get("category_type")
 
         if not search_type and not box and not site and not category_type:
             return Response([])
-        
-        queryset = self.get_queryset()
 
-        # Apply site filter
-        if site:
-            queryset = queryset.filter(site_id=site)
-
-        # Apply bbox filter
-        if box:
-            box = list(map(float, box.strip().split(',')))
-            bounding_box = Envelope(box)  # Assuming spatial filtering
-            site_ids = models.Site.objects.filter(coordinates__intersects=bounding_box.wkt).values_list("id", flat=True)
-            queryset = queryset.filter(site_id__in=site_ids)
-
-        # Apply search types
+        # Apply search types first: this defines the base queryset
         if search_type == "advanced":
             queryset = self.get_advanced_search_queryset()
         elif search_type == "general":
@@ -455,12 +441,26 @@ class GalleryViewSet(DynamicDepthViewSet):
         else:
             queryset = self.filter_queryset(self.get_queryset())
 
-        # Apply image type filter
+        # Apply site filter
+        if site:
+            queryset = queryset.filter(site_id=site)
+
+        # Apply bbox filter
+        if box:
+            box_coords = list(map(float, box.strip().split(',')))
+            bounding_box = Envelope(box_coords)
+            site_ids = models.Site.objects.filter(
+                coordinates__intersects=bounding_box.wkt
+            ).values_list("id", flat=True)
+            queryset = queryset.filter(site_id__in=site_ids)
+
+        # Apply category_type filter
         if category_type:
-            queryset = queryset.filter(Q(type__text=category_type) |
-                                       Q(type__english_translation=category_type))
+            queryset = queryset.filter(
+                Q(type__text=category_type) |
+                Q(type__english_translation=category_type)
+            )
         else:
-            # Categorize images by type
             return Response({
                 "results": self.categorize_by_type(queryset),
             })
@@ -477,15 +477,10 @@ class GalleryViewSet(DynamicDepthViewSet):
             bbox = cache.get(cache_key)
 
             if bbox is None:
-                if isinstance(page, QuerySet):
-                    image_ids = list(page.values_list('id', flat=True))
-                else:
-                    image_ids = [obj.id for obj in page]
-
+                image_ids = [obj.id for obj in page] if not isinstance(page, QuerySet) else list(page.values_list('id', flat=True))
                 bbox = models.Site.objects.filter(
                     image__id__in=image_ids
                 ).aggregate(Extent('coordinates'))['coordinates__extent']
-
                 cache.set(cache_key, bbox, timeout=300)
 
             paginated_response.data['bbox'] = [*bbox] if bbox else None
