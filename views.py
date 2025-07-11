@@ -33,42 +33,59 @@ class CustomPageNumberPagination(PageNumberPagination):
     def get_paginated_response(self, data, extra_metadata=None):
         # Use cached count or estimate for better performance
         try:
-            # Try to get cached count first
-            cache_key = f"pagination_count_{hash(str(self.page.paginator.object_list.query))}"
-            count = cache.get(cache_key)
-            
-            if count is None:
-                # For large datasets, use estimated count instead of exact count
-                if hasattr(self.page.paginator, '_count') and self.page.paginator._count is not None:
-                    count = self.page.paginator._count
-                else:
-                    # Use database estimation for very large tables
-                    queryset = self.page.paginator.object_list
-                    if queryset.model._meta.db_table:
-                        from django.db import connection
-                        with connection.cursor() as cursor:
-                            cursor.execute(
-                                f"SELECT reltuples::BIGINT AS estimate FROM pg_class WHERE relname='{queryset.model._meta.db_table}'"
-                            )
-                            result = cursor.fetchone()
-                            if result and result[0] > 10000:  # Use estimate for large tables
-                                count = int(result[0])
-                            else:
-                                count = self.page.paginator.count  # Fall back to exact count for smaller tables
+            # Handle empty querysets gracefully
+            if not self.page or not hasattr(self.page, 'paginator'):
+                count = 0
+            else:
+                # Try to get cached count first
+                cache_key = f"pagination_count_{hash(str(self.page.paginator.object_list.query))}"
+                count = cache.get(cache_key)
                 
-                # Cache the count for 5 minutes
-                cache.set(cache_key, count, timeout=300)
-        except:
+                if count is None:
+                    # For large datasets, use estimated count instead of exact count
+                    if hasattr(self.page.paginator, '_count') and self.page.paginator._count is not None:
+                        count = self.page.paginator._count
+                    else:
+                        # Use database estimation for very large tables
+                        try:
+                            queryset = self.page.paginator.object_list
+                            if queryset.model._meta.db_table:
+                                from django.db import connection
+                                with connection.cursor() as cursor:
+                                    cursor.execute(
+                                        f"SELECT reltuples::BIGINT AS estimate FROM pg_class WHERE relname='{queryset.model._meta.db_table}'"
+                                    )
+                                    result = cursor.fetchone()
+                                    if result and result[0] > 10000:  # Use estimate for large tables
+                                        count = int(result[0])
+                                    else:
+                                        count = self.page.paginator.count  # Fall back to exact count for smaller tables
+                        except:
+                            count = self.page.paginator.count if hasattr(self.page.paginator, 'count') else 0
+                    
+                    # Cache the count for 5 minutes
+                    cache.set(cache_key, count, timeout=300)
+        except Exception:
             # Fallback to original count method
-            count = self.page.paginator.count
+            try:
+                count = self.page.paginator.count if self.page and hasattr(self.page.paginator, 'count') else 0
+            except:
+                count = 0
 
         response_data = {
             'count': count,
-            'next': self.get_next_link(),
-            'previous': self.get_previous_link(),
+            'next': self.get_next_link() if self.page else None,
+            'previous': self.get_previous_link() if self.page else None,
             'results': data,
-            'estimated': count != self.page.paginator.count if hasattr(self.page.paginator, '_count') else False
+            'estimated': False
         }
+        
+        # Add estimated flag if we're using estimates
+        try:
+            if self.page and hasattr(self.page.paginator, '_count'):
+                response_data['estimated'] = count != self.page.paginator.count
+        except:
+            pass
         
         if extra_metadata:
             response_data.update(extra_metadata)
@@ -479,14 +496,19 @@ class GalleryViewSet(DynamicDepthViewSet):
             if site_ids is None:
                 try:
                     box_coords = list(map(float, box.strip().split(',')))
+                    if len(box_coords) != 4:
+                        return Response({'error': 'Bbox must contain exactly 4 coordinates'}, status=400)
+                    
                     bounding_box = Envelope(box_coords)
                     site_ids = list(models.Site.objects.filter(
                         coordinates__intersects=bounding_box.wkt
                     ).values_list("id", flat=True))
                     # Cache bbox results for 10 minutes
                     cache.set(bbox_cache_key, site_ids, timeout=600)
-                except (ValueError, TypeError) as e:
-                    return Response({'error': 'Invalid bbox coordinates'}, status=400)
+                except (ValueError, TypeError, IndexError) as e:
+                    return Response({'error': f'Invalid bbox coordinates: {str(e)}'}, status=400)
+                except Exception as e:
+                    return Response({'error': f'Error processing bbox: {str(e)}'}, status=500)
 
         # Apply search types first: this defines the base queryset
         if search_type == "advanced":
@@ -503,7 +525,13 @@ class GalleryViewSet(DynamicDepthViewSet):
         # Apply bbox filter using cached site_ids
         if box and site_ids is not None:
             if not site_ids:  # Empty list means no sites in bbox
-                return Response({'results': [], 'count': 0, 'next': None, 'previous': None})
+                return Response({
+                    'results': [], 
+                    'count': 0, 
+                    'next': None, 
+                    'previous': None, 
+                    'bbox': None
+                })
             queryset = queryset.filter(site_id__in=site_ids)
 
         # Apply category_type filter
@@ -529,32 +557,72 @@ class GalleryViewSet(DynamicDepthViewSet):
             serializer = self.get_serializer(page, many=True)
             paginated_response = self.get_paginated_response(serializer.data)
 
-            # Only calculate bbox for first page or if not cached
-            page_number = request.query_params.get('page', 1)
-            cache_key = f"gallery_bbox:{hashlib.md5(request.get_full_path().encode()).hexdigest()}:page:{page_number}"
-
-            bbox = cache.get(cache_key)
-
-            if bbox is None and page_number == '1':  # Only calculate bbox for first page
-                try:
-                    if site_ids:  # Use pre-filtered site_ids for bbox calculation
+            # Calculate bbox for entire result set (consistent across all pages)
+            bbox = None
+            
+            if box and site_ids:
+                # Use the bbox of all sites in the spatial filter
+                bbox_extent_key = f"bbox_extent:{hashlib.md5(box.encode()).hexdigest()}"
+                bbox = cache.get(bbox_extent_key)
+                
+                if bbox is None:
+                    try:
                         bbox = models.Site.objects.filter(
                             id__in=site_ids
                         ).aggregate(Extent('coordinates'))['coordinates__extent']
-                    else:
-                        image_ids = [obj.id for obj in page] if not isinstance(page, QuerySet) else list(page.values_list('id', flat=True))
-                        bbox = models.Site.objects.filter(
-                            image__id__in=image_ids
-                        ).aggregate(Extent('coordinates'))['coordinates__extent']
-                    cache.set(cache_key, bbox, timeout=300)
-                except Exception:
-                    bbox = None
+                        cache.set(bbox_extent_key, bbox, timeout=600)  # Cache for 10 minutes
+                    except Exception:
+                        bbox = None
+            else:
+                # For non-bbox searches, calculate bbox from entire queryset (not just current page)
+                # Remove page parameter to get consistent cache key across all pages
+                full_path = request.get_full_path()
+                base_path = full_path.split('&page=')[0].split('?page=')[0]
+                if '?' in base_path and not base_path.endswith('?'):
+                    base_path += '&'
+                elif '?' not in base_path:
+                    base_path += '?'
+                    
+                cache_key = f"gallery_bbox_full:{hashlib.md5(base_path.encode()).hexdigest()}"
+                bbox = cache.get(cache_key)
+                
+                if bbox is None:
+                    try:
+                        # Get all image IDs from the full queryset (before pagination)
+                        all_image_ids = list(queryset.values_list('id', flat=True))
+                        if all_image_ids:
+                            bbox = models.Site.objects.filter(
+                                image__id__in=all_image_ids
+                            ).aggregate(Extent('coordinates'))['coordinates__extent']
+                        else:
+                            bbox = None
+                        cache.set(cache_key, bbox, timeout=600)  # Cache for 10 minutes
+                    except Exception:
+                        bbox = None
 
             paginated_response.data['bbox'] = [*bbox] if bbox else None
             return paginated_response
 
         serializer = self.get_serializer(queryset, many=True)
-        return Response({'results': serializer.data})
+        response_data = {'results': serializer.data}
+        
+        # Add bbox for non-paginated responses too
+        if box and site_ids:
+            bbox_extent_key = f"bbox_extent:{hashlib.md5(box.encode()).hexdigest()}"
+            bbox = cache.get(bbox_extent_key)
+            
+            if bbox is None:
+                try:
+                    bbox = models.Site.objects.filter(
+                        id__in=site_ids
+                    ).aggregate(Extent('coordinates'))['coordinates__extent']
+                    cache.set(bbox_extent_key, bbox, timeout=600)
+                except Exception:
+                    bbox = None
+            
+            response_data['bbox'] = [*bbox] if bbox else None
+        
+        return Response(response_data)
 
 
     def categorize_by_type(self, queryset):
