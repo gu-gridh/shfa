@@ -20,8 +20,12 @@ from django.contrib.gis.db.models import Extent
 from django.db.models.query import QuerySet
 from django.core.cache import cache
 import hashlib
+import logging
 # myapp/pagination.py
 from rest_framework.pagination import PageNumberPagination
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 # Custom pagination class to allow dynamic page size
 
@@ -32,50 +36,76 @@ class CustomPageNumberPagination(PageNumberPagination):
     
     def get_paginated_response(self, data, extra_metadata=None):
         # Use cached count or estimate for better performance
+        count = 0
         try:
             # Handle empty querysets gracefully
             if not self.page or not hasattr(self.page, 'paginator'):
                 count = 0
             else:
                 # Try to get cached count first
-                cache_key = f"pagination_count_{hash(str(self.page.paginator.object_list.query))}"
-                count = cache.get(cache_key)
+                try:
+                    query_str = str(self.page.paginator.object_list.query)
+                    cache_key = f"pagination_count_{hash(query_str)}"
+                    count = cache.get(cache_key)
+                except Exception:
+                    cache_key = None
+                    count = None
                 
                 if count is None:
-                    # For large datasets, use estimated count instead of exact count
-                    if hasattr(self.page.paginator, '_count') and self.page.paginator._count is not None:
-                        count = self.page.paginator._count
-                    else:
-                        # Use database estimation for very large tables
-                        try:
-                            queryset = self.page.paginator.object_list
-                            if queryset.model._meta.db_table:
-                                from django.db import connection
-                                with connection.cursor() as cursor:
-                                    cursor.execute(
-                                        f"SELECT reltuples::BIGINT AS estimate FROM pg_class WHERE relname='{queryset.model._meta.db_table}'"
-                                    )
-                                    result = cursor.fetchone()
-                                    if result and result[0] > 10000:  # Use estimate for large tables
-                                        count = int(result[0])
+                    try:
+                        # For large datasets, use estimated count instead of exact count
+                        if hasattr(self.page.paginator, '_count') and self.page.paginator._count is not None:
+                            count = self.page.paginator._count
+                        else:
+                            # Try to get exact count, but with fallback
+                            try:
+                                count = self.page.paginator.count
+                            except Exception:
+                                # Use database estimation for very large tables as fallback
+                                try:
+                                    queryset = self.page.paginator.object_list
+                                    if hasattr(queryset, 'model') and queryset.model._meta.db_table:
+                                        from django.db import connection
+                                        with connection.cursor() as cursor:
+                                            cursor.execute(
+                                                f"SELECT reltuples::BIGINT AS estimate FROM pg_class WHERE relname='{queryset.model._meta.db_table}'"
+                                            )
+                                            result = cursor.fetchone()
+                                            if result and result[0] > 1000:  # Use estimate for large tables
+                                                count = int(result[0])
+                                            else:
+                                                count = 0  # Safe fallback
                                     else:
-                                        count = self.page.paginator.count  # Fall back to exact count for smaller tables
-                        except:
-                            count = self.page.paginator.count if hasattr(self.page.paginator, 'count') else 0
-                    
-                    # Cache the count for 5 minutes
-                    cache.set(cache_key, count, timeout=300)
+                                        count = 0
+                                except Exception:
+                                    count = 0
+                        
+                        # Cache the count for 5 minutes if we have a valid cache key
+                        if cache_key and count is not None:
+                            cache.set(cache_key, count, timeout=300)
+                    except Exception:
+                        count = 0
+                        
+        except Exception as e:
+            # Ultimate fallback
+            logger.error(f"Pagination error: {e}")
+            count = 0
+
+        # Build response with safe defaults
+        try:
+            next_link = self.get_next_link() if self.page else None
         except Exception:
-            # Fallback to original count method
-            try:
-                count = self.page.paginator.count if self.page and hasattr(self.page.paginator, 'count') else 0
-            except:
-                count = 0
+            next_link = None
+            
+        try:
+            previous_link = self.get_previous_link() if self.page else None
+        except Exception:
+            previous_link = None
 
         response_data = {
             'count': count,
-            'next': self.get_next_link() if self.page else None,
-            'previous': self.get_previous_link() if self.page else None,
+            'next': next_link,
+            'previous': previous_link,
             'results': data,
             'estimated': False
         }
@@ -84,11 +114,14 @@ class CustomPageNumberPagination(PageNumberPagination):
         try:
             if self.page and hasattr(self.page.paginator, '_count'):
                 response_data['estimated'] = count != self.page.paginator.count
-        except:
+        except Exception:
             pass
         
         if extra_metadata:
-            response_data.update(extra_metadata)
+            try:
+                response_data.update(extra_metadata)
+            except Exception:
+                pass
 
         return Response(response_data)
     
@@ -477,274 +510,382 @@ class GalleryViewSet(DynamicDepthViewSet):
 
     def list(self, request, *args, **kwargs):
         """Handles GET requests, returning paginated image results with summary by creator and institution."""
+        
+        try:
+            params = request.GET
+            search_type = params.get("search_type")
+            box = params.get("in_bbox")
+            site = params.get("site")
+            category_type = params.get("category_type")
 
-        params = request.GET
-        search_type = params.get("search_type")
-        box = params.get("in_bbox")
-        site = params.get("site")
-        category_type = params.get("category_type")
-
-        if not search_type and not box and not site and not category_type:
-            return Response([])
-
-        # Cache bbox site_ids to avoid repeated spatial queries
-        site_ids = None
-        if box:
-            bbox_cache_key = f"bbox_sites:{hashlib.md5(box.encode()).hexdigest()}"
-            site_ids = cache.get(bbox_cache_key)
-            
-            if site_ids is None:
-                try:
-                    box_coords = list(map(float, box.strip().split(',')))
-                    if len(box_coords) != 4:
-                        return Response({'error': 'Bbox must contain exactly 4 coordinates'}, status=400)
-                    
-                    bounding_box = Envelope(box_coords)
-                    site_ids = list(models.Site.objects.filter(
-                        coordinates__intersects=bounding_box.wkt
-                    ).values_list("id", flat=True))
-                    # Cache bbox results for 10 minutes
-                    cache.set(bbox_cache_key, site_ids, timeout=600)
-                except (ValueError, TypeError, IndexError) as e:
-                    return Response({'error': f'Invalid bbox coordinates: {str(e)}'}, status=400)
-                except Exception as e:
-                    return Response({'error': f'Error processing bbox: {str(e)}'}, status=500)
-
-        # Apply search types first: this defines the base queryset
-        if search_type == "advanced":
-            queryset = self.get_advanced_search_queryset()
-        elif search_type == "general":
-            queryset = self.get_general_search_queryset()
-        else:
-            queryset = self.filter_queryset(self.get_queryset())
-
-        # Apply site filter
-        if site:
-            queryset = queryset.filter(site_id=site)
-
-        # Apply bbox filter using cached site_ids
-        if box and site_ids is not None:
-            if not site_ids:  # Empty list means no sites in bbox
+            if not search_type and not box and not site and not category_type:
                 return Response({
-                    'results': [], 
-                    'count': 0, 
-                    'next': None, 
-                    'previous': None, 
+                    'results': [],
+                    'count': 0,
+                    'next': None,
+                    'previous': None,
                     'bbox': None
                 })
-            queryset = queryset.filter(site_id__in=site_ids)
 
-        # Apply category_type filter
-        if category_type:
-            queryset = queryset.filter(
-                Q(type__text=category_type) |
-                Q(type__english_translation=category_type)
-            )
-        else:
-            return Response({
-                "results": self.categorize_by_type(queryset),
-            })
+            # Cache bbox site_ids to avoid repeated spatial queries
+            site_ids = None
+            if box:
+                bbox_cache_key = f"bbox_sites:{hashlib.md5(box.encode()).hexdigest()}"
+                site_ids = cache.get(bbox_cache_key)
+                
+                if site_ids is None:
+                    try:
+                        box_coords = list(map(float, box.strip().split(',')))
+                        if len(box_coords) != 4:
+                            return Response({'error': 'Bbox must contain exactly 4 coordinates'}, status=400)
+                        
+                        bounding_box = Envelope(box_coords)
+                        site_ids = list(models.Site.objects.filter(
+                            coordinates__intersects=bounding_box.wkt
+                        ).values_list("id", flat=True))
+                        # Cache bbox results for 10 minutes
+                        cache.set(bbox_cache_key, site_ids, timeout=600)
+                    except (ValueError, TypeError, IndexError) as e:
+                        return Response({'error': f'Invalid bbox coordinates: {str(e)}'}, status=400)
+                    except Exception as e:
+                        return Response({'error': f'Error processing bbox: {str(e)}'}, status=500)
 
-        # Optimize queryset for pagination
-        queryset = queryset.select_related('site', 'type', 'institution').only(
-            'id', 'site_id', 'type__order', 'type__text', 'type__english_translation',
-            'institution__name', 'site__raa_id', 'site__placename'
-        )
+            # Apply search types first: this defines the base queryset
+            try:
+                if search_type == "advanced":
+                    queryset = self.get_advanced_search_queryset()
+                elif search_type == "general":
+                    queryset = self.get_general_search_queryset()
+                else:
+                    queryset = self.filter_queryset(self.get_queryset())
+            except Exception as e:
+                logger.error(f"Error getting base queryset: {e}")
+                return Response({'error': 'Error processing search query'}, status=500)
 
-        # Apply pagination
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            paginated_response = self.get_paginated_response(serializer.data)
+            # Apply site filter
+            if site:
+                try:
+                    queryset = queryset.filter(site_id=site)
+                except Exception as e:
+                    logger.error(f"Error applying site filter: {e}")
+                    return Response({'error': 'Error applying site filter'}, status=500)
 
-            # Calculate bbox for entire result set (consistent across all pages)
+            # Apply bbox filter using cached site_ids
+            if box and site_ids is not None:
+                if not site_ids:  # Empty list means no sites in bbox
+                    return Response({
+                        'results': [], 
+                        'count': 0, 
+                        'next': None, 
+                        'previous': None, 
+                        'bbox': None
+                    })
+                try:
+                    queryset = queryset.filter(site_id__in=site_ids)
+                except Exception as e:
+                    logger.error(f"Error applying bbox filter: {e}")
+                    return Response({'error': 'Error applying bbox filter'}, status=500)
+
+            # Apply category_type filter
+            if category_type:
+                try:
+                    queryset = queryset.filter(
+                        Q(type__text=category_type) |
+                        Q(type__english_translation=category_type)
+                    )
+                except Exception as e:
+                    logger.error(f"Error applying category filter: {e}")
+                    return Response({'error': 'Error applying category filter'}, status=500)
+            else:
+                try:
+                    # Calculate bbox for categorized response too
+                    bbox = None
+                    
+                    # Create cache key for this specific search combination
+                    full_path = request.get_full_path()
+                    base_path = full_path.split('&page=')[0].split('?page=')[0]
+                    if '?' in base_path and not base_path.endswith('?'):
+                        base_path += '&'
+                    elif '?' not in base_path:
+                        base_path += '?'
+                    
+                    if box and site_ids:
+                        # For spatial searches: use the bbox of all sites in the spatial filter
+                        bbox_cache_key = f"bbox_extent:{hashlib.md5(box.encode()).hexdigest()}"
+                        bbox = cache.get(bbox_cache_key)
+                        
+                        if bbox is None:
+                            try:
+                                bbox = models.Site.objects.filter(
+                                    id__in=site_ids
+                                ).aggregate(Extent('coordinates'))['coordinates__extent']
+                                cache.set(bbox_cache_key, bbox, timeout=600)
+                            except Exception as e:
+                                logger.error(f"Error calculating bbox for categorized response: {e}")
+                                bbox = None
+                    else:
+                        # For other searches: calculate bbox from the queryset
+                        bbox_cache_key = f"gallery_bbox_categorized:{hashlib.md5(base_path.encode()).hexdigest()}"
+                        bbox = cache.get(bbox_cache_key)
+                        
+                        if bbox is None:
+                            try:
+                                all_image_ids = list(queryset.values_list('id', flat=True))
+                                if all_image_ids:
+                                    bbox = models.Site.objects.filter(
+                                        image__id__in=all_image_ids
+                                    ).aggregate(Extent('coordinates'))['coordinates__extent']
+                                else:
+                                    bbox = None
+                                cache.set(bbox_cache_key, bbox, timeout=600)
+                            except Exception as e:
+                                logger.error(f"Error calculating bbox for categorized response: {e}")
+                                bbox = None
+                    
+                    return Response({
+                        "results": self.categorize_by_type(queryset),
+                        "bbox": [*bbox] if bbox else None
+                    })
+                except Exception as e:
+                    logger.error(f"Error categorizing by type: {e}")
+                    return Response({'error': 'Error categorizing results'}, status=500)
+
+            # Calculate bbox for entire result set BEFORE optimizing queryset for pagination
+            # This bbox represents the spatial extent of ALL results, not just the current page
             bbox = None
+            bbox_cache_key = None
+            
+            # Create a consistent cache key that doesn't include page parameter
+            full_path = request.get_full_path()
+            base_path = full_path.split('&page=')[0].split('?page=')[0]
+            if '?' in base_path and not base_path.endswith('?'):
+                base_path += '&'
+            elif '?' not in base_path:
+                base_path += '?'
             
             if box and site_ids:
-                # Use the bbox of all sites in the spatial filter
-                bbox_extent_key = f"bbox_extent:{hashlib.md5(box.encode()).hexdigest()}"
-                bbox = cache.get(bbox_extent_key)
+                # For spatial searches: use the bbox of all sites in the spatial filter
+                bbox_cache_key = f"bbox_extent:{hashlib.md5(box.encode()).hexdigest()}"
+                bbox = cache.get(bbox_cache_key)
                 
                 if bbox is None:
                     try:
                         bbox = models.Site.objects.filter(
                             id__in=site_ids
                         ).aggregate(Extent('coordinates'))['coordinates__extent']
-                        cache.set(bbox_extent_key, bbox, timeout=600)  # Cache for 10 minutes
-                    except Exception:
+                        cache.set(bbox_cache_key, bbox, timeout=600)  # Cache for 10 minutes
+                        logger.info(f"Calculated spatial bbox: {bbox} for {len(site_ids)} sites")
+                    except Exception as e:
+                        logger.error(f"Error calculating bbox from site_ids: {e}")
                         bbox = None
             else:
-                # For non-bbox searches, calculate bbox from entire queryset (not just current page)
-                # Remove page parameter to get consistent cache key across all pages
-                full_path = request.get_full_path()
-                base_path = full_path.split('&page=')[0].split('?page=')[0]
-                if '?' in base_path and not base_path.endswith('?'):
-                    base_path += '&'
-                elif '?' not in base_path:
-                    base_path += '?'
-                    
-                cache_key = f"gallery_bbox_full:{hashlib.md5(base_path.encode()).hexdigest()}"
-                bbox = cache.get(cache_key)
+                # For all other searches: calculate bbox from the entire filtered queryset
+                bbox_cache_key = f"gallery_bbox_full:{hashlib.md5(base_path.encode()).hexdigest()}"
+                bbox = cache.get(bbox_cache_key)
                 
                 if bbox is None:
                     try:
-                        # Get all image IDs from the full queryset (before pagination)
+                        # Get all image IDs from the full queryset (BEFORE applying .only())
                         all_image_ids = list(queryset.values_list('id', flat=True))
                         if all_image_ids:
+                            # Calculate bbox from all sites that have these images
                             bbox = models.Site.objects.filter(
                                 image__id__in=all_image_ids
                             ).aggregate(Extent('coordinates'))['coordinates__extent']
                         else:
                             bbox = None
-                        cache.set(cache_key, bbox, timeout=600)  # Cache for 10 minutes
-                    except Exception:
+                        
+                        # Cache for 10 minutes - this bbox applies to all pages of this search
+                        cache.set(bbox_cache_key, bbox, timeout=600)
+                        logger.info(f"Calculated search bbox: {bbox} for {len(all_image_ids)} images")
+                    except Exception as e:
+                        logger.error(f"Error calculating bbox from queryset: {e}")
                         bbox = None
 
-            paginated_response.data['bbox'] = [*bbox] if bbox else None
-            return paginated_response
+            # NOW optimize queryset for pagination (after bbox calculation)
+            try:
+                queryset = queryset.select_related('site', 'type', 'institution').only(
+                    'id', 'site_id', 'type__order', 'type__text', 'type__english_translation',
+                    'institution__name', 'site__raa_id', 'site__placename'
+                )
+            except Exception as e:
+                logger.error(f"Error optimizing queryset: {e}")
+                # Fall back to basic queryset without optimization
+                queryset = queryset.select_related('site', 'type', 'institution')
 
-        serializer = self.get_serializer(queryset, many=True)
-        response_data = {'results': serializer.data}
-        
-        # Add bbox for non-paginated responses too
-        if box and site_ids:
-            bbox_extent_key = f"bbox_extent:{hashlib.md5(box.encode()).hexdigest()}"
-            bbox = cache.get(bbox_extent_key)
-            
-            if bbox is None:
-                try:
-                    bbox = models.Site.objects.filter(
-                        id__in=site_ids
-                    ).aggregate(Extent('coordinates'))['coordinates__extent']
-                    cache.set(bbox_extent_key, bbox, timeout=600)
-                except Exception:
-                    bbox = None
-            
-            response_data['bbox'] = [*bbox] if bbox else None
-        
-        return Response(response_data)
+            # Apply pagination
+            try:
+                page = self.paginate_queryset(queryset)
+                if page is not None:
+                    serializer = self.get_serializer(page, many=True)
+                    paginated_response = self.get_paginated_response(serializer.data)
+                    paginated_response.data['bbox'] = [*bbox] if bbox else None
+                    return paginated_response
+            except Exception as e:
+                logger.error(f"Error during pagination: {e}")
+                return Response({'error': 'Error during pagination'}, status=500)
+
+            # Non-paginated response
+            try:
+                serializer = self.get_serializer(queryset, many=True)
+                response_data = {'results': serializer.data}
+                
+                # Always add bbox for consistency (already calculated above)
+                response_data['bbox'] = [*bbox] if bbox else None
+                
+                return Response(response_data)
+            except Exception as e:
+                logger.error(f"Error creating non-paginated response: {e}")
+                return Response({'error': 'Error creating response'}, status=500)
+                
+        except Exception as e:
+            # Top-level exception handler
+            logger.error(f"Unexpected error in GalleryViewSet.list: {e}")
+            return Response({'error': 'Internal server error'}, status=500)
 
 
     def categorize_by_type(self, queryset):
         """Groups queryset results by `type__text` with counts and paginates images per type."""
+        try:
+            # Step 1: Group data by type with translation and count
+            grouped_data = (
+                queryset
+                .values("type__id", "type__text", "type__english_translation")
+                .annotate(img_count=Count("id", distinct=True))
+                .order_by("type__id")
+            )
 
-        # Step 1: Group data by type with translation and count
-        grouped_data = (
-            queryset
-            .values("type__id", "type__text", "type__english_translation")
-            .annotate(img_count=Count("id", distinct=True))
-            .order_by("type__id")
-        )
-
-        # Step 2: Prepare dictionary for categories
-        category_dict = {
-            entry["type__id"]: {
-                "type": entry["type__text"],
-                "type_translation": entry.get("type__english_translation", "Unknown"),
-                "count": entry["img_count"],
-                # "images": [],
+            # Step 2: Prepare dictionary for categories
+            category_dict = {
+                entry["type__id"]: {
+                    "type": entry["type__text"],
+                    "type_translation": entry.get("type__english_translation", "Unknown"),
+                    "count": entry["img_count"],
+                    # "images": [],
+                }
+                for entry in grouped_data
             }
-            for entry in grouped_data
-        }
-        return list(category_dict.values())
+            return list(category_dict.values())
+        except Exception as e:
+            logger.error(f"Error in categorize_by_type: {e}")
+            return []
 
     def get_advanced_search_queryset(self):
-        params = self.request.GET
-        operator = params.get("operator", "OR")
-        query_conditions = []
+        try:
+            params = self.request.GET
+            operator = params.get("operator", "OR")
+            query_conditions = []
 
-        # Start with optimized base queryset
-        queryset = (
-            models.Image.objects
-            .filter(published=True)
-            .select_related('site', 'institution', 'type')
-            .prefetch_related('keywords', 'people', 'dating_tags')
-            .defer('iiif_file', 'file')
-        )
-
-        field_mapping = {
-            "site_name": ["site__raa_id", "site__lamning_id", "site__askeladden_id",
-                        "site__lokalitet_id", "site__placename", "site__ksamsok_id"],
-            "author_name": ["people__name", "people__english_translation"],
-            "dating_tag": ["dating_tags__text", "dating_tags__english_translation"],
-            "image_type": ["type__text", "type__english_translation"],
-            "institution_name": ["institution__name"],
-            "region_name": ["site__parish__name", "site__municipality__name", "site__province__name"],
-            "visualization_group": ["group__name"],
-        }
-
-        for param, fields in field_mapping.items():
-            values = self.parse_multi_values(params.getlist(param))
-            if values:
-                field_condition = Q()
-                for value in values:
-                    or_condition = Q()
-                    for field in fields:
-                        or_condition |= Q(**{f"{field}__icontains": value})
-                    field_condition |= or_condition
-                query_conditions.append(field_condition)
-
-        # Handle keywords
-        keywords = self.parse_multi_values(params.getlist("keyword"))
-        if keywords:
-            keyword_condition = Q()
-            for keyword in keywords:
-                keyword_condition |= (
-                    Q(keywords__text__icontains=keyword) |
-                    Q(keywords__english_translation__icontains=keyword)
-                )
-            query_conditions.append(keyword_condition)
-
-        if query_conditions:
-            combined_condition = reduce(
-                (lambda x, y: x & y) if operator == "AND" else (lambda x, y: x | y),
-                query_conditions
+            # Start with optimized base queryset
+            queryset = (
+                models.Image.objects
+                .filter(published=True)
+                .select_related('site', 'institution', 'type')
+                .prefetch_related('keywords', 'people', 'dating_tags')
+                .defer('iiif_file', 'file')
             )
-            queryset = queryset.filter(combined_condition)
 
-        return queryset.distinct().order_by('type__order', 'id')
+            field_mapping = {
+                "site_name": ["site__raa_id", "site__lamning_id", "site__askeladden_id",
+                            "site__lokalitet_id", "site__placename", "site__ksamsok_id"],
+                "author_name": ["people__name", "people__english_translation"],
+                "dating_tag": ["dating_tags__text", "dating_tags__english_translation"],
+                "image_type": ["type__text", "type__english_translation"],
+                "institution_name": ["institution__name"],
+                "region_name": ["site__parish__name", "site__municipality__name", "site__province__name"],
+                "visualization_group": ["group__name"],
+            }
+
+            for param, fields in field_mapping.items():
+                try:
+                    values = self.parse_multi_values(params.getlist(param))
+                    if values:
+                        field_condition = Q()
+                        for value in values:
+                            or_condition = Q()
+                            for field in fields:
+                                or_condition |= Q(**{f"{field}__icontains": value})
+                            field_condition |= or_condition
+                        query_conditions.append(field_condition)
+                except Exception as e:
+                    logger.error(f"Error processing {param}: {e}")
+                    continue
+
+            # Handle keywords
+            try:
+                keywords = self.parse_multi_values(params.getlist("keyword"))
+                if keywords:
+                    keyword_condition = Q()
+                    for keyword in keywords:
+                        keyword_condition |= (
+                            Q(keywords__text__icontains=keyword) |
+                            Q(keywords__english_translation__icontains=keyword)
+                        )
+                    query_conditions.append(keyword_condition)
+            except Exception as e:
+                logger.error(f"Error processing keywords: {e}")
+
+            if query_conditions:
+                try:
+                    combined_condition = reduce(
+                        (lambda x, y: x & y) if operator == "AND" else (lambda x, y: x | y),
+                        query_conditions
+                    )
+                    queryset = queryset.filter(combined_condition)
+                except Exception as e:
+                    logger.error(f"Error combining query conditions: {e}")
+                    return queryset.none()
+
+            return queryset.distinct().order_by('type__order', 'id')
+        except Exception as e:
+            logger.error(f"Error in get_advanced_search_queryset: {e}")
+            return models.Image.objects.none()
 
     def parse_multi_values(self, param_list):
         return list(set(v.strip() for val in param_list for v in val.split(",") if v.strip()))
 
     def get_general_search_queryset(self):
         """Handles general search with 'q' parameter."""
-        q = self.request.GET.get("q", "")
-        
-        if not q:
-            return models.Image.objects.none()
+        try:
+            q = self.request.GET.get("q", "")
+            
+            if not q:
+                return models.Image.objects.none()
 
-        return (
-            models.Image.objects
-            .filter(published=True)
-            .select_related('site', 'institution', 'type')
-            .prefetch_related('dating_tags', 'people', 'keywords', 'rock_carving_object')
-            .filter(
-                Q(dating_tags__text__icontains=q)
-                | Q(dating_tags__english_translation__icontains=q)
-                | Q(people__name__icontains=q)
-                | Q(people__english_translation__icontains=q)
-                | Q(type__text__icontains=q)
-                | Q(type__english_translation__icontains=q)
-                | Q(site__raa_id__icontains=q)
-                | Q(site__lamning_id__icontains=q)
-                | Q(site__askeladden_id__icontains=q)
-                | Q(site__lokalitet_id__icontains=q)
-                | Q(site__placename__icontains=q)
-                | Q(keywords__text__icontains=q)
-                | Q(keywords__english_translation__icontains=q)
-                | Q(keywords__category__icontains=q)
-                | Q(keywords__category_translation__icontains=q)
-                | Q(rock_carving_object__name__icontains=q)
-                | Q(institution__name__icontains=q)
-                | Q(site__parish__name__icontains=q)
-                | Q(site__municipality__name__icontains=q)
-                | Q(site__province__name__icontains=q)
+            return (
+                models.Image.objects
+                .filter(published=True)
+                .select_related('site', 'institution', 'type')
+                .prefetch_related('dating_tags', 'people', 'keywords', 'rock_carving_object')
+                .filter(
+                    Q(dating_tags__text__icontains=q)
+                    | Q(dating_tags__english_translation__icontains=q)
+                    | Q(people__name__icontains=q)
+                    | Q(people__english_translation__icontains=q)
+                    | Q(type__text__icontains=q)
+                    | Q(type__english_translation__icontains=q)
+                    | Q(site__raa_id__icontains=q)
+                    | Q(site__lamning_id__icontains=q)
+                    | Q(site__askeladden_id__icontains=q)
+                    | Q(site__lokalitet_id__icontains=q)
+                    | Q(site__placename__icontains=q)
+                    | Q(keywords__text__icontains=q)
+                    | Q(keywords__english_translation__icontains=q)
+                    | Q(keywords__category__icontains=q)
+                    | Q(keywords__category_translation__icontains=q)
+                    | Q(rock_carving_object__name__icontains=q)
+                    | Q(institution__name__icontains=q)
+                    | Q(site__parish__name__icontains=q)
+                    | Q(site__municipality__name__icontains=q)
+                    | Q(site__province__name__icontains=q)
+                )
+                .defer('iiif_file', 'file')
+                .distinct()
+                .order_by('type__order', 'id')
             )
-            .defer('iiif_file', 'file')
-            .distinct()
-            .order_by('type__order', 'id')
-        )
+        except Exception as e:
+            logger.error(f"Error in get_general_search_queryset: {e}")
+            return models.Image.objects.none()
 
 
 # Add autocomplete for general search from rest_framework.viewsets import ViewSet
