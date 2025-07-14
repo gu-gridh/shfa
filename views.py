@@ -480,7 +480,7 @@ class GalleryViewSet(DynamicDepthViewSet):
 
         params = request.GET
         search_type = params.get("search_type")
-        bbox_param = params.get("bbox")
+        bbox_param = params.get("in_bbox")
         site = params.get("site")
         category_type = params.get("category_type")
 
