@@ -20,6 +20,8 @@ from django.contrib.gis.db.models import Extent
 from django.contrib.gis.geos import MultiPoint
 from django.db.models.query import QuerySet
 from django.core.cache import cache
+from django.db import connection
+
 import hashlib
 # myapp/pagination.py
 from rest_framework.pagination import PageNumberPagination
@@ -39,7 +41,7 @@ class CustomPageNumberPagination(PageNumberPagination):
                 count = 0
             else:
                 # Try to get cached count first
-                cache_key = f"pagination_count_{hash(str(self.page.paginator.object_list.query))}"
+                cache_key = f"pg_count_{hashlib.md5(str(self.request.build_absolute_uri()).encode()).hexdigest()[:16]}"
                 count = cache.get(cache_key)
                 
                 if count is None:
@@ -51,27 +53,22 @@ class CustomPageNumberPagination(PageNumberPagination):
                         try:
                             queryset = self.page.paginator.object_list
                             if queryset.model._meta.db_table:
-                                from django.db import connection
                                 with connection.cursor() as cursor:
                                     cursor.execute(
                                         f"SELECT reltuples::BIGINT AS estimate FROM pg_class WHERE relname='{queryset.model._meta.db_table}'"
                                     )
                                     result = cursor.fetchone()
-                                    if result and result[0] > 10000:  # Use estimate for large tables
-                                        count = int(result[0])
+                                    if result and result[0] > 50000:  # Use estimate for large tables
+                                        count = max(int(result[0] * 0.8), 1000)  # Conservative estimate
                                     else:
                                         count = self.page.paginator.count  # Fall back to exact count for smaller tables
                         except:
                             count = self.page.paginator.count if hasattr(self.page.paginator, 'count') else 0
 
-                    # Cache the count for 10 minutes
-                    cache.set(cache_key, count, timeout=600)
+                    # Cache the count for 30 minutes
+                    cache.set(cache_key, count, timeout=1800)
         except Exception:
-            # Fallback to original count method
-            try:
-                count = self.page.paginator.count if self.page and hasattr(self.page.paginator, 'count') else 0
-            except:
-                count = 0
+            count = 1000  # Safe fallback
 
         response_data = {
             'count': count,
@@ -469,9 +466,12 @@ class GalleryViewSet(DynamicDepthViewSet):
             .select_related('type', 'institution', 'site')
             .prefetch_related(
                 Prefetch('keywords', queryset=models.KeywordTag.objects.only('text', 'english_translation')),
-                Prefetch('people', queryset=models.People.objects.only('name', 'english_translation'))
+                Prefetch('people', queryset=models.People.objects.only('name', 'english_translation')),
+                Prefetch('dating_tags', queryset=models.DatingTag.objects.only('text', 'english_translation')),
+                Prefetch('rock_carving_object', queryset=models.RockCarvingObject.objects.only('name')),
+                Prefetch('institution', queryset=models.Institution.objects.only('name')),
             )
-            .defer('iiif_file', 'file')
+            .defer('iiif_file', 'file', 'reference')
             .order_by('type__order', 'id')  # Added id for consistent ordering
         )
 
@@ -595,20 +595,50 @@ class GalleryViewSet(DynamicDepthViewSet):
         except Exception:
             return None
 
-    def calculate_bbox_for_queryset(self, queryset):
-        """Calculate bounding box for entire queryset (fallback for non-paginated results)."""
-        try:
-            site_ids = list(queryset.values_list('site_id', flat=True).distinct())
-            if not site_ids:
-                return None
-            
-            bbox = models.Site.objects.filter(
-                id__in=site_ids
-            ).aggregate(Extent('coordinates'))['coordinates__extent']
-            
-            return list(bbox) if bbox else None
-        except Exception:
+    def calculate_bbox_for_page(self, page_results):
+        """Calculate bounding box for current page - lightweight version."""
+        if not page_results or len(page_results) == 0:
             return None
+        
+        # Get unique site IDs only
+        site_ids = list({img.site_id for img in page_results if img.site_id})
+        
+        if not site_ids:
+            return None
+        
+        # Use cache for bbox calculation
+        cache_key = f"bbox_{hashlib.md5(','.join(map(str, sorted(site_ids))).encode()).hexdigest()[:16]}"
+        bbox = cache.get(cache_key)
+        
+        if bbox is None:
+            try:
+                # Use raw SQL for better performance
+                from django.db import connection
+                with connection.cursor() as cursor:
+                    site_ids_str = ','.join(map(str, site_ids))
+                    cursor.execute(f"""
+                        SELECT ST_Extent(coordinates) 
+                        FROM shfa_site 
+                        WHERE id IN ({site_ids_str})
+                    """)
+                    result = cursor.fetchone()
+                    if result and result[0]:
+                        # Parse PostgreSQL box format: BOX(minx miny,maxx maxy)
+                        box_str = result[0].replace('BOX(', '').replace(')', '')
+                        coords = box_str.split(',')
+                        min_coords = coords[0].split()
+                        max_coords = coords[1].split()
+                        bbox = [float(min_coords[0]), float(min_coords[1]), 
+                            float(max_coords[0]), float(max_coords[1])]
+                    else:
+                        bbox = None
+            except Exception:
+                bbox = None
+            
+            if bbox:
+                cache.set(cache_key, bbox, timeout=600)
+        
+        return bbox
 
 
     def categorize_by_type(self, queryset):
