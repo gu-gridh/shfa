@@ -475,9 +475,8 @@ class GalleryViewSet(DynamicDepthViewSet):
             .order_by('type__order', 'id')  # Added id for consistent ordering
         )
 
-
     def list(self, request, *args, **kwargs):
-        """Handles GET requests, returning paginated image results with summary by creator and institution."""
+        """Handles GET requests, returning paginated image results with calculated bbox per page."""
 
         params = request.GET
         search_type = params.get("search_type")
@@ -488,48 +487,21 @@ class GalleryViewSet(DynamicDepthViewSet):
         if not search_type and not bbox_param and not site and not category_type:
             return Response([])
 
-        # Cache key setup
-        site_ids = None
-        if bbox_param:
-            bbox_cache_key = f"bbox_sites:{hashlib.md5(bbox_param.encode()).hexdigest()}"
-            site_ids = cache.get(bbox_cache_key)
+        # Get base queryset based on search type
+        queryset = self.get_base_queryset(search_type)
 
-        # Base queryset selection
-        if search_type == "advanced":
-            queryset = self.get_advanced_search_queryset()
-        elif search_type == "general":
-            queryset = self.get_general_search_queryset()
-        else:
-            queryset = self.filter_queryset(self.get_queryset())
+        # Apply filters
+        queryset = self.apply_site_filter(queryset, site)
+        queryset = self.apply_bbox_filter(queryset, bbox_param)
+        queryset = self.apply_category_filter(queryset, category_type)
 
-        # Apply site filter
-        if site:
-            queryset = queryset.filter(site_id=site)
-
-        # Apply bbox filter using cached or fresh site_ids
-        if bbox_param:
-            if site_ids is None:
-                bbox_coords = [float(coord) for coord in bbox_param.strip().split(',')]
-                bounding_box = Envelope(bbox_coords)
-                site_ids = list(models.Site.objects.filter(
-                    coordinates__intersects=bounding_box.wkt
-                ).values_list('id', flat=True))
-                cache.set(bbox_cache_key, site_ids, timeout=600)
-
-            queryset = queryset.filter(site_id__in=site_ids)
-
-        # Apply category_type filter
-        if category_type:
-            queryset = queryset.filter(
-                Q(type__text=category_type) |
-                Q(type__english_translation=category_type)
-            )
-        else:
+        # If no category_type, return categorized results
+        if not category_type:
             return Response({
                 "results": self.categorize_by_type(queryset),
             })
 
-        # Optimize queryset
+        # Optimize queryset for pagination
         queryset = queryset.select_related('site', 'type', 'institution').only(
             'id', 'site_id', 'type__order', 'type__text', 'type__english_translation',
             'institution__name', 'site__raa_id', 'site__placename'
@@ -541,13 +513,102 @@ class GalleryViewSet(DynamicDepthViewSet):
             serializer = self.get_serializer(page, many=True)
             paginated_response = self.get_paginated_response(serializer.data)
 
-            # Always return the original bbox if set, don't recalculate per page
-            paginated_response.data['bbox'] = [float(coord) for coord in bbox_param.strip().split(',')] if bbox_param else None
+            # Calculate bbox for current page results
+            bbox = self.calculate_bbox_for_page(page)
+            paginated_response.data['bbox'] = bbox
+            
             return paginated_response
 
-        # Fallback if no pagination (unlikely with PageNumberPagination)
+        # Fallback if no pagination
         serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+        bbox = self.calculate_bbox_for_queryset(queryset)
+        return Response({
+            'results': serializer.data,
+            'bbox': bbox
+        })
+
+    def get_base_queryset(self, search_type):
+        """Get base queryset based on search type."""
+        if search_type == "advanced":
+            return self.get_advanced_search_queryset()
+        elif search_type == "general":
+            return self.get_general_search_queryset()
+        else:
+            return self.filter_queryset(self.get_queryset())
+
+    def apply_site_filter(self, queryset, site):
+        """Apply site filter if provided."""
+        if site:
+            return queryset.filter(site_id=site)
+        return queryset
+
+    def apply_bbox_filter(self, queryset, bbox_param):
+        """Apply bounding box filter using cached site_ids."""
+        if not bbox_param:
+            return queryset
+        
+        # Cache key for bbox sites
+        bbox_cache_key = f"bbox_sites:{hashlib.md5(bbox_param.encode()).hexdigest()}"
+        site_ids = cache.get(bbox_cache_key)
+        
+        if site_ids is None:
+            try:
+                bbox_coords = [float(coord) for coord in bbox_param.strip().split(',')]
+                bounding_box = Envelope(bbox_coords)
+                site_ids = list(models.Site.objects.filter(
+                    coordinates__intersects=bounding_box.wkt
+                ).values_list('id', flat=True))
+                cache.set(bbox_cache_key, site_ids, timeout=600)
+            except (ValueError, TypeError) as e:
+                # Handle invalid bbox format
+                return queryset.none()
+        
+        return queryset.filter(site_id__in=site_ids)
+
+    def apply_category_filter(self, queryset, category_type):
+        """Apply category type filter if provided."""
+        if category_type:
+            return queryset.filter(
+                Q(type__text=category_type) |
+                Q(type__english_translation=category_type)
+            )
+        return queryset
+
+    def calculate_bbox_for_page(self, page_results):
+        """Calculate bounding box for the current page results."""
+        if not page_results:
+            return None
+        
+        # Get site IDs from current page
+        site_ids = [img.site_id for img in page_results if img.site_id]
+        
+        if not site_ids:
+            return None
+        
+        try:
+            # Calculate extent for sites in current page
+            bbox = models.Site.objects.filter(
+                id__in=site_ids
+            ).aggregate(Extent('coordinates'))['coordinates__extent']
+            
+            return list(bbox) if bbox else None
+        except Exception:
+            return None
+
+    def calculate_bbox_for_queryset(self, queryset):
+        """Calculate bounding box for entire queryset (fallback for non-paginated results)."""
+        try:
+            site_ids = list(queryset.values_list('site_id', flat=True).distinct())
+            if not site_ids:
+                return None
+            
+            bbox = models.Site.objects.filter(
+                id__in=site_ids
+            ).aggregate(Extent('coordinates'))['coordinates__extent']
+            
+            return list(bbox) if bbox else None
+        except Exception:
+            return None
 
 
     def categorize_by_type(self, queryset):
