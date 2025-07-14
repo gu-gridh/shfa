@@ -705,6 +705,7 @@ class GalleryViewSet(DynamicDepthViewSet):
             .filter(published=True)
             .select_related('site', 'institution', 'type')
             .prefetch_related('dating_tags', 'people', 'keywords', 'rock_carving_object')
+            .defer('iiif_file', 'file')
             .filter(
                 Q(dating_tags__text__icontains=q)
                 | Q(dating_tags__english_translation__icontains=q)
@@ -727,7 +728,6 @@ class GalleryViewSet(DynamicDepthViewSet):
                 | Q(site__municipality__name__icontains=q)
                 | Q(site__province__name__icontains=q)
             )
-            .defer('iiif_file', 'file')
             .distinct()
             .order_by('type__order', 'id')
         )
