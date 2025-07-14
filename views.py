@@ -533,72 +533,24 @@ class GalleryViewSet(DynamicDepthViewSet):
             serializer = self.get_serializer(page, many=True)
             paginated_response = self.get_paginated_response(serializer.data)
 
-            # Calculate bbox for entire result set (consistent across all pages)
-            bbox = None
-            
-            if box and site_ids:
-                # Use the bbox of all sites in the spatial filter
-                bbox_extent_key = f"bbox_extent:{hashlib.md5(box.encode()).hexdigest()}"
-                bbox = cache.get(bbox_extent_key)
-                
-                if bbox is None:
-                    try:
-                        bbox = models.Site.objects.filter(
-                            id__in=site_ids
-                        ).aggregate(Extent('coordinates'))['coordinates__extent']
-                        cache.set(bbox_extent_key, bbox, timeout=600)  # Cache for 10 minutes
-                    except Exception:
-                        bbox = None
-            else:
-                # For non-bbox searches, calculate bbox from entire queryset (not just current page)
-                # Remove page parameter to get consistent cache key across all pages
-                full_path = request.get_full_path()
-                base_path = full_path.split('&page=')[0].split('?page=')[0]
-                if '?' in base_path and not base_path.endswith('?'):
-                    base_path += '&'
-                elif '?' not in base_path:
-                    base_path += '?'
-                    
-                cache_key = f"gallery_bbox_full:{hashlib.md5(base_path.encode()).hexdigest()}"
-                bbox = cache.get(cache_key)
-                
-                if bbox is None:
-                    try:
-                        # Get all image IDs from the full queryset (before pagination)
-                        all_image_ids = list(queryset.values_list('id', flat=True))
-                        if all_image_ids:
-                            bbox = models.Site.objects.filter(
-                                image__id__in=all_image_ids
-                            ).aggregate(Extent('coordinates'))['coordinates__extent']
-                        else:
-                            bbox = None
-                        cache.set(cache_key, bbox, timeout=600)  # Cache for 10 minutes
-                    except Exception:
-                        bbox = None
+            bbox_param = params.get("bbox")
+            bbox_list = None  # Default value
 
-            paginated_response.data['bbox'] = [*bbox] if bbox else None
+            if bbox_param:
+                bbox_coords = [float(coord) for coord in bbox_param.strip().split(',')]
+                bounding_box = Polygon.from_bbox(bbox_coords)
+                bounding_box = Envelope(bbox_coords)
+
+                if site_ids is None:
+                    site_ids = list(models.Site.objects.filter(
+                        coordinates__intersects=bounding_box.wkt
+                    ).values_list('id', flat=True))
+
+                cache.set(bbox_cache_key, site_ids, timeout=600)
+                bbox_list = bbox_coords
+
+            paginated_response.data['bbox'] = bbox_list
             return paginated_response
-
-        serializer = self.get_serializer(queryset, many=True)
-        response_data = {'results': serializer.data}
-        
-        # Add bbox for non-paginated responses too
-        if box and site_ids:
-            bbox_extent_key = f"bbox_extent:{hashlib.md5(box.encode()).hexdigest()}"
-            bbox = cache.get(bbox_extent_key)
-            
-            if bbox is None:
-                try:
-                    bbox = models.Site.objects.filter(
-                        id__in=site_ids
-                    ).aggregate(Extent('coordinates'))['coordinates__extent']
-                    cache.set(bbox_extent_key, bbox, timeout=600)
-                except Exception:
-                    bbox = None
-            
-            response_data['bbox'] = [*bbox] if bbox else None
-        
-        return Response(response_data)
 
 
     def categorize_by_type(self, queryset):
