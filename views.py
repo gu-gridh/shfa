@@ -595,50 +595,20 @@ class GalleryViewSet(DynamicDepthViewSet):
         except Exception:
             return None
 
-    def calculate_bbox_for_page(self, page_results):
-        """Calculate bounding box for current page - lightweight version."""
-        if not page_results or len(page_results) == 0:
-            return None
-        
-        # Get unique site IDs only
-        site_ids = list({img.site_id for img in page_results if img.site_id})
-        
-        if not site_ids:
-            return None
-        
-        # Use cache for bbox calculation
-        cache_key = f"bbox_{hashlib.md5(','.join(map(str, sorted(site_ids))).encode()).hexdigest()[:16]}"
-        bbox = cache.get(cache_key)
-        
-        if bbox is None:
-            try:
-                # Use raw SQL for better performance
-                from django.db import connection
-                with connection.cursor() as cursor:
-                    site_ids_str = ','.join(map(str, site_ids))
-                    cursor.execute(f"""
-                        SELECT ST_Extent(coordinates) 
-                        FROM shfa_site 
-                        WHERE id IN ({site_ids_str})
-                    """)
-                    result = cursor.fetchone()
-                    if result and result[0]:
-                        # Parse PostgreSQL box format: BOX(minx miny,maxx maxy)
-                        box_str = result[0].replace('BOX(', '').replace(')', '')
-                        coords = box_str.split(',')
-                        min_coords = coords[0].split()
-                        max_coords = coords[1].split()
-                        bbox = [float(min_coords[0]), float(min_coords[1]), 
-                            float(max_coords[0]), float(max_coords[1])]
-                    else:
-                        bbox = None
-            except Exception:
-                bbox = None
+    def calculate_bbox_for_queryset(self, queryset):
+        """Calculate bounding box for entire queryset (fallback for non-paginated results)."""
+        try:
+            site_ids = list(queryset.values_list('site_id', flat=True).distinct())
+            if not site_ids:
+                return None
             
-            if bbox:
-                cache.set(cache_key, bbox, timeout=600)
-        
-        return bbox
+            bbox = models.Site.objects.filter(
+                id__in=site_ids
+            ).aggregate(Extent('coordinates'))['coordinates__extent']
+            
+            return list(bbox) if bbox else None
+        except Exception:
+            return None
 
 
     def categorize_by_type(self, queryset):
