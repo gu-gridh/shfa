@@ -24,57 +24,12 @@ import hashlib
 from rest_framework.pagination import PageNumberPagination
 
 # Custom pagination class to allow dynamic page size
-
 class CustomPageNumberPagination(PageNumberPagination):
-    page_size = 25
-    page_size_query_param = 'limit'
-    max_page_size = 100
-    
-    def get_paginated_response(self, data, extra_metadata=None):
-        # Use cached count or estimate for better performance
-        try:
-            # Try to get cached count first
-            cache_key = f"pagination_count_{hash(str(self.page.paginator.object_list.query))}"
-            count = cache.get(cache_key)
-            
-            if count is None:
-                # For large datasets, use estimated count instead of exact count
-                if hasattr(self.page.paginator, '_count') and self.page.paginator._count is not None:
-                    count = self.page.paginator._count
-                else:
-                    # Use database estimation for very large tables
-                    queryset = self.page.paginator.object_list
-                    if queryset.model._meta.db_table:
-                        from django.db import connection
-                        with connection.cursor() as cursor:
-                            cursor.execute(
-                                f"SELECT reltuples::BIGINT AS estimate FROM pg_class WHERE relname='{queryset.model._meta.db_table}'"
-                            )
-                            result = cursor.fetchone()
-                            if result and result[0] > 10000:  # Use estimate for large tables
-                                count = int(result[0])
-                            else:
-                                count = self.page.paginator.count  # Fall back to exact count for smaller tables
-                
-                # Cache the count for 5 minutes
-                cache.set(cache_key, count, timeout=300)
-        except:
-            # Fallback to original count method
-            count = self.page.paginator.count
+    page_size = 25  # default limit if not provided
+    page_size_query_param = 'limit'  # allows ?limit=50
+    max_page_size = 100  # optional: prevent abuse
 
-        response_data = {
-            'count': count,
-            'next': self.get_next_link(),
-            'previous': self.get_previous_link(),
-            'results': data,
-            'estimated': count != self.page.paginator.count if hasattr(self.page.paginator, '_count') else False
-        }
-        
-        if extra_metadata:
-            response_data.update(extra_metadata)
 
-        return Response(response_data)
-    
 class SiteViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteSerializer
     queryset = models.Site.objects.all()
@@ -84,6 +39,7 @@ class SiteViewSet(DynamicDepthViewSet):
     search_fields = ['raa_id', 'lamning_id', 'ksamsok_id', 'placename']
     bbox_filter_field = 'coordinates'
     bbox_filter_include_overlapping = True
+
 
 class SiteGeoViewSet(GeoViewSet):
 
@@ -100,12 +56,15 @@ class SiteGeoViewSet(GeoViewSet):
     bbox_filter_include_overlapping = True
 
 # Add 3D views
+
+
 class SHFA3DViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SHFA3DSerializer
     tree_d_data_group = models.Group.objects.all()
     queryset = models.SHFA3D.objects.filter(
         group_id__in=list(tree_d_data_group.values_list('id', flat=True)))
     filterset_fields = get_fields(models.SHFA3D, exclude=DEFAULT_FIELDS)
+
 
 class VisualizationGroupViewset(DynamicDepthViewSet):
     serializer_class = serializers.VisualizationGroupSerializer
@@ -155,8 +114,9 @@ class CameraSpecificationViewSet(DynamicDepthViewSet):
     filterset_fields = get_fields(
         models.CameraMeta, exclude=DEFAULT_FIELDS)
 
-
   # Search views
+
+
 class SiteSearchViewSet(GeoViewSet):
     serializer_class = serializers.SiteGeoSerializer
 
@@ -182,6 +142,7 @@ class SiteSearchViewSet(GeoViewSet):
     search_fields = ['raa_id', 'lamning_id', 'ksamsok_id', 'placename']
     bbox_filter_field = 'coordinates'
     bbox_filter_include_overlapping = True
+
 
 class IIIFImageViewSet(DynamicDepthViewSet):
     """
@@ -499,30 +460,33 @@ class GalleryViewSet(DynamicDepthViewSet):
                 "results": self.categorize_by_type(queryset),
             })
 
-        # Apply pagination
+        # Apply pagination and limit it bases on limit parameter
+
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             paginated_response = self.get_paginated_response(serializer.data)
 
-            page_number = request.query_params.get('page', 1)
-            cache_key = f"gallery_bbox:{hashlib.md5(request.get_full_path().encode()).hexdigest()}:page:{page_number}"
-
-            bbox = cache.get(cache_key)
-
-            if bbox is None:
-                image_ids = [obj.id for obj in page] if not isinstance(page, QuerySet) else list(page.values_list('id', flat=True))
-                bbox = models.Site.objects.filter(
-                    image__id__in=image_ids
-                ).aggregate(Extent('coordinates'))['coordinates__extent']
-                cache.set(cache_key, bbox, timeout=300)
+            # Get bbox from current page only
+            if isinstance(page, QuerySet):
+                bbox = page.aggregate(Extent('site__coordinates'))['site__coordinates__extent']
+            else:
+                image_ids = [img.id for img in page]
+                bbox = models.Image.objects.filter(id__in=image_ids).aggregate(
+                    Extent('site__coordinates')
+                )['site__coordinates__extent']
 
             paginated_response.data['bbox'] = [*bbox] if bbox else None
             return paginated_response
 
-        serializer = self.get_serializer(queryset, many=True)
-        return Response({'results': serializer.data})
 
+        # If pagination is disabled, return full results with summary
+        serializer = self.get_serializer(queryset, many=True)
+
+
+        return Response({
+            "results": serializer.data,
+        })
 
     def categorize_by_type(self, queryset):
         """Groups queryset results by `type__text` with counts and paginates images per type."""
@@ -602,6 +566,9 @@ class GalleryViewSet(DynamicDepthViewSet):
 
     def parse_multi_values(self, param_list):
         return list(set(v.strip() for val in param_list for v in val.split(",") if v.strip()))
+
+
+
 
     def get_general_search_queryset(self):
         """Handles general search with 'q' parameter."""
