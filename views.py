@@ -24,18 +24,69 @@ import hashlib
 from rest_framework.pagination import PageNumberPagination
 
 # Custom pagination class to allow dynamic page size
+
 class CustomPageNumberPagination(PageNumberPagination):
     page_size = 25
     page_size_query_param = 'limit'
     max_page_size = 100
-
+    
     def get_paginated_response(self, data, extra_metadata=None):
+        # Use cached count or estimate for better performance
+        try:
+            # Handle empty querysets gracefully
+            if not self.page or not hasattr(self.page, 'paginator'):
+                count = 0
+            else:
+                # Try to get cached count first
+                cache_key = f"pagination_count_{hash(str(self.page.paginator.object_list.query))}"
+                count = cache.get(cache_key)
+                
+                if count is None:
+                    # For large datasets, use estimated count instead of exact count
+                    if hasattr(self.page.paginator, '_count') and self.page.paginator._count is not None:
+                        count = self.page.paginator._count
+                    else:
+                        # Use database estimation for very large tables
+                        try:
+                            queryset = self.page.paginator.object_list
+                            if queryset.model._meta.db_table:
+                                from django.db import connection
+                                with connection.cursor() as cursor:
+                                    cursor.execute(
+                                        f"SELECT reltuples::BIGINT AS estimate FROM pg_class WHERE relname='{queryset.model._meta.db_table}'"
+                                    )
+                                    result = cursor.fetchone()
+                                    if result and result[0] > 10000:  # Use estimate for large tables
+                                        count = int(result[0])
+                                    else:
+                                        count = self.page.paginator.count  # Fall back to exact count for smaller tables
+                        except:
+                            count = self.page.paginator.count if hasattr(self.page.paginator, 'count') else 0
+
+                    # Cache the count for 10 minutes
+                    cache.set(cache_key, count, timeout=600)
+        except Exception:
+            # Fallback to original count method
+            try:
+                count = self.page.paginator.count if self.page and hasattr(self.page.paginator, 'count') else 0
+            except:
+                count = 0
+
         response_data = {
-            'count': self.page.paginator.count,
-            'next': self.get_next_link(),
-            'previous': self.get_previous_link(),
-            'results': data
+            'count': count,
+            'next': self.get_next_link() if self.page else None,
+            'previous': self.get_previous_link() if self.page else None,
+            'results': data,
+            'estimated': False
         }
+        
+        # Add estimated flag if we're using estimates
+        try:
+            if self.page and hasattr(self.page.paginator, '_count'):
+                response_data['estimated'] = count != self.page.paginator.count
+        except:
+            pass
+        
         if extra_metadata:
             response_data.update(extra_metadata)
 
@@ -414,10 +465,13 @@ class GalleryViewSet(DynamicDepthViewSet):
         return (
             models.Image.objects
             .filter(published=True)
-            .select_related('type', 'institution', 'site__province')
-            .prefetch_related('keywords', 'people')
+            .select_related('type', 'institution', 'site')
+            .prefetch_related(
+                Prefetch('keywords', queryset=models.KeywordTag.objects.only('text', 'english_translation')),
+                Prefetch('people', queryset=models.People.objects.only('name', 'english_translation'))
+            )
             .defer('iiif_file', 'file')
-            .order_by('type__order')
+            .order_by('type__order', 'id')  # Added id for consistent ordering
         )
 
 
@@ -433,6 +487,12 @@ class GalleryViewSet(DynamicDepthViewSet):
         if not search_type and not box and not site and not category_type:
             return Response([])
 
+        # Cache bbox site_ids to avoid repeated spatial queries
+        site_ids = None
+        if box:
+            bbox_cache_key = f"bbox_sites:{hashlib.md5(box.encode()).hexdigest()}"
+            site_ids = cache.get(bbox_cache_key)
+
         # Apply search types first: this defines the base queryset
         if search_type == "advanced":
             queryset = self.get_advanced_search_queryset()
@@ -445,13 +505,8 @@ class GalleryViewSet(DynamicDepthViewSet):
         if site:
             queryset = queryset.filter(site_id=site)
 
-        # Apply bbox filter
-        if box:
-            box_coords = list(map(float, box.strip().split(',')))
-            bounding_box = Envelope(box_coords)
-            site_ids = models.Site.objects.filter(
-                coordinates__intersects=bounding_box.wkt
-            ).values_list("id", flat=True)
+        # Apply bbox filter using cached site_ids
+        if box and site_ids is not None:
             queryset = queryset.filter(site_id__in=site_ids)
 
         # Apply category_type filter
@@ -465,29 +520,85 @@ class GalleryViewSet(DynamicDepthViewSet):
                 "results": self.categorize_by_type(queryset),
             })
 
+        # Optimize queryset 
+        # Use select_related and only to reduce database load
+        queryset = queryset.select_related('site', 'type', 'institution').only(
+            'id', 'site_id', 'type__order', 'type__text', 'type__english_translation',
+            'institution__name', 'site__raa_id', 'site__placename'
+        )
+
         # Apply pagination
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             paginated_response = self.get_paginated_response(serializer.data)
 
-            page_number = request.query_params.get('page', 1)
-            cache_key = f"gallery_bbox:{hashlib.md5(request.get_full_path().encode()).hexdigest()}:page:{page_number}"
-
-            bbox = cache.get(cache_key)
-
-            if bbox is None:
-                image_ids = [obj.id for obj in page] if not isinstance(page, QuerySet) else list(page.values_list('id', flat=True))
-                bbox = models.Site.objects.filter(
-                    image__id__in=image_ids
-                ).aggregate(Extent('coordinates'))['coordinates__extent']
-                cache.set(cache_key, bbox, timeout=300)
+            # Calculate bbox for entire result set (consistent across all pages)
+            bbox = None
+            
+            if box and site_ids:
+                # Use the bbox of all sites in the spatial filter
+                bbox_extent_key = f"bbox_extent:{hashlib.md5(box.encode()).hexdigest()}"
+                bbox = cache.get(bbox_extent_key)
+                
+                if bbox is None:
+                    try:
+                        bbox = models.Site.objects.filter(
+                            id__in=site_ids
+                        ).aggregate(Extent('coordinates'))['coordinates__extent']
+                        cache.set(bbox_extent_key, bbox, timeout=600)  # Cache for 10 minutes
+                    except Exception:
+                        bbox = None
+            else:
+                # For non-bbox searches, calculate bbox from entire queryset (not just current page)
+                # Remove page parameter to get consistent cache key across all pages
+                full_path = request.get_full_path()
+                base_path = full_path.split('&page=')[0].split('?page=')[0]
+                if '?' in base_path and not base_path.endswith('?'):
+                    base_path += '&'
+                elif '?' not in base_path:
+                    base_path += '?'
+                    
+                cache_key = f"gallery_bbox_full:{hashlib.md5(base_path.encode()).hexdigest()}"
+                bbox = cache.get(cache_key)
+                
+                if bbox is None:
+                    try:
+                        # Get all image IDs from the full queryset (before pagination)
+                        all_image_ids = list(queryset.values_list('id', flat=True))
+                        if all_image_ids:
+                            bbox = models.Site.objects.filter(
+                                image__id__in=all_image_ids
+                            ).aggregate(Extent('coordinates'))['coordinates__extent']
+                        else:
+                            bbox = None
+                        cache.set(cache_key, bbox, timeout=600)  # Cache for 10 minutes
+                    except Exception:
+                        bbox = None
 
             paginated_response.data['bbox'] = [*bbox] if bbox else None
             return paginated_response
 
         serializer = self.get_serializer(queryset, many=True)
-        return Response({'results': serializer.data})
+        response_data = {'results': serializer.data}
+        
+        # Add bbox for non-paginated responses too
+        if box and site_ids:
+            bbox_extent_key = f"bbox_extent:{hashlib.md5(box.encode()).hexdigest()}"
+            bbox = cache.get(bbox_extent_key)
+            
+            if bbox is None:
+                try:
+                    bbox = models.Site.objects.filter(
+                        id__in=site_ids
+                    ).aggregate(Extent('coordinates'))['coordinates__extent']
+                    cache.set(bbox_extent_key, bbox, timeout=600)
+                except Exception:
+                    bbox = None
+            
+            response_data['bbox'] = [*bbox] if bbox else None
+        
+        return Response(response_data)
 
 
     def categorize_by_type(self, queryset):
@@ -518,10 +629,13 @@ class GalleryViewSet(DynamicDepthViewSet):
         operator = params.get("operator", "OR")
         query_conditions = []
 
-        queryset = self.get_queryset().select_related(
-            "site__parish", "site__municipality", "site__province", "institution"
-        ).prefetch_related(
-            "people", "dating_tags", "type", "keywords", "group"
+        # Start with optimized base queryset
+        queryset = (
+            models.Image.objects
+            .filter(published=True)
+            .select_related('site', 'institution', 'type')
+            .prefetch_related('keywords', 'people', 'dating_tags')
+            .defer('iiif_file', 'file')
         )
 
         field_mapping = {
@@ -564,7 +678,7 @@ class GalleryViewSet(DynamicDepthViewSet):
             )
             queryset = queryset.filter(combined_condition)
 
-        return queryset.filter(published=True).distinct()
+        return queryset.distinct().order_by('type__order', 'id')
 
     def parse_multi_values(self, param_list):
         return list(set(v.strip() for val in param_list for v in val.split(",") if v.strip()))
@@ -572,36 +686,41 @@ class GalleryViewSet(DynamicDepthViewSet):
     def get_general_search_queryset(self):
         """Handles general search with 'q' parameter."""
         q = self.request.GET.get("q", "")
-        queryset = self.get_queryset()
-
+        
         if not q:
-            return self.queryset.none()
+            return models.Image.objects.none()
 
-        return queryset.select_related(
-            "institution", "type").prefetch_related(
-            "dating_tags", "people", "keywords", "rock_carving_object"
-            ).filter(
-            Q(dating_tags__text__icontains=q)
-            | Q(dating_tags__english_translation__icontains=q)
-            | Q(people__name__icontains=q)
-            | Q(people__english_translation__icontains=q)
-            | Q(type__text__icontains=q)
-            | Q(type__english_translation__icontains=q)
-            | Q(site__raa_id__icontains=q)
-            | Q(site__lamning_id__icontains=q)
-            | Q(site__askeladden_id__icontains=q)
-            | Q(site__lokalitet_id__icontains=q)
-            | Q(site__placename__icontains=q)
-            | Q(keywords__text__icontains=q)
-            | Q(keywords__english_translation__icontains=q)
-            | Q(keywords__category__icontains=q)
-            | Q(keywords__category_translation__icontains=q)
-            | Q(rock_carving_object__name__icontains=q)
-            | Q(institution__name__icontains=q)
-            | Q(site__parish__name__icontains=q)
-            | Q(site__municipality__name__icontains=q)
-            | Q(site__province__name__icontains=q)
-        ).filter(published=True).distinct()
+        return (
+            models.Image.objects
+            .filter(published=True)
+            .select_related('site', 'institution', 'type')
+            .prefetch_related('dating_tags', 'people', 'keywords', 'rock_carving_object')
+            .filter(
+                Q(dating_tags__text__icontains=q)
+                | Q(dating_tags__english_translation__icontains=q)
+                | Q(people__name__icontains=q)
+                | Q(people__english_translation__icontains=q)
+                | Q(type__text__icontains=q)
+                | Q(type__english_translation__icontains=q)
+                | Q(site__raa_id__icontains=q)
+                | Q(site__lamning_id__icontains=q)
+                | Q(site__askeladden_id__icontains=q)
+                | Q(site__lokalitet_id__icontains=q)
+                | Q(site__placename__icontains=q)
+                | Q(keywords__text__icontains=q)
+                | Q(keywords__english_translation__icontains=q)
+                | Q(keywords__category__icontains=q)
+                | Q(keywords__category_translation__icontains=q)
+                | Q(rock_carving_object__name__icontains=q)
+                | Q(institution__name__icontains=q)
+                | Q(site__parish__name__icontains=q)
+                | Q(site__municipality__name__icontains=q)
+                | Q(site__province__name__icontains=q)
+            )
+            .defer('iiif_file', 'file')
+            .distinct()
+            .order_by('type__order', 'id')
+        )
 
 
 # Add autocomplete for general search from rest_framework.viewsets import ViewSet
