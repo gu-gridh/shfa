@@ -17,6 +17,7 @@ from diana.forms import ContactForm
 from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib.gis.db.models import Extent
+from django.contrib.gis.geos import MultiPoint
 from django.db.models.query import QuerySet
 from django.core.cache import cache
 import hashlib
@@ -527,29 +528,26 @@ class GalleryViewSet(DynamicDepthViewSet):
             'institution__name', 'site__raa_id', 'site__placename'
         )
 
-        # Apply pagination
+        # After getting the paginated queryset
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
+            
+            # Calculate bbox from page items
+            coordinates = list(
+                models.Site.objects.filter(
+                    id__in=[img.site_id for img in page if img.site_id]
+                ).values_list('coordinates', flat=True)
+            )
+
+            bbox_coords = None
+            if coordinates:
+                points = MultiPoint([coord for coord in coordinates if coord])
+                if not points.empty:
+                    bbox_coords = list(points.extent)  # Returns [min_x, min_y, max_x, max_y]
+
             paginated_response = self.get_paginated_response(serializer.data)
-
-            bbox_param = params.get("bbox")
-            bbox_list = None  # Default value
-
-            if bbox_param:
-                bbox_coords = [float(coord) for coord in bbox_param.strip().split(',')]
-                bounding_box = Polygon.from_bbox(bbox_coords)
-                bounding_box = Envelope(bbox_coords)
-
-                if site_ids is None:
-                    site_ids = list(models.Site.objects.filter(
-                        coordinates__intersects=bounding_box.wkt
-                    ).values_list('id', flat=True))
-
-                cache.set(bbox_cache_key, site_ids, timeout=600)
-                bbox_list = bbox_coords
-
-            paginated_response.data['bbox'] = bbox_list
+            paginated_response.data['bbox'] = bbox_coords
             return paginated_response
 
 
