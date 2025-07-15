@@ -19,6 +19,7 @@ from django.conf import settings
 from django.core.cache import cache
 import hashlib
 from rest_framework.pagination import PageNumberPagination
+from itertools import chain
 
 class SiteViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteSerializer
@@ -367,33 +368,18 @@ class AdvancedSearch(DynamicDepthViewSet):
     filterset_fields = [
         'id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
-# Add gallery view
-class GalleryViewSet(DynamicDepthViewSet):  
-    """A viewset to return images in a gallery format with advanced search capabilities."""
-    serializer_class = serializers.GallerySerializer
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
-    # Add any additional filtering or search capabilities here
-    def get_queryset(self):
-        params = self.request.GET
-        operator = params.get("operator", "OR")
-        search_type = params.get("search_type")
-        category_type = params.get("category_type")
-
-        queryset = (
-            models.Image.objects
-            .filter(published=True)
-            .select_related('site', 'institution', 'type')
-            .prefetch_related('keywords', 'people', 'dating_tags')
-            .defer('iiif_file', 'file', 'reference')
-        )
-
-        # Step 1: Filter by category_type first for performance
-        if category_type:
-            queryset = queryset.filter(type__text__iexact=category_type)
-
-        ALL_FIELDS = {
+# New Module search views
+class BaseSearchViewSet(DynamicDepthViewSet):
+    """Base class containing common search functionality."""
+    
+    def parse_multi_values(self, values):
+        """Helper method to parse multiple values from query parameters."""
+        return [v for v in values if v]
+    
+    def get_search_fields_mapping(self):
+        """Define the mapping between search parameters and model fields."""
+        return {
             "site_name": ["site__raa_id", "site__lamning_id", "site__askeladden_id",
                         "site__lokalitet_id", "site__placename", "site__ksamsok_id"],
             "author_name": ["people__name", "people__english_translation"],
@@ -406,96 +392,147 @@ class GalleryViewSet(DynamicDepthViewSet):
                             "keywords__category", "keywords__category_translation"],
             "rock_carving_object": ["rock_carving_object__name"],
         }
-
-        # Dynamically build "q" as a combination of all unique field values
-        from itertools import chain
-
+    
+    def get_type_field_keys(self):
+        """Define search type configurations."""
+        ALL_FIELDS = self.get_search_fields_mapping()
         ALL_FIELDS["q"] = sorted(set(chain.from_iterable(ALL_FIELDS.values())))
-
-        TYPE_FIELD_KEYS = {
+        
+        return {
             "advanced": ["site_name", "author_name", "dating_tag",
                         "image_type", "institution_name", "region_name",
                         "visualization_group", "keywords_info", "rock_carving_object"],
             "general": ["q"],
-        }
+        }, ALL_FIELDS
+    
+    def build_search_query(self, params, search_type="general", operator="OR"):
+        """Build dynamic search query based on parameters."""
+        try:
+            TYPE_FIELD_KEYS, ALL_FIELDS = self.get_type_field_keys()
+            
+            field_keys = TYPE_FIELD_KEYS.get(search_type, list(ALL_FIELDS.keys()))
+            mapping_filter_fields = {key: ALL_FIELDS[key] for key in field_keys}
+            
+            query_conditions = []
+            
+            # Apply dynamic search filters
+            for param_key, fields in mapping_filter_fields.items():
+                values = self.parse_multi_values(params.getlist(param_key))
+                if values:
+                    q_obj = Q()
+                    for value in values:
+                        sub_q = Q()
+                        for field in fields:
+                            sub_q |= Q(**{f"{field}__icontains": value})
+                        q_obj |= sub_q
+                    query_conditions.append(q_obj)
+            
+            # Combine conditions based on operator
+            if query_conditions:
+                combined_q = reduce(
+                    (lambda x, y: x & y) if operator == "AND" else (lambda x, y: x | y),
+                    query_conditions
+                )
+                return combined_q
+            
+            return Q()
+            
+        except Exception as e:
+            return Q()
+    
+    def apply_bbox_filter(self, queryset, bbox_param):
+        """Apply bounding box filter to queryset."""
+        if not bbox_param:
+            return queryset
+            
+        try:
+            coords = list(map(float, bbox_param.split(",")))
+            if len(coords) == 4:
+                polygon = Polygon.from_bbox(coords)
+                site_ids = models.Site.objects.filter(
+                    coordinates__intersects=polygon
+                ).values_list("id", flat=True)
+                return queryset.filter(site_id__in=site_ids)
+        except (ValueError, Exception) as e:
+            pass
+        return queryset
+    
+    def get_base_image_queryset(self):
+        """Get optimized base queryset for images."""
+        return (
+            models.Image.objects
+            .filter(published=True)
+            .select_related('site', 'institution', 'type')
+            .prefetch_related('keywords', 'people', 'dating_tags')
+            .defer('iiif_file', 'file', 'reference')
+        )
 
-        field_keys = TYPE_FIELD_KEYS.get(search_type, list(ALL_FIELDS.keys()))
-        mapping_filter_fields = {key: ALL_FIELDS[key] for key in field_keys}
 
-        query_conditions = []
+# Add gallery view
+class GalleryViewSet(BaseSearchViewSet):
+    """A viewset to return images in a gallery format with advanced search capabilities."""
+    serializer_class = serializers.GallerySerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
-        # Step 3: Apply dynamic search filters
-        for param_key, fields in mapping_filter_fields.items():
-            values = self.parse_multi_values(params.getlist(param_key))
-            if values:
-                q_obj = Q()
-                for value in values:
-                    sub_q = Q()
-                    for field in fields:
-                        sub_q |= Q(**{f"{field}__icontains": value})
-                    q_obj |= sub_q
-                query_conditions.append(q_obj)
+    def get_queryset(self):
+        params = self.request.GET
+        operator = params.get("operator", "OR")
+        search_type = params.get("search_type")
+        category_type = params.get("category_type")
 
-        # Step 4: Combine conditions based on operator
-        if query_conditions:
-            combined_q = reduce(
-                (lambda x, y: x & y) if operator == "AND" else (lambda x, y: x | y),
-                query_conditions
-            )
-            queryset = queryset.filter(combined_q)
+        queryset = self.get_base_image_queryset()
 
-        # Step 5: Apply bbox filtering last
-        in_bbox = params.get("in_bbox")
-        if in_bbox:
-            try:
-                coords = list(map(float, in_bbox.split(",")))
-                if len(coords) == 4:
-                    polygon = Polygon.from_bbox(coords)
-                    site_ids = models.Site.objects.filter(coordinates__intersects=polygon).values_list("id", flat=True)
-                    queryset = queryset.filter(site_id__in=site_ids)
-            except ValueError:
-                pass  # Ignore invalid bbox
+        # Filter by category_type first for performance
+        if category_type:
+            queryset = queryset.filter(type__text__iexact=category_type)
+
+        # Apply search filters using base class method
+        search_query = self.build_search_query(params, search_type, operator)
+        if search_query:
+            queryset = queryset.filter(search_query)
+
+        # Apply bbox filtering using base class method
+        queryset = self.apply_bbox_filter(queryset, params.get("in_bbox"))
 
         return queryset.distinct().order_by('type__order', 'id')
 
-    def parse_multi_values(self, values):
-        """Helper method to parse multiple values from query parameters."""
-        return [v for v in values if v]
-    
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        # Categorized based on imge types
-        # For this we don't need to paginate results
-        categorized_data = self.categorize_by_type(queryset)
-
-        # Prepare the response data
-        response_data = {
-            "categories": categorized_data
-        }
-        return Response(response_data, status=status.HTTP_200_OK)
-    
     def categorize_by_type(self, queryset):
-        """Groups queryset results by `type__text` with counts and paginates images per type."""
+        """Groups queryset results by type with counts."""
+        try:
+            grouped_data = (
+                queryset
+                .values("type__id", "type__text", "type__english_translation")
+                .annotate(img_count=Count("id", distinct=True))
+                .order_by("type__id")
+            )
 
-        # Step 1: Group data by type with translation and count
-        grouped_data = (
-            queryset
-            .values("type__id", "type__text", "type__english_translation")
-            .annotate(img_count=Count("id", distinct=True))
-            .order_by("type__id")
-        )
-
-        # Step 2: Prepare dictionary for categories
-        category_dict = {
-            entry["type__id"]: {
-                "type": entry["type__text"],
-                "type_translation": entry.get("type__english_translation", "Unknown"),
-                "count": entry["img_count"],
-                # "images": [],
+            category_dict = {
+                entry["type__id"]: {
+                    "type": entry["type__text"],
+                    "type_translation": entry.get("type__english_translation", "Unknown"),
+                    "count": entry["img_count"],
+                }
+                for entry in grouped_data
             }
-            for entry in grouped_data
-        }
-        return list(category_dict.values())
+            return list(category_dict.values())
+        except Exception as e:
+            return []
+
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset = self.filter_queryset(self.get_queryset())
+            categorized_data = self.categorize_by_type(queryset)
+
+            response_data = {
+                "categories": categorized_data
+            }
+            return Response(response_data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {"error": "Internal server error"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 # Custom pagination class to return bounding box for paginated results
 class BoundingBoxPagination(PageNumberPagination):
@@ -503,15 +540,12 @@ class BoundingBoxPagination(PageNumberPagination):
     page_size_query_param = 'limit'
     max_page_size = 100
 
-class SearchCategoryViewSet(DynamicDepthViewSet):
-    """Search images by category, supporting advanced search, general search, site name, and bbox."""
+class SearchCategoryViewSet(BaseSearchViewSet):
+    """Search images by category with pagination."""
     serializer_class = serializers.GallerySerializer
     pagination_class = BoundingBoxPagination
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id'] + get_fields(models.Image, exclude=['iiif_file', 'file'])
-
-    def parse_multi_values(self, values):
-        return [v for v in values if v]
 
     def get_queryset(self):
         params = self.request.GET
@@ -519,80 +553,19 @@ class SearchCategoryViewSet(DynamicDepthViewSet):
         search_type = params.get("search_type")
         category_type = params.get("category_type")
 
-        queryset = (
-            models.Image.objects
-            .filter(published=True)
-            .select_related('site', 'institution', 'type')
-            .prefetch_related('keywords', 'people', 'dating_tags')
-            .defer('iiif_file', 'file', 'reference')
-        )
+        queryset = self.get_base_image_queryset()
 
-        # Step 1: Filter by category_type first for performance
+        # Filter by category_type first for performance
         if category_type:
             queryset = queryset.filter(type__text__iexact=category_type)
 
-        ALL_FIELDS = {
-            "site_name": ["site__raa_id", "site__lamning_id", "site__askeladden_id",
-                        "site__lokalitet_id", "site__placename", "site__ksamsok_id"],
-            "author_name": ["people__name", "people__english_translation"],
-            "dating_tag": ["dating_tags__text", "dating_tags__english_translation"],
-            "image_type": ["type__text", "type__english_translation"],
-            "institution_name": ["institution__name"],
-            "region_name": ["site__parish__name", "site__municipality__name", "site__province__name"],
-            "visualization_group": ["group__text"],
-            "keywords_info": ["keywords__text", "keywords__english_translation",
-                            "keywords__category", "keywords__category_translation"],
-            "rock_carving_object": ["rock_carving_object__name"],
-        }
+        # Apply search filters using base class method
+        search_query = self.build_search_query(params, search_type, operator)
+        if search_query:
+            queryset = queryset.filter(search_query)
 
-        # Dynamically build "q" as a combination of all unique field values
-        from itertools import chain
-
-        ALL_FIELDS["q"] = sorted(set(chain.from_iterable(ALL_FIELDS.values())))
-
-        TYPE_FIELD_KEYS = {
-            "advanced": ["site_name", "author_name", "dating_tag",
-                        "image_type", "institution_name", "region_name",
-                        "visualization_group", "keywords_info", "rock_carving_object"],
-            "general": ["q"],
-        }
-
-        field_keys = TYPE_FIELD_KEYS.get(search_type, list(ALL_FIELDS.keys()))
-        mapping_filter_fields = {key: ALL_FIELDS[key] for key in field_keys}
-
-        query_conditions = []
-
-        # Step 3: Apply dynamic search filters
-        for param_key, fields in mapping_filter_fields.items():
-            values = self.parse_multi_values(params.getlist(param_key))
-            if values:
-                q_obj = Q()
-                for value in values:
-                    sub_q = Q()
-                    for field in fields:
-                        sub_q |= Q(**{f"{field}__icontains": value})
-                    q_obj |= sub_q
-                query_conditions.append(q_obj)
-
-        # Step 4: Combine conditions based on operator
-        if query_conditions:
-            combined_q = reduce(
-                (lambda x, y: x & y) if operator == "AND" else (lambda x, y: x | y),
-                query_conditions
-            )
-            queryset = queryset.filter(combined_q)
-
-        # Step 5: Apply bbox filtering last
-        in_bbox = params.get("in_bbox")
-        if in_bbox:
-            try:
-                coords = list(map(float, in_bbox.split(",")))
-                if len(coords) == 4:
-                    polygon = Polygon.from_bbox(coords)
-                    site_ids = models.Site.objects.filter(coordinates__intersects=polygon).values_list("id", flat=True)
-                    queryset = queryset.filter(site_id__in=site_ids)
-            except ValueError:
-                pass  # Ignore invalid bbox
+        # Apply bbox filtering using base class method
+        queryset = self.apply_bbox_filter(queryset, params.get("in_bbox"))
 
         return queryset.distinct().order_by('type__order', 'id')
 
@@ -753,41 +726,37 @@ class GeneralSearchAutocomplete(ViewSet):
         return Response(sorted_suggestions)
 
 
-class SummaryViewSet(DynamicDepthViewSet):
-    """A separate viewset to return summary data for images grouped by creator and institution and etc."""
+class SummaryViewSet(BaseSearchViewSet):
+    """A separate viewset to return summary data for images."""
     queryset = models.Image.objects.filter(published=True).order_by('type__order')
     serializer_class = serializers.SummarySerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
+    def get_queryset(self):
+        params = self.request.GET
+        operator = params.get("operator", "OR")
+        search_type = params.get("search_type")
+        category_type = params.get("category_type")
+
+        queryset = self.get_base_image_queryset()
+
+        # Filter by category_type first for performance
+        if category_type:
+            queryset = queryset.filter(type__text__iexact=category_type)
+
+        # Apply search filters using base class method
+        search_query = self.build_search_query(params, search_type, operator)
+        if search_query:
+            queryset = queryset.filter(search_query)
+
+        # Apply bbox filtering using base class method
+        queryset = self.apply_bbox_filter(queryset, params.get("in_bbox"))
+
+        return queryset.distinct().order_by('type__order', 'id')
+
     def list(self, request, *args, **kwargs):
-        """Handles GET requests, returning paginated image results with summary by creator and institution."""
-
-        search_type = request.GET.get("search_type")
-        box = request.GET.get("in_bbox")
-        site = request.GET.get("site")
-
-        queryset = self.queryset
-
-        # Apply site filter
-        if site:
-            queryset = queryset.filter(site_id=site)
-
-        # Apply bbox filter
-        if box:
-            box = list(map(float, box.strip().split(',')))
-            bounding_box = Envelope(box)  # Assuming spatial filtering
-            sites = models.Site.objects.filter(coordinates__intersects=bounding_box.wkt)
-            queryset = queryset.filter(site_id__in=sites)
-
-        # Apply search types
-        elif search_type == "advanced":
-            queryset = self.get_advanced_search_queryset()
-        elif search_type == "general":
-            queryset = self.get_general_search_queryset()
-        else:
-            queryset = self.filter_queryset(self.get_queryset())
-
+        queryset = self.filter_queryset(self.get_queryset())
         # Generate summary BEFORE pagination
         summary_data = self.summarize_results(queryset)
         
@@ -1001,36 +970,6 @@ class SummaryViewSet(DynamicDepthViewSet):
             return self.queryset.none()
 
         return self.queryset.filter(reduce(lambda x, y: x & y, query_conditions), published=True).order_by('type__order')
-
-    def get_general_search_queryset(self):
-        """Handles general search with 'q' parameter."""
-        q = self.request.GET.get("q", "")
-
-        if not q:
-            return self.queryset.none()
-
-        return self.queryset.filter(
-            Q(dating_tags__text__icontains=q)
-            | Q(dating_tags__english_translation__icontains=q)
-            | Q(people__name__icontains=q)
-            | Q(people__english_translation__icontains=q)
-            | Q(type__text__icontains=q)
-            | Q(type__english_translation__icontains=q)
-            | Q(site__raa_id__icontains=q)
-            | Q(site__lamning_id__icontains=q)
-            | Q(site__askeladden_id__icontains=q)
-            | Q(site__lokalitet_id__icontains=q)
-            | Q(site__placename__icontains=q)
-            | Q(keywords__text__icontains=q)
-            | Q(keywords__english_translation__icontains=q)
-            | Q(keywords__category__icontains=q)
-            | Q(keywords__category_translation__icontains=q)
-            | Q(rock_carving_object__name__icontains=q)
-            | Q(institution__name__icontains=q)
-            | Q(site__parish__name__icontains=q)
-            | Q(site__municipality__name__icontains=q)
-            | Q(site__province__name__icontains=q)
-        ).filter(published=True).order_by('-id', 'type__order').distinct()
 
     
 # VIEW FOR OAI_CAT
