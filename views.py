@@ -732,9 +732,16 @@ class GalleryViewSet(DynamicDepthViewSet):
             .order_by('type__order', 'id')
         )
 
+# Custom pagination class to return bounding box for paginated results
+class BoundingBoxPagination(PageNumberPagination):
+    page_size = 25
+    page_size_query_param = 'limit'
+    max_page_size = 100
+
 class SearchCategoryViewSet(DynamicDepthViewSet):
     """Search images by category, supporting advanced search, general search, site name, and bbox."""
     serializer_class = serializers.GallerySerializer
+    pagination_class = BoundingBoxPagination
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id'] + get_fields(models.Image, exclude=['iiif_file', 'file'])
 
@@ -823,6 +830,51 @@ class SearchCategoryViewSet(DynamicDepthViewSet):
                 pass  # Ignore invalid bbox
 
         return queryset.distinct().order_by('type__order', 'id')
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+
+            site_coords = [
+                image.site.coordinates.extent
+                for image in page if image.site and image.site.coordinates
+            ]
+            xs = [c[0] for c in site_coords] + [c[2] for c in site_coords] if site_coords else []
+            ys = [c[1] for c in site_coords] + [c[3] for c in site_coords] if site_coords else []
+
+            page_bbox = (min(xs), min(ys), max(xs), max(ys)) if site_coords else None
+
+            response = self.get_paginated_response(serializer.data)
+            response.data['bbox'] = page_bbox
+            return response
+        else:
+            # Fallback if everything fits on one page
+            serializer = self.get_serializer(queryset, many=True)
+            page_bbox = self.calculate_page_bbox(queryset)
+
+            return Response({
+                'count': len(queryset),
+                'next': None,
+                'previous': None,
+                'bbox': page_bbox,
+                'results': serializer.data,
+            })
+    
+    def calculate_page_bbox(images):
+        site_coords = [
+            image.site.coordinates.extent
+            for image in images if image.site and image.site.coordinates
+        ]
+        if not site_coords:
+            return None
+
+        xs = [c[0] for c in site_coords] + [c[2] for c in site_coords]
+        ys = [c[1] for c in site_coords] + [c[3] for c in site_coords]
+
+        return (min(xs), min(ys), max(xs), max(ys))
 
 # Add autocomplete for general search from rest_framework.viewsets import ViewSet
 class GeneralSearchAutocomplete(ViewSet):
