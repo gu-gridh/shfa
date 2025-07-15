@@ -732,6 +732,97 @@ class GalleryViewSet(DynamicDepthViewSet):
             .order_by('type__order', 'id')
         )
 
+class SearchCategoryViewSet(DynamicDepthViewSet):
+    """Search images by category, supporting advanced search, general search, site name, and bbox."""
+    serializer_class = serializers.GallerySerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['id'] + get_fields(models.Image, exclude=['iiif_file', 'file'])
+
+    def parse_multi_values(self, values):
+        return [v for v in values if v]
+
+    def get_queryset(self):
+        params = self.request.GET
+        operator = params.get("operator", "OR")
+        search_type = params.get("search_type")
+        category_type = params.get("category_type")
+
+        queryset = (
+            models.Image.objects
+            .filter(published=True)
+            .select_related('site', 'institution', 'type')
+            .prefetch_related('keywords', 'people', 'dating_tags')
+            .defer('iiif_file', 'file', 'reference')
+        )
+
+        # Step 1: Filter by category_type first for performance
+        if category_type:
+            queryset = queryset.filter(type__text__iexact=category_type)
+
+        ALL_FIELDS = {
+            "site_name": ["site__raa_id", "site__lamning_id", "site__askeladden_id",
+                        "site__lokalitet_id", "site__placename", "site__ksamsok_id"],
+            "author_name": ["people__name", "people__english_translation"],
+            "dating_tag": ["dating_tags__text", "dating_tags__english_translation"],
+            "image_type": ["type__text", "type__english_translation"],
+            "institution_name": ["institution__name"],
+            "region_name": ["site__parish__name", "site__municipality__name", "site__province__name"],
+            "visualization_group": ["group__text"],
+            "keywords_info": ["keywords__text", "keywords__english_translation",
+                            "keywords__category", "keywords__category_translation"],
+            "rock_carving_object": ["rock_carving_object__name"],
+        }
+
+        # Dynamically build "q" as a combination of all unique field values
+        from itertools import chain
+
+        ALL_FIELDS["q"] = sorted(set(chain.from_iterable(ALL_FIELDS.values())))
+
+        TYPE_FIELD_KEYS = {
+            "advanced": ["site_name", "author_name", "dating_tag",
+                        "image_type", "institution_name", "region_name",
+                        "visualization_group", "keywords_info", "rock_carving_object"],
+            "general": ["q"],
+        }
+
+        field_keys = TYPE_FIELD_KEYS.get(search_type, list(ALL_FIELDS.keys()))
+        mapping_filter_fields = {key: ALL_FIELDS[key] for key in field_keys}
+
+        query_conditions = []
+
+        # Step 3: Apply dynamic search filters
+        for param_key, fields in mapping_filter_fields.items():
+            values = self.parse_multi_values(params.getlist(param_key))
+            if values:
+                q_obj = Q()
+                for value in values:
+                    sub_q = Q()
+                    for field in fields:
+                        sub_q |= Q(**{f"{field}__icontains": value})
+                    q_obj |= sub_q
+                query_conditions.append(q_obj)
+
+        # Step 4: Combine conditions based on operator
+        if query_conditions:
+            combined_q = reduce(
+                (lambda x, y: x & y) if operator == "AND" else (lambda x, y: x | y),
+                query_conditions
+            )
+            queryset = queryset.filter(combined_q)
+
+        # Step 5: Apply bbox filtering last
+        in_bbox = params.get("in_bbox")
+        if in_bbox:
+            try:
+                coords = list(map(float, in_bbox.split(",")))
+                if len(coords) == 4:
+                    polygon = Polygon.from_bbox(coords)
+                    site_ids = models.Site.objects.filter(coordinates__intersects=polygon).values_list("id", flat=True)
+                    queryset = queryset.filter(site_id__in=site_ids)
+            except ValueError:
+                pass  # Ignore invalid bbox
+
+        return queryset.distinct().order_by('type__order', 'id')
 
 # Add autocomplete for general search from rest_framework.viewsets import ViewSet
 class GeneralSearchAutocomplete(ViewSet):

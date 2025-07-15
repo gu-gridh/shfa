@@ -47,6 +47,8 @@ router.register(rf'{endpoint}/search', views.GeneralSearch, basename='search')
 # urls for the image gallery
 router.register(rf'{endpoint}/gallery',
                 views.GalleryViewSet, basename='gallery')
+router.register(rf'{endpoint}/type_categorized',
+                views.SearchCategoryViewSet, basename='gallery categorized by type')
 router.register(rf'{endpoint}/summary', 
                 views.SummaryViewSet, basename='gallery-summary')
 
