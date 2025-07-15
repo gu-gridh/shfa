@@ -16,80 +16,10 @@ from collections import defaultdict
 from diana.forms import ContactForm
 from django.core.mail import send_mail
 from django.conf import settings
-from django.contrib.gis.db.models import Extent
-from django.contrib.gis.geos import MultiPoint
-from django.db.models.query import QuerySet
 from django.core.cache import cache
-from django.db import connection
-
 import hashlib
-# myapp/pagination.py
 from rest_framework.pagination import PageNumberPagination
 
-# Custom pagination class to allow dynamic page size
-
-class CustomPageNumberPagination(PageNumberPagination):
-    page_size = 25
-    page_size_query_param = 'limit'
-    max_page_size = 100
-    
-    def get_paginated_response(self, data, extra_metadata=None):
-        # Use cached count or estimate for better performance
-        try:
-            # Handle empty querysets gracefully
-            if not self.page or not hasattr(self.page, 'paginator'):
-                count = 0
-            else:
-                # Try to get cached count first
-                cache_key = f"pg_count_{hashlib.md5(str(self.request.build_absolute_uri()).encode()).hexdigest()[:16]}"
-                count = cache.get(cache_key)
-                
-                if count is None:
-                    # For large datasets, use estimated count instead of exact count
-                    if hasattr(self.page.paginator, '_count') and self.page.paginator._count is not None:
-                        count = self.page.paginator._count
-                    else:
-                        # Use database estimation for very large tables
-                        try:
-                            queryset = self.page.paginator.object_list
-                            if queryset.model._meta.db_table:
-                                with connection.cursor() as cursor:
-                                    cursor.execute(
-                                        f"SELECT reltuples::BIGINT AS estimate FROM pg_class WHERE relname='{queryset.model._meta.db_table}'"
-                                    )
-                                    result = cursor.fetchone()
-                                    if result and result[0] > 50000:  # Use estimate for large tables
-                                        count = max(int(result[0] * 0.8), 1000)  # Conservative estimate
-                                    else:
-                                        count = self.page.paginator.count  # Fall back to exact count for smaller tables
-                        except:
-                            count = self.page.paginator.count if hasattr(self.page.paginator, 'count') else 0
-
-                    # Cache the count for 30 minutes
-                    cache.set(cache_key, count, timeout=1800)
-        except Exception:
-            count = 1000  # Safe fallback
-
-        response_data = {
-            'count': count,
-            'next': self.get_next_link() if self.page else None,
-            'previous': self.get_previous_link() if self.page else None,
-            'results': data,
-            'estimated': False
-        }
-        
-        # Add estimated flag if we're using estimates
-        try:
-            if self.page and hasattr(self.page.paginator, '_count'):
-                response_data['estimated'] = count != self.page.paginator.count
-        except:
-            pass
-        
-        if extra_metadata:
-            response_data.update(extra_metadata)
-
-        return Response(response_data)
-    
 class SiteViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteSerializer
     queryset = models.Site.objects.all()
@@ -149,13 +79,11 @@ class VisualizationGroupViewset(DynamicDepthViewSet):
 
     filterset_fields = get_fields(models.Group, exclude=DEFAULT_FIELDS)
 
-
 class GeologyViewSet(GeoViewSet):
     serializer_class = serializers.GeologySerializer
     queryset = models.Geology.objects.all()
     filterset_fields = get_fields(
         models.Geology, exclude=DEFAULT_FIELDS + ['coordinates', ])
-
 
 class SHFA3DMeshViewset(DynamicDepthViewSet):
     serializer_class = serializers.SHFA3DMeshSerializer
@@ -163,15 +91,13 @@ class SHFA3DMeshViewset(DynamicDepthViewSet):
     filterset_fields = get_fields(
         models.SHFA3DMesh, exclude=DEFAULT_FIELDS + ['dimensions'])
 
-
 class CameraSpecificationViewSet(DynamicDepthViewSet):
     serializer_class = serializers.CameraSpecificationSerializer
     queryset = models.CameraMeta.objects.all()
     filterset_fields = get_fields(
         models.CameraMeta, exclude=DEFAULT_FIELDS)
 
-
-  # Search views
+# Search views
 class SiteSearchViewSet(GeoViewSet):
     serializer_class = serializers.SiteGeoSerializer
 
@@ -251,7 +177,6 @@ class CompilationViewset(DynamicDepthViewSet):
     filterset_fields = ['id']+get_fields(models.Compilation, exclude=DEFAULT_FIELDS + [
                                          'images__iiif_file', 'images__file'])
 
-
 class SearchKeywords(DynamicDepthViewSet):
     serializer_class = serializers.KeywordsSerializer
 
@@ -266,7 +191,6 @@ class SearchKeywords(DynamicDepthViewSet):
                 category_translation__icontains=q)).distinct().order_by('text', 'category')
         return queryset
 
-
 class SearchRockCarving(DynamicDepthViewSet):
     serializer_class = serializers.RockCarvingSerializer
 
@@ -275,7 +199,6 @@ class SearchRockCarving(DynamicDepthViewSet):
         queryset = models.RockCarvingObject.objects.filter(
             name__icontains=q).order_by('name')
         return queryset
-
 
 class SearchAuthor(DynamicDepthViewSet):
     serializer_class = serializers.AuthorSerializer
@@ -294,7 +217,6 @@ class SearchAuthor(DynamicDepthViewSet):
                                                       )).order_by('name')
         return queryset
 
-
 class SearchPeople(DynamicDepthViewSet):
     serializer_class = serializers.PeopleSerializer
 
@@ -310,7 +232,6 @@ class SearchPeople(DynamicDepthViewSet):
 
         return queryset
 
-
 class SearchInstitution(DynamicDepthViewSet):
     serializer_class = serializers.InstitutionSerializer
 
@@ -319,7 +240,6 @@ class SearchInstitution(DynamicDepthViewSet):
         queryset = models.Institution.objects.filter(
             name__icontains=q).order_by('name')
         return queryset
-
 
 class SearchDatinTag(DynamicDepthViewSet):
     serializer_class = serializers.DatingTagSerializer
@@ -335,7 +255,6 @@ class SearchDatinTag(DynamicDepthViewSet):
                 english_translation__icontains=q).order_by('text')
         return queryset
 
-
 class TypeSearchViewSet(DynamicDepthViewSet):
     serializer_class = serializers.ImageTypeSerializer
 
@@ -349,7 +268,6 @@ class TypeSearchViewSet(DynamicDepthViewSet):
             queryset = models.ImageTypeTag.objects.filter(
                 english_translation__icontains=q).order_by('text')
         return queryset
-
 
 class RegionSearchViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteCoordinatesExcludeSerializer
@@ -406,7 +324,6 @@ class GeneralSearch(DynamicDepthViewSet):
 
     filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
 
-
 class AdvancedSearch(DynamicDepthViewSet):
     serializer_class = serializers.TIFFImageSerializer
 
@@ -452,165 +369,111 @@ class AdvancedSearch(DynamicDepthViewSet):
 
 # Add gallery view
 class GalleryViewSet(DynamicDepthViewSet):  
-
     """A viewset to return images in a gallery format with advanced search capabilities."""
     serializer_class = serializers.GallerySerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
-    pagination_class = CustomPageNumberPagination
 
+    # Add any additional filtering or search capabilities here
     def get_queryset(self):
-        return (
-            models.Image.objects
-            .filter(published=True)
-            .select_related('type', 'institution', 'site')
-            .prefetch_related(
-                Prefetch('keywords', queryset=models.KeywordTag.objects.only('text', 'english_translation')),
-                Prefetch('people', queryset=models.People.objects.only('name', 'english_translation')),
-                Prefetch('dating_tags', queryset=models.DatingTag.objects.only('text', 'english_translation')),
-                Prefetch('rock_carving_object', queryset=models.RockCarvingObject.objects.only('name')),
-                Prefetch('institution', queryset=models.Institution.objects.only('name')),
-            )
-            .defer('iiif_file', 'file', 'reference')
-            .order_by('type__order', 'id')  # Added id for consistent ordering
-        )
-
-    def list(self, request, *args, **kwargs):
-        """Handles GET requests, returning paginated image results with calculated bbox per page."""
-
-        params = request.GET
+        params = self.request.GET
+        operator = params.get("operator", "OR")
         search_type = params.get("search_type")
-        bbox_param = params.get("in_bbox")
-        site = params.get("site")
         category_type = params.get("category_type")
 
-        if not search_type and not bbox_param and not site and not category_type:
-            return Response([])
-
-        # Get base queryset based on search type
-        queryset = self.get_base_queryset(search_type)
-
-        # Apply filters
-        queryset = self.apply_site_filter(queryset, site)
-        queryset = self.apply_bbox_filter(queryset, bbox_param)
-        queryset = self.apply_category_filter(queryset, category_type)
-
-        # If no category_type, return categorized results
-        if not category_type:
-            return Response({
-                "results": self.categorize_by_type(queryset),
-            })
-
-        # Optimize queryset for pagination
-        queryset = queryset.select_related('site', 'type', 'institution').only(
-            'id', 'site_id', 'type__order', 'type__text', 'type__english_translation',
-            'institution__name', 'site__raa_id', 'site__placename'
+        queryset = (
+            models.Image.objects
+            .filter(published=True)
+            .select_related('site', 'institution', 'type')
+            .prefetch_related('keywords', 'people', 'dating_tags')
+            .defer('iiif_file', 'file', 'reference')
         )
 
-        # Apply pagination
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            paginated_response = self.get_paginated_response(serializer.data)
-
-            # Calculate bbox for current page results
-            bbox = self.calculate_bbox_for_page(page)
-            paginated_response.data['bbox'] = bbox
-            
-            return paginated_response
-
-        # Fallback if no pagination
-        serializer = self.get_serializer(queryset, many=True)
-        bbox = self.calculate_bbox_for_queryset(queryset)
-        return Response({
-            'results': serializer.data,
-            'bbox': bbox
-        })
-
-    def get_base_queryset(self, search_type):
-        """Get base queryset based on search type."""
-        if search_type == "advanced":
-            return self.get_advanced_search_queryset()
-        elif search_type == "general":
-            return self.get_general_search_queryset()
-        else:
-            return self.filter_queryset(self.get_queryset())
-
-    def apply_site_filter(self, queryset, site):
-        """Apply site filter if provided."""
-        if site:
-            return queryset.filter(site_id=site)
-        return queryset
-
-    def apply_bbox_filter(self, queryset, bbox_param):
-        """Apply bounding box filter using cached site_ids."""
-        if not bbox_param:
-            return queryset
-        
-        # Cache key for bbox sites
-        bbox_cache_key = f"bbox_sites:{hashlib.md5(bbox_param.encode()).hexdigest()}"
-        site_ids = cache.get(bbox_cache_key)
-        
-        if site_ids is None:
-            try:
-                bbox_coords = [float(coord) for coord in bbox_param.strip().split(',')]
-                bounding_box = Envelope(bbox_coords)
-                site_ids = list(models.Site.objects.filter(
-                    coordinates__intersects=bounding_box.wkt
-                ).values_list('id', flat=True))
-                cache.set(bbox_cache_key, site_ids, timeout=600)
-            except (ValueError, TypeError) as e:
-                # Handle invalid bbox format
-                return queryset.none()
-        
-        return queryset.filter(site_id__in=site_ids)
-
-    def apply_category_filter(self, queryset, category_type):
-        """Apply category type filter if provided."""
+        # Step 1: Filter by category_type first for performance
         if category_type:
-            return queryset.filter(
-                Q(type__text=category_type) |
-                Q(type__english_translation=category_type)
+            queryset = queryset.filter(type__text__iexact=category_type)
+
+        ALL_FIELDS = {
+            "site_name": ["site__raa_id", "site__lamning_id", "site__askeladden_id",
+                        "site__lokalitet_id", "site__placename", "site__ksamsok_id"],
+            "author_name": ["people__name", "people__english_translation"],
+            "dating_tag": ["dating_tags__text", "dating_tags__english_translation"],
+            "image_type": ["type__text", "type__english_translation"],
+            "institution_name": ["institution__name"],
+            "region_name": ["site__parish__name", "site__municipality__name", "site__province__name"],
+            "visualization_group": ["group__text"],
+            "keywords_info": ["keywords__text", "keywords__english_translation",
+                            "keywords__category", "keywords__category_translation"],
+            "rock_carving_object": ["rock_carving_object__name"],
+        }
+
+        # Dynamically build "q" as a combination of all unique field values
+        from itertools import chain
+
+        ALL_FIELDS["q"] = sorted(set(chain.from_iterable(ALL_FIELDS.values())))
+
+        TYPE_FIELD_KEYS = {
+            "advanced": ["site_name", "author_name", "dating_tag",
+                        "image_type", "institution_name", "region_name",
+                        "visualization_group", "keywords_info", "rock_carving_object"],
+            "general": ["q"],
+        }
+
+        field_keys = TYPE_FIELD_KEYS.get(search_type, list(ALL_FIELDS.keys()))
+        mapping_filter_fields = {key: ALL_FIELDS[key] for key in field_keys}
+
+        query_conditions = []
+
+        # Step 3: Apply dynamic search filters
+        for param_key, fields in mapping_filter_fields.items():
+            values = self.parse_multi_values(params.getlist(param_key))
+            if values:
+                q_obj = Q()
+                for value in values:
+                    sub_q = Q()
+                    for field in fields:
+                        sub_q |= Q(**{f"{field}__icontains": value})
+                    q_obj |= sub_q
+                query_conditions.append(q_obj)
+
+        # Step 4: Combine conditions based on operator
+        if query_conditions:
+            combined_q = reduce(
+                (lambda x, y: x & y) if operator == "AND" else (lambda x, y: x | y),
+                query_conditions
             )
-        return queryset
+            queryset = queryset.filter(combined_q)
 
-    def calculate_bbox_for_page(self, page_results):
-        """Calculate bounding box for the current page results."""
-        if not page_results:
-            return None
-        
-        # Get site IDs from current page
-        site_ids = [img.site_id for img in page_results if img.site_id]
-        
-        if not site_ids:
-            return None
-        
-        try:
-            # Calculate extent for sites in current page
-            bbox = models.Site.objects.filter(
-                id__in=site_ids
-            ).aggregate(Extent('coordinates'))['coordinates__extent']
-            
-            return list(bbox) if bbox else None
-        except Exception:
-            return None
+        # Step 5: Apply bbox filtering last
+        in_bbox = params.get("in_bbox")
+        if in_bbox:
+            try:
+                coords = list(map(float, in_bbox.split(",")))
+                if len(coords) == 4:
+                    polygon = Polygon.from_bbox(coords)
+                    site_ids = models.Site.objects.filter(coordinates__intersects=polygon).values_list("id", flat=True)
+                    queryset = queryset.filter(site_id__in=site_ids)
+            except ValueError:
+                pass  # Ignore invalid bbox
 
-    def calculate_bbox_for_queryset(self, queryset):
-        """Calculate bounding box for entire queryset (fallback for non-paginated results)."""
-        try:
-            site_ids = list(queryset.values_list('site_id', flat=True).distinct())
-            if not site_ids:
-                return None
-            
-            bbox = models.Site.objects.filter(
-                id__in=site_ids
-            ).aggregate(Extent('coordinates'))['coordinates__extent']
-            
-            return list(bbox) if bbox else None
-        except Exception:
-            return None
+        return queryset.distinct().order_by('type__order', 'id')
 
+    def parse_multi_values(self, values):
+        """Helper method to parse multiple values from query parameters."""
+        return [v for v in values if v]
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        # Categorized based on imge types
+        # For this we don't need to paginate results
+        categorized_data = self.categorize_by_type(queryset)
 
+        # Prepare the response data
+        response_data = {
+            "categories": categorized_data
+        }
+        return Response(response_data, status=status.HTTP_200_OK)
+    
     def categorize_by_type(self, queryset):
         """Groups queryset results by `type__text` with counts and paginates images per type."""
 
@@ -633,104 +496,6 @@ class GalleryViewSet(DynamicDepthViewSet):
             for entry in grouped_data
         }
         return list(category_dict.values())
-
-    def get_advanced_search_queryset(self):
-        params = self.request.GET
-        operator = params.get("operator", "OR")
-        query_conditions = []
-
-        # Start with optimized base queryset
-        queryset = (
-            models.Image.objects
-            .filter(published=True)
-            .select_related('site', 'institution', 'type')
-            .prefetch_related('keywords', 'people', 'dating_tags')
-            .defer('iiif_file', 'file')
-        )
-
-        field_mapping = {
-            "site_name": ["site__raa_id", "site__lamning_id", "site__askeladden_id",
-                        "site__lokalitet_id", "site__placename", "site__ksamsok_id"],
-            "author_name": ["people__name", "people__english_translation"],
-            "dating_tag": ["dating_tags__text", "dating_tags__english_translation"],
-            "image_type": ["type__text", "type__english_translation"],
-            "institution_name": ["institution__name"],
-            "region_name": ["site__parish__name", "site__municipality__name", "site__province__name"],
-            "visualization_group": ["group__name"],
-        }
-
-        for param, fields in field_mapping.items():
-            values = self.parse_multi_values(params.getlist(param))
-            if values:
-                field_condition = Q()
-                for value in values:
-                    or_condition = Q()
-                    for field in fields:
-                        or_condition |= Q(**{f"{field}__icontains": value})
-                    field_condition |= or_condition
-                query_conditions.append(field_condition)
-
-        # Handle keywords
-        keywords = self.parse_multi_values(params.getlist("keyword"))
-        if keywords:
-            keyword_condition = Q()
-            for keyword in keywords:
-                keyword_condition |= (
-                    Q(keywords__text__icontains=keyword) |
-                    Q(keywords__english_translation__icontains=keyword)
-                )
-            query_conditions.append(keyword_condition)
-
-        if query_conditions:
-            combined_condition = reduce(
-                (lambda x, y: x & y) if operator == "AND" else (lambda x, y: x | y),
-                query_conditions
-            )
-            queryset = queryset.filter(combined_condition)
-
-        return queryset.distinct().order_by('type__order', 'id')
-
-    def parse_multi_values(self, param_list):
-        return list(set(v.strip() for val in param_list for v in val.split(",") if v.strip()))
-
-    def get_general_search_queryset(self):
-        """Handles general search with 'q' parameter."""
-        q = self.request.GET.get("q", "")
-        
-        if not q:
-            return models.Image.objects.none()
-
-        return (
-            models.Image.objects
-            .filter(published=True)
-            .select_related('site', 'institution', 'type')
-            .prefetch_related('dating_tags', 'people', 'keywords', 'rock_carving_object')
-            .defer('iiif_file', 'file')
-            .filter(
-                Q(dating_tags__text__icontains=q)
-                | Q(dating_tags__english_translation__icontains=q)
-                | Q(people__name__icontains=q)
-                | Q(people__english_translation__icontains=q)
-                | Q(type__text__icontains=q)
-                | Q(type__english_translation__icontains=q)
-                | Q(site__raa_id__icontains=q)
-                | Q(site__lamning_id__icontains=q)
-                | Q(site__askeladden_id__icontains=q)
-                | Q(site__lokalitet_id__icontains=q)
-                | Q(site__placename__icontains=q)
-                | Q(keywords__text__icontains=q)
-                | Q(keywords__english_translation__icontains=q)
-                | Q(keywords__category__icontains=q)
-                | Q(keywords__category_translation__icontains=q)
-                | Q(rock_carving_object__name__icontains=q)
-                | Q(institution__name__icontains=q)
-                | Q(site__parish__name__icontains=q)
-                | Q(site__municipality__name__icontains=q)
-                | Q(site__province__name__icontains=q)
-            )
-            .distinct()
-            .order_by('type__order', 'id')
-        )
 
 # Custom pagination class to return bounding box for paginated results
 class BoundingBoxPagination(PageNumberPagination):
