@@ -725,7 +725,6 @@ class GeneralSearchAutocomplete(ViewSet):
 
         return Response(sorted_suggestions)
 
-
 class SummaryViewSet(BaseSearchViewSet):
     """A separate viewset to return summary data for images."""
     queryset = models.Image.objects.filter(published=True).order_by('type__order')
@@ -942,35 +941,6 @@ class SummaryViewSet(BaseSearchViewSet):
         ]
 
         return summary
-
-
-    def get_advanced_search_queryset(self):
-        """Handles advanced search with query parameters."""
-        query_params = self.request.GET
-        query_conditions = []
-
-        field_mapping = {
-            "site_name": ["site__raa_id", "site__lamning_id", "site__askeladden_id",
-                          "site__lokalitet_id", "site__placename", "site__ksamsok_id"],
-            "keyword": ["keywords__text", "keywords__english_translation", "keywords__category", "keywords__category_translation"],
-            "author_name": ["people__name", "people__english_translation"],
-            "dating_tag": ["dating_tags__text", "dating_tags__english_translation"],
-            "image_type": ["type__text", "type__english_translation"],
-            "institution_name": ["institution__name"],
-            "region_name": ["site__parish__name", "site__municipality__name", "site__province__name"],
-        }
-
-        for param, fields in field_mapping.items():
-            if param in query_params:
-                value = query_params[param]
-                or_conditions = [Q(**{f"{field}__icontains": value}) for field in fields]
-                query_conditions.append(reduce(lambda x, y: x | y, or_conditions))
-
-        if not query_conditions:
-            return self.queryset.none()
-
-        return self.queryset.filter(reduce(lambda x, y: x & y, query_conditions), published=True).order_by('type__order')
-
     
 # VIEW FOR OAI_CAT
 @csrf_exempt
