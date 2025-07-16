@@ -388,7 +388,7 @@ class BaseSearchViewSet(DynamicDepthViewSet):
             "institution_name": ["institution__name"],
             "region_name": ["site__parish__name", "site__municipality__name", "site__province__name"],
             "visualization_group": ["group__text"],
-            "keywords_info": ["keywords__text", "keywords__english_translation",
+            "keyword": ["keywords__text", "keywords__english_translation",
                             "keywords__category", "keywords__category_translation"],
             "rock_carving_object": ["rock_carving_object__name"],
         }
@@ -401,7 +401,7 @@ class BaseSearchViewSet(DynamicDepthViewSet):
         return {
             "advanced": ["site_name", "author_name", "dating_tag",
                         "image_type", "institution_name", "region_name",
-                        "visualization_group", "keywords_info", "rock_carving_object"],
+                        "visualization_group", "keyword", "rock_carving_object"],
             "general": ["q"],
         }, ALL_FIELDS
     
