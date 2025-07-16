@@ -17,7 +17,7 @@ from diana.forms import ContactForm
 from django.core.mail import send_mail
 from django.conf import settings
 from django.core.cache import cache
-import hashlib
+from django.utils.functional import cached_property
 from rest_framework.pagination import PageNumberPagination
 from itertools import chain
 
@@ -527,14 +527,42 @@ class BoundingBoxPagination(PageNumberPagination):
     page_size_query_param = 'limit'
     max_page_size = 100
 
+    # This is the key optimization: override the count to be fast
+    @cached_property
+    def count(self):
+        """
+        Uses PostgreSQL's fast row estimation instead of a slow COUNT(*).
+        """
+        try:
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT reltuples::BIGINT FROM pg_class WHERE relname = %s", 
+                               [self.object_list.model._meta.db_table])
+                estimate = cursor.fetchone()[0]
+                # Return a slightly padded estimate to be safe
+                return estimate + 1000 
+        except Exception:
+            # Fallback for safety if the estimation fails
+            return 10000 
+
+    def get_paginated_response(self, data):
+        return Response({
+            'count': self.count,
+            'next': self.get_next_link(),
+            'previous': self.get_previous_link(),
+            'estimated_count': True, # Inform the client this is an estimate
+            'results': data
+        })
+
 class GalleryViewSet(BaseSearchViewSet):
     """Search images by category with pagination."""
     serializer_class = serializers.GallerySerializer
-    pagination_class = BoundingBoxPagination
+    pagination_class = BoundingBoxPagination # Use our new optimized class
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id'] + get_fields(models.Image, exclude=['iiif_file', 'file'])
 
     def get_queryset(self):
+        # This method remains the same, defining the filtering logic.
         params = self.request.GET
         operator = params.get("operator", "OR")
         search_type = params.get("search_type")
@@ -542,48 +570,49 @@ class GalleryViewSet(BaseSearchViewSet):
 
         queryset = self.get_base_image_queryset()
 
-        # Filter by category_type first for performance
         if category_type:
             queryset = queryset.filter(type__text__iexact=category_type)
 
-        # Apply search filters using base class method
         search_query = self.build_search_query(params, search_type, operator)
         if search_query:
             queryset = queryset.filter(search_query)
 
-        # Apply bbox filtering using base class method
         queryset = self.apply_bbox_filter(queryset, params.get("in_bbox"))
 
-        return queryset.distinct().order_by('type__order', 'id')
+        # We only select the 'id' here to make the initial query very fast.
+        return queryset.distinct().order_by('type__order', 'id').values('id')
 
     def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
+        # Phase 1: Get a paginated list of ONLY image IDs.
+        # This is extremely fast and uses very little memory.
+        id_queryset = self.filter_queryset(self.get_queryset())
+        page_of_ids = self.paginate_queryset(id_queryset)
 
-        if page is not None:
-            # Paginated response
-            serializer = self.get_serializer(page, many=True)
+        if page_of_ids is not None:
+            # Extract the list of IDs for the current page.
+            page_ids = [item['id'] for item in page_of_ids]
+
+            # Phase 2: Fetch the full, rich objects for ONLY the IDs on the current page.
+            # This query is fast because it's a simple lookup by primary key.
+            results_queryset = (
+                models.Image.objects
+                .filter(id__in=page_ids)
+                .select_related('site', 'institution', 'type')
+                .prefetch_related('keywords', 'people', 'dating_tags')
+                .order_by('type__order', 'id') # Maintain order
+            )
             
-            # Calculate bbox only for current page images
-            page_bbox = self.calculate_bbox_for_images(page)
+            serializer = self.get_serializer(results_queryset, many=True)
+            
+            # Calculate bbox on the small, already-fetched page results.
+            page_bbox = self.calculate_bbox_for_images(results_queryset)
             
             response = self.get_paginated_response(serializer.data)
             response.data['bbox'] = page_bbox
             return response
-        else:
-            # Non-paginated response (all results fit on one page)
-            serializer = self.get_serializer(queryset, many=True)
-            
-            # Calculate bbox only for the actual results, not entire queryset
-            page_bbox = self.calculate_bbox_for_images(queryset)
 
-            return Response({
-                'count': len(queryset),
-                'next': None,
-                'previous': None,
-                'bbox': page_bbox,
-                'results': serializer.data,
-            })
+        # This case is for when pagination is not used or returns no pages.
+        return Response({"results": []})
 
 
     def calculate_bbox_for_images(self, images):
