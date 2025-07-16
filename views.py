@@ -557,49 +557,68 @@ class GalleryViewSet(BaseSearchViewSet):
         return queryset.distinct().order_by('type__order', 'id')
 
     def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
+        try:
+            queryset = self.filter_queryset(self.get_queryset())
+            page = self.paginate_queryset(queryset)
 
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
+            if page is not None:
+                # Paginated response
+                serializer = self.get_serializer(page, many=True)
+                
+                # Calculate bbox only for current page images
+                page_bbox = self.calculate_bbox_for_images(page)
+                
+                response = self.get_paginated_response(serializer.data)
+                response.data['bbox'] = page_bbox
+                return response
+            else:
+                # Non-paginated response (all results fit on one page)
+                serializer = self.get_serializer(queryset, many=True)
+                
+                # Calculate bbox only for the actual results, not entire queryset
+                page_bbox = self.calculate_bbox_for_images(queryset)
 
-            site_coords = [
-                image.site.coordinates.extent
-                for image in page if image.site and image.site.coordinates
-            ]
-            xs = [c[0] for c in site_coords] + [c[2] for c in site_coords] if site_coords else []
-            ys = [c[1] for c in site_coords] + [c[3] for c in site_coords] if site_coords else []
+                return Response({
+                    'count': len(queryset),
+                    'next': None,
+                    'previous': None,
+                    'bbox': page_bbox,
+                    'results': serializer.data,
+                })
+        except Exception as e:
+            import logging
+            logging.error(f"GalleryViewSet error: {str(e)}")
+            return Response(
+                {"error": "Search results too large. Please refine your search."},
+                status=413
+            )
 
-            page_bbox = (min(xs), min(ys), max(xs), max(ys)) if site_coords else None
-
-            response = self.get_paginated_response(serializer.data)
-            response.data['bbox'] = page_bbox
-            return response
-        else:
-            # Fallback if everything fits on one page
-            serializer = self.get_serializer(queryset, many=True)
-            page_bbox = self.calculate_page_bbox(queryset)
-
-            return Response({
-                'count': len(queryset),
-                'next': None,
-                'previous': None,
-                'bbox': page_bbox,
-                'results': serializer.data,
-            })
-    
-    def calculate_page_bbox(images):
-        site_coords = [
-            image.site.coordinates.extent
-            for image in images if image.site and image.site.coordinates
-        ]
-        if not site_coords:
+    def calculate_bbox_for_images(self, images):
+        """Calculate bbox for a specific set of images (current page or queryset)."""
+        if not images:
             return None
-
-        xs = [c[0] for c in site_coords] + [c[2] for c in site_coords]
-        ys = [c[1] for c in site_coords] + [c[3] for c in site_coords]
-
-        return (min(xs), min(ys), max(xs), max(ys))
+        
+        try:
+            # Extract coordinates more efficiently
+            site_coords = []
+            for image in images:
+                if hasattr(image, 'site') and image.site and hasattr(image.site, 'coordinates') and image.site.coordinates:
+                    site_coords.append(image.site.coordinates.extent)
+            
+            if not site_coords:
+                return None
+            
+            # Calculate min/max coordinates
+            xs = [c[0] for c in site_coords] + [c[2] for c in site_coords]
+            ys = [c[1] for c in site_coords] + [c[3] for c in site_coords]
+            
+            return [min(xs), min(ys), max(xs), max(ys)]
+            
+        except Exception as e:
+            import logging
+            logging.error(f"Bbox calculation error: {str(e)}")
+            return None
+                
 
 # Add autocomplete for general search from rest_framework.viewsets import ViewSet
 class GeneralSearchAutocomplete(ViewSet):
