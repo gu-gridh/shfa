@@ -6,6 +6,7 @@ from django.views.decorators.csrf import csrf_exempt
 from .oai_cat import *
 from django.contrib.gis.geos import Polygon
 from django.contrib.gis.gdal.envelope import Envelope
+from django.contrib.gis.db.models import Extent
 from functools import reduce
 from rest_framework import viewsets, status
 from rest_framework.viewsets import ViewSet
@@ -615,25 +616,28 @@ class GalleryViewSet(BaseSearchViewSet):
         return Response({"results": []})
 
 
-    def calculate_bbox_for_images(self, images):
-        """Calculate bbox for a specific set of images (current page or queryset)."""
-        if not images:
+    def calculate_bbox_for_images(self, image_ids):
+        """
+        Calculates the bounding box for a given list of image IDs by
+        querying the database directly, which is highly efficient.
+        """
+        if not image_ids:
             return None
+
+
+        # Get the site IDs associated with the images on the current page
+        site_ids = models.Image.objects.filter(id__in=image_ids).values_list('site_id', flat=True).distinct()
         
-        # Extract coordinates more efficiently
-        site_coords = []
-        for image in images:
-            if hasattr(image, 'site') and image.site and hasattr(image.site, 'coordinates') and image.site.coordinates:
-                site_coords.append(image.site.coordinates.extent)
-        
-        if not site_coords:
+        # Filter out null site_ids
+        valid_site_ids = [sid for sid in site_ids if sid is not None]
+
+        if not valid_site_ids:
             return None
+
+        # Calculate the collective bounding box (extent) of these sites in a single DB query
+        bbox = models.Site.objects.filter(id__in=valid_site_ids).aggregate(Extent('coordinates'))['coordinates__extent']
         
-        # Calculate min/max coordinates
-        xs = [c[0] for c in site_coords] + [c[2] for c in site_coords]
-        ys = [c[1] for c in site_coords] + [c[3] for c in site_coords]
-        
-        return [min(xs), min(ys), max(xs), max(ys)]
+        return bbox # bbox is a tuple: (xmin, ymin, xmax, ymax) or None
 
 
 # Add autocomplete for general search from rest_framework.viewsets import ViewSet
