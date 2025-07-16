@@ -18,6 +18,10 @@ from diana.forms import ContactForm
 from django.core.mail import send_mail
 from django.conf import settings
 from django.core.cache import cache
+from django.db import OperationalError
+from rest_framework import status
+from django.contrib.gis.db.models.functions import Extent
+import gc
 from django.utils.functional import cached_property
 from rest_framework.pagination import PageNumberPagination
 from itertools import chain
@@ -554,7 +558,6 @@ class BoundingBoxPagination(PageNumberPagination):
             'estimated_count': True, # Inform the client this is an estimate
             'results': data
         })
-
 class GalleryViewSet(BaseSearchViewSet):
     """Search images by category with pagination."""
     serializer_class = serializers.GallerySerializer
@@ -584,48 +587,75 @@ class GalleryViewSet(BaseSearchViewSet):
         return queryset.distinct().order_by('type__order', 'id').values('id')
 
     def list(self, request, *args, **kwargs):
-        # Phase 1: Get a paginated list of ONLY image IDs.
-        # This is extremely fast and uses very little memory.
-        id_queryset = self.filter_queryset(self.get_queryset())
-        page_of_ids = self.paginate_queryset(id_queryset)
+        page_bbox = None
+        results_queryset = None
+        page_ids = []
 
-        if page_of_ids is not None:
-            # Extract the list of IDs for the current page.
-            page_ids = [item['id'] for item in page_of_ids]
+        try:
+            # Phase 1: Get a paginated list of ONLY image IDs.
+            id_queryset = self.filter_queryset(self.get_queryset())
+            page_of_ids = self.paginate_queryset(id_queryset)
 
-            # Phase 2: Fetch the full, rich objects for ONLY the IDs on the current page.
-            # This query is fast because it's a simple lookup by primary key.
-            results_queryset = (
-                models.Image.objects
-                .filter(id__in=page_ids)
-                .select_related('site', 'institution', 'type')
-                .prefetch_related('keywords', 'people', 'dating_tags')
-                .order_by('type__order', 'id') # Maintain order
+            if page_of_ids is not None:
+                page_ids = [item['id'] for item in page_of_ids]
+
+                if not page_ids:
+                    return self.get_paginated_response([])
+
+                # Phase 2: Fetch the full, rich objects for ONLY the IDs on the current page.
+                results_queryset = (
+                    models.Image.objects
+                    .filter(id__in=page_ids)
+                    .select_related('site', 'institution', 'type')
+                    .prefetch_related('keywords', 'people', 'dating_tags')
+                    .order_by('type__order', 'id')
+                )
+                
+                serializer = self.get_serializer(results_queryset, many=True)
+                
+                # Phase 3: Calculate bbox with a separate, optimized query using only IDs.
+                page_bbox = self.calculate_bbox_for_image_ids(page_ids)
+                
+                response = self.get_paginated_response(serializer.data)
+                response.data['bbox'] = page_bbox
+                return response
+
+            return Response({"results": []})
+
+        except OperationalError as e:
+            # Handle specific, potentially transient database errors.
+            import logging
+            logging.warning(f"Database operational error in GalleryViewSet: {e}", exc_info=True)
+            return Response(
+                {"error": "The database is temporarily busy. Please try again in a moment."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
-            
-            serializer = self.get_serializer(results_queryset, many=True)
-            
-            # Calculate bbox on the small, already-fetched page results.
-            page_bbox = self.calculate_bbox_for_images(results_queryset)
-            
-            response = self.get_paginated_response(serializer.data)
-            response.data['bbox'] = page_bbox
-            return response
+        except Exception as e:
+            # Handle any other unexpected errors.
+            import logging
+            logging.error(f"An unexpected error occurred in GalleryViewSet: {e}", exc_info=True)
+            return Response(
+                {"error": "The server encountered an unexpected issue. Please try refreshing the page."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        finally:
+            # This is the "cleanup" step. By explicitly deleting the large objects
+            # and calling the garbage collector, we ensure memory is released
+            # immediately, which can help in very high-memory situations.
+            del results_queryset
+            del page_ids
+            gc.collect()
 
-        # This case is for when pagination is not used or returns no pages.
-        return Response({"results": []})
-
-
-    def calculate_bbox_for_images(self, image_ids):
+    def calculate_bbox_for_image_ids(self, image_ids):
         """
         Calculates the bounding box for a given list of image IDs by
-        querying the database directly, which is highly efficient.
+        querying the database directly. This is the most efficient method.
         """
         if not image_ids:
             return None
 
-
         # Get the site IDs associated with the images on the current page
+        # This query is fast as it only deals with integers.
         site_ids = models.Image.objects.filter(id__in=image_ids).values_list('site_id', flat=True).distinct()
         
         # Filter out null site_ids
