@@ -407,54 +407,49 @@ class BaseSearchViewSet(DynamicDepthViewSet):
     
     def build_search_query(self, params, search_type="general", operator="OR"):
         """Build dynamic search query based on parameters."""
-        try:
-            TYPE_FIELD_KEYS, ALL_FIELDS = self.get_type_field_keys()
+        TYPE_FIELD_KEYS, ALL_FIELDS = self.get_type_field_keys()
+        
+        field_keys = TYPE_FIELD_KEYS.get(search_type, list(ALL_FIELDS.keys()))
+        mapping_filter_fields = {key: ALL_FIELDS[key] for key in field_keys}
+        
+        query_conditions = []
+        
+        # Apply dynamic search filters
+        for param_key, fields in mapping_filter_fields.items():
+            values = self.parse_multi_values(params.getlist(param_key))
+            if values:
+                q_obj = Q()
+                for value in values:
+                    sub_q = Q()
+                    for field in fields:
+                        sub_q |= Q(**{f"{field}__icontains": value})
+                    q_obj |= sub_q
+                query_conditions.append(q_obj)
+        
+        # Combine conditions based on operator
+        if query_conditions:
+            combined_q = reduce(
+                (lambda x, y: x & y) if operator == "AND" else (lambda x, y: x | y),
+                query_conditions
+            )
+            return combined_q
+        
+        return Q()
             
-            field_keys = TYPE_FIELD_KEYS.get(search_type, list(ALL_FIELDS.keys()))
-            mapping_filter_fields = {key: ALL_FIELDS[key] for key in field_keys}
-            
-            query_conditions = []
-            
-            # Apply dynamic search filters
-            for param_key, fields in mapping_filter_fields.items():
-                values = self.parse_multi_values(params.getlist(param_key))
-                if values:
-                    q_obj = Q()
-                    for value in values:
-                        sub_q = Q()
-                        for field in fields:
-                            sub_q |= Q(**{f"{field}__icontains": value})
-                        q_obj |= sub_q
-                    query_conditions.append(q_obj)
-            
-            # Combine conditions based on operator
-            if query_conditions:
-                combined_q = reduce(
-                    (lambda x, y: x & y) if operator == "AND" else (lambda x, y: x | y),
-                    query_conditions
-                )
-                return combined_q
-            
-            return Q()
-            
-        except Exception as e:
-            return Q()
-    
+
     def apply_bbox_filter(self, queryset, bbox_param):
         """Apply bounding box filter to queryset."""
         if not bbox_param:
             return queryset
             
-        try:
-            coords = list(map(float, bbox_param.split(",")))
-            if len(coords) == 4:
-                polygon = Polygon.from_bbox(coords)
-                site_ids = models.Site.objects.filter(
-                    coordinates__intersects=polygon
-                ).values_list("id", flat=True)
-                return queryset.filter(site_id__in=site_ids)
-        except (ValueError, Exception) as e:
-            pass
+        coords = list(map(float, bbox_param.split(",")))
+        if len(coords) == 4:
+            polygon = Polygon.from_bbox(coords)
+            site_ids = models.Site.objects.filter(
+                coordinates__intersects=polygon
+            ).values_list("id", flat=True)
+            return queryset.filter(site_id__in=site_ids)
+
         return queryset
     
     def get_base_image_queryset(self):
@@ -499,40 +494,32 @@ class SearchCategoryViewSet(BaseSearchViewSet):
 
     def categorize_by_type(self, queryset):
         """Groups queryset results by type with counts."""
-        try:
-            grouped_data = (
-                queryset
-                .values("type__id", "type__text", "type__english_translation")
-                .annotate(img_count=Count("id", distinct=True))
-                .order_by("type__id")
-            )
+        grouped_data = (
+            queryset
+            .values("type__id", "type__text", "type__english_translation")
+            .annotate(img_count=Count("id", distinct=True))
+            .order_by("type__id")
+        )
 
-            category_dict = {
-                entry["type__id"]: {
-                    "type": entry["type__text"],
-                    "type_translation": entry.get("type__english_translation", "Unknown"),
-                    "count": entry["img_count"],
-                }
-                for entry in grouped_data
+        category_dict = {
+            entry["type__id"]: {
+                "type": entry["type__text"],
+                "type_translation": entry.get("type__english_translation", "Unknown"),
+                "count": entry["img_count"],
             }
-            return list(category_dict.values())
-        except Exception as e:
-            return []
+            for entry in grouped_data
+        }
+        return list(category_dict.values())
+
 
     def list(self, request, *args, **kwargs):
-        try:
-            queryset = self.filter_queryset(self.get_queryset())
-            categorized_data = self.categorize_by_type(queryset)
+        queryset = self.filter_queryset(self.get_queryset())
+        categorized_data = self.categorize_by_type(queryset)
 
-            response_data = {
-                "categories": categorized_data
-            }
-            return Response(response_data, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response(
-                {"error": "Internal server error"}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        response_data = {
+            "categories": categorized_data
+        }
+        return Response(response_data, status=status.HTTP_200_OK)
 
 # Custom pagination class to return bounding box for paginated results
 class BoundingBoxPagination(PageNumberPagination):
