@@ -468,9 +468,9 @@ class BaseSearchViewSet(DynamicDepthViewSet):
         )
 
 
-# Add gallery view
-class GalleryViewSet(BaseSearchViewSet):
-    """A viewset to return images in a gallery format with advanced search capabilities."""
+# Add search category view
+class SearchCategoryViewSet(BaseSearchViewSet):
+    """A viewset to return images in a category format with advanced search capabilities."""
     serializer_class = serializers.GallerySerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id'] + get_fields(models.Image, exclude=DEFAULT_FIELDS + ['iiif_file', 'file'])
@@ -540,7 +540,7 @@ class BoundingBoxPagination(PageNumberPagination):
     page_size_query_param = 'limit'
     max_page_size = 100
 
-class SearchCategoryViewSet(BaseSearchViewSet):
+class GalleryViewSet(BaseSearchViewSet):
     """Search images by category with pagination."""
     serializer_class = serializers.GallerySerializer
     pagination_class = BoundingBoxPagination
