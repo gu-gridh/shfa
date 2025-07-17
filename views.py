@@ -570,6 +570,7 @@ class GalleryViewSet(BaseSearchViewSet):
     pagination_class = BoundingBoxPagination # Use our new optimized class
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id'] + get_fields(models.Image, exclude=['iiif_file', 'file'])
+    bbox_filter_field = 'coordinates'
 
     def get_queryset(self):
         # This method remains the same, defining the filtering logic.
@@ -613,8 +614,22 @@ class GalleryViewSet(BaseSearchViewSet):
                 results_queryset = (
                     models.Image.objects
                     .filter(id__in=page_ids)
+                    .defer('iiif_file', 'file', 'reference')
                     .select_related('site', 'institution', 'type')
-                    .prefetch_related('keywords', 'people', 'dating_tags')
+                    .prefetch_related(
+                        Prefetch(
+                            'keywords',
+                            queryset=models.KeywordTag.objects.only('id', 'text', 'english_translation', 'category', 'category_translation')
+                        ),
+                        Prefetch(
+                            'people',
+                            queryset=models.People.objects.only('id', 'name', 'english_translation')
+                        ),
+                        Prefetch(
+                            'dating_tags',
+                            queryset=models.DatingTag.objects.only('id', 'text', 'english_translation')
+                        )
+                    )
                     .order_by('type__order', 'id')
                 )
                 
@@ -629,22 +644,6 @@ class GalleryViewSet(BaseSearchViewSet):
 
             return Response({"results": []})
 
-        except OperationalError as e:
-            # Handle specific, potentially transient database errors.
-            import logging
-            logging.warning(f"Database operational error in GalleryViewSet: {e}", exc_info=True)
-            return Response(
-                {"error": "The database is temporarily busy. Please try again in a moment."},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE
-            )
-        except Exception as e:
-            # Handle any other unexpected errors.
-            import logging
-            logging.error(f"An unexpected error occurred in GalleryViewSet: {e}", exc_info=True)
-            return Response(
-                {"error": "The server encountered an unexpected issue. Please try refreshing the page."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
         finally:
             # This is the "cleanup" step. By explicitly deleting the large objects
             # and calling the garbage collector, we ensure memory is released

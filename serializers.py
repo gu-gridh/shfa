@@ -3,21 +3,19 @@ from rest_framework_gis.serializers import GeoFeatureModelSerializer
 from diana.utils import get_fields, DEFAULT_FIELDS
 from .models import *
 from rest_framework import serializers
-
+import requests
 
 class DynamicDepthModelSerializer(serializers.ModelSerializer):
     def __init__(self, *args, **kwargs):
-        # Grab the depth from context
-        request = kwargs.get('context', {}).get('request', None)
-        if request:
-            depth = request.query_params.get('depth', 0)
-            try:
-                self.Meta.depth = int(depth)
-            except ValueError:
-                self.Meta.depth = 0
-        else:
-            self.Meta.depth = 0
         super().__init__(*args, **kwargs)
+        request = self.context.get('request', None)
+        if request:
+            try:
+                self.Meta.depth = int(request.query_params.get('depth', 0))  # Default 0
+            except (ValueError, TypeError):
+                self.Meta.depth = 0  
+        else:
+            self.Meta.depth = 0  
 
 class SiteCoordinatesExcludeSerializer(DynamicDepthModelSerializer):
     parish = serializers.CharField(source='parish.name', default=None)
@@ -210,7 +208,7 @@ class VisualizationGroupSerializer(DynamicDepthSerializer):
         return representation
 
 class GallerySerializer(DynamicDepthModelSerializer):
-    site = SiteCoordinatesExcludeSerializer()
+    # site = SiteCoordinatesExcludeSerializer()
     width = serializers.SerializerMethodField()
     height = serializers.SerializerMethodField()
 
@@ -223,13 +221,10 @@ class GallerySerializer(DynamicDepthModelSerializer):
         return info.get("height")
 
     def get_iiif_info(self, obj):
-        import requests
 
         base_url = "https://img.dh.gu.se/diana/static/"
-
         if not obj.iiif_file:
             return {}
-
         # Convert to URL string
         iiif_file_url = getattr(obj.iiif_file, 'url', None)
         if not iiif_file_url:
@@ -247,8 +242,7 @@ class GallerySerializer(DynamicDepthModelSerializer):
 
         return {}
 
-
-
     class Meta:
         model = Image
         fields = ['id', 'width', 'height'] + get_fields(Image, exclude=DEFAULT_FIELDS)
+        depth= 0 
