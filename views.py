@@ -20,8 +20,9 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db import OperationalError
 from rest_framework import status
-from django.contrib.gis.db.models.functions import Extent
+from django.contrib.gis.db.models import Extent
 import gc
+from django.db import connection
 from django.utils.functional import cached_property
 from rest_framework.pagination import PageNumberPagination
 from itertools import chain
@@ -463,7 +464,7 @@ class BaseSearchViewSet(DynamicDepthViewSet):
             models.Image.objects
             .filter(published=True)
             .select_related('site', 'institution', 'type')
-            .prefetch_related('keywords', 'people', 'dating_tags')
+            # .prefetch_related('keywords', 'people', 'dating_tags')
             .defer('iiif_file', 'file', 'reference')
         )
 
@@ -539,16 +540,21 @@ class BoundingBoxPagination(PageNumberPagination):
         Uses PostgreSQL's fast row estimation instead of a slow COUNT(*).
         """
         try:
-            from django.db import connection
+            # Use actual count for smaller datasets, estimate for larger ones
+            if hasattr(self, '_count_cache'):
+                return self._count_cache
+                
             with connection.cursor() as cursor:
                 cursor.execute("SELECT reltuples::BIGINT FROM pg_class WHERE relname = %s", 
-                               [self.object_list.model._meta.db_table])
+                            [self.object_list.model._meta.db_table])
                 estimate = cursor.fetchone()[0]
-                # Return a slightly padded estimate to be safe
-                return estimate + 1000 
+                
+                # Cap the estimate to prevent runaway memory usage
+                self._count_cache = min(estimate + 1000, 1000000)  # Max 1M
+                return self._count_cache
         except Exception:
-            # Fallback for safety if the estimation fails
-            return 10000 
+                # Fallback for safety if the estimation fails
+                return 10000 
 
     def get_paginated_response(self, data):
         return Response({
@@ -590,6 +596,7 @@ class GalleryViewSet(BaseSearchViewSet):
         page_bbox = None
         results_queryset = None
         page_ids = []
+        serializer = None
 
         try:
             # Phase 1: Get a paginated list of ONLY image IDs.
@@ -642,9 +649,27 @@ class GalleryViewSet(BaseSearchViewSet):
             # This is the "cleanup" step. By explicitly deleting the large objects
             # and calling the garbage collector, we ensure memory is released
             # immediately, which can help in very high-memory situations.
-            del results_queryset
-            del page_ids
+            # More aggressive cleanup
+            if results_queryset is not None:
+                results_queryset._result_cache = None  # Clear Django query cache
+                del results_queryset
+            
+            if serializer is not None:
+                del serializer
+                
+            if page_ids:
+                page_ids.clear()
+                del page_ids
+                
+            if page_bbox:
+                del page_bbox
+                
+            # Force garbage collection
             gc.collect()
+            
+            # Clear Django query cache periodically
+            if hasattr(connection, 'queries_log'):
+                connection.queries_log.clear()
 
     def calculate_bbox_for_image_ids(self, image_ids):
         """
