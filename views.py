@@ -10,17 +10,13 @@ from django.contrib.gis.db.models import Extent
 from functools import reduce
 from rest_framework import viewsets, status
 from rest_framework.viewsets import ViewSet
-from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.response import Response
-from collections import defaultdict
 from diana.forms import ContactForm
 from django.core.mail import send_mail
 from django.conf import settings
-from django.core.cache import cache
-from django.db import OperationalError
 from rest_framework import status
-from django.contrib.gis.db.models import Extent
+from django.contrib.gis.db.models.aggregates import Extent
 import gc
 from django.db import connection
 from django.utils.functional import cached_property
@@ -566,7 +562,7 @@ class BoundingBoxPagination(PageNumberPagination):
         })
 class GalleryViewSet(BaseSearchViewSet):
     """Search images by category with pagination."""
-    serializer_class = serializers.GallerySerializer
+    serializer_class = serializers.GallerySerializerExcludeCoordinates
     pagination_class = BoundingBoxPagination # Use our new optimized class
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id'] + get_fields(models.Image, exclude=['iiif_file', 'file'])
