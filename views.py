@@ -595,76 +595,50 @@ class GalleryViewSet(BaseSearchViewSet):
         page_ids = []
         serializer = None
 
-        try:
-            # Phase 1: Get a paginated list of ONLY image IDs.
-            id_queryset = self.filter_queryset(self.get_queryset())
-            page_of_ids = self.paginate_queryset(id_queryset)
+        # Phase 1: Get a paginated list of ONLY image IDs.
+        id_queryset = self.filter_queryset(self.get_queryset())
+        page_of_ids = self.paginate_queryset(id_queryset)
 
-            if page_of_ids is not None:
-                page_ids = [item['id'] for item in page_of_ids]
+        if page_of_ids is not None:
+            page_ids = [item['id'] for item in page_of_ids]
 
-                if not page_ids:
-                    return self.get_paginated_response([])
+            if not page_ids:
+                return self.get_paginated_response([])
 
-                # Phase 2: Fetch the full, rich objects for ONLY the IDs on the current page.
-                results_queryset = (
-                    models.Image.objects
-                    .filter(id__in=page_ids)
-                    .defer('iiif_file', 'file', 'reference')
-                    .select_related('site', 'institution', 'type')
-                    .prefetch_related(
-                        Prefetch(
-                            'keywords',
-                            queryset=models.KeywordTag.objects.only('id', 'text', 'english_translation', 'category', 'category_translation')
-                        ),
-                        Prefetch(
-                            'people',
-                            queryset=models.People.objects.only('id', 'name', 'english_translation')
-                        ),
-                        Prefetch(
-                            'dating_tags',
-                            queryset=models.DatingTag.objects.only('id', 'text', 'english_translation')
-                        )
+            # Phase 2: Fetch the full, rich objects for ONLY the IDs on the current page.
+            results_queryset = (
+                models.Image.objects
+                .filter(id__in=page_ids)
+                .defer('iiif_file', 'file', 'reference')
+                .select_related('site', 'institution', 'type')
+                .prefetch_related(
+                    Prefetch(
+                        'keywords',
+                        queryset=models.KeywordTag.objects.only('id', 'text', 'english_translation', 'category', 'category_translation')
+                    ),
+                    Prefetch(
+                        'people',
+                        queryset=models.People.objects.only('id', 'name', 'english_translation')
+                    ),
+                    Prefetch(
+                        'dating_tags',
+                        queryset=models.DatingTag.objects.only('id', 'text', 'english_translation')
                     )
-                    .order_by('type__order', 'id')
                 )
-                
-                serializer = self.get_serializer(results_queryset, many=True)
-                
-                # Phase 3: Calculate bbox with a separate, optimized query using only IDs.
-                page_bbox = self.calculate_bbox_for_image_ids(page_ids)
-                
-                response = self.get_paginated_response(serializer.data)
-                response.data['bbox'] = page_bbox
-                return response
-
-            return Response({"results": []})
-
-        finally:
-            # This is the "cleanup" step. By explicitly deleting the large objects
-            # and calling the garbage collector, we ensure memory is released
-            # immediately, which can help in very high-memory situations.
-            # More aggressive cleanup
-            if results_queryset is not None:
-                results_queryset._result_cache = None  # Clear Django query cache
-                del results_queryset
+                .order_by('type__order', 'id')
+            )
             
-            if serializer is not None:
-                del serializer
-                
-            if page_ids:
-                page_ids.clear()
-                del page_ids
-                
-            if page_bbox:
-                del page_bbox
-                
-            # Force garbage collection
-            gc.collect()
+            serializer = self.get_serializer(results_queryset, many=True)
             
-            # Clear Django query cache periodically
-            if hasattr(connection, 'queries_log'):
-                connection.queries_log.clear()
+            # Phase 3: Calculate bbox with a separate, optimized query using only IDs.
+            page_bbox = self.calculate_bbox_for_image_ids(page_ids)
+            
+            response = self.get_paginated_response(serializer.data)
+            response.data['bbox'] = page_bbox
+            return response
+
+        return Response({"results": []})
+
 
     def calculate_bbox_for_image_ids(self, image_ids):
         """
