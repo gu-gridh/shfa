@@ -29,10 +29,41 @@ class SiteCoordinatesExcludeSerializer(GeoFeatureModelSerializer):
         depth = 0  # Set a default depth for related objects
 
 class TIFFImageSerializer(DynamicDepthSerializer):
-    # site = SiteCoordinatesExcludeSerializer()
+    width = serializers.SerializerMethodField()
+    height = serializers.SerializerMethodField()
+
+    def get_width(self, obj):
+        info = self.get_iiif_info(obj)
+        return info.get("width")
+
+    def get_height(self, obj):
+        info = self.get_iiif_info(obj)
+        return info.get("height")
+
+    def get_iiif_info(self, obj):
+
+        base_url = "https://img.dh.gu.se/diana/static/"
+        if not obj.iiif_file:
+            return {}
+        # Convert to URL string
+        iiif_file_url = getattr(obj.iiif_file, 'url', None)
+        if not iiif_file_url:
+            return {}
+
+        # Fix relative paths
+        if not iiif_file_url.startswith("http"):
+            iiif_file_url = base_url + iiif_file_url.lstrip("/")
+
+        info_url = f"{iiif_file_url}/info.json"
+
+        response = requests.get(info_url, timeout=3)
+        if response.status_code == 200:
+            return response.json()
+
+        return {}
     class Meta:
         model = Image
-        fields = ['id']+get_fields(Image, exclude=['created_at', 'updated_at'])
+        fields = ['id', 'width', 'height'] + get_fields(Image, exclude=['created_at', 'updated_at'])
 class SummarySerializer(DynamicDepthSerializer):
 
     class Meta:
@@ -179,42 +210,10 @@ class SHFA3DSerializerExcludeCoordinates(DynamicDepthSerializer):
         fields = ['id']+get_fields(SHFA3D, exclude=DEFAULT_FIELDS)+['image']
 
 class TIFFImageExcludeSiteSerializer(DynamicDepthSerializer):
-    # site = SiteSerializerExcludeCoordinates()
-    width = serializers.SerializerMethodField()
-    height = serializers.SerializerMethodField()
 
-    def get_width(self, obj):
-        info = self.get_iiif_info(obj)
-        return info.get("width")
-
-    def get_height(self, obj):
-        info = self.get_iiif_info(obj)
-        return info.get("height")
-
-    def get_iiif_info(self, obj):
-
-        base_url = "https://img.dh.gu.se/diana/static/"
-        if not obj.iiif_file:
-            return {}
-        # Convert to URL string
-        iiif_file_url = getattr(obj.iiif_file, 'url', None)
-        if not iiif_file_url:
-            return {}
-
-        # Fix relative paths
-        if not iiif_file_url.startswith("http"):
-            iiif_file_url = base_url + iiif_file_url.lstrip("/")
-
-        info_url = f"{iiif_file_url}/info.json"
-
-        response = requests.get(info_url, timeout=3)
-        if response.status_code == 200:
-            return response.json()
-
-        return {}
     class Meta:
         model = Image
-        fields = ['id', 'width', 'height'] + get_fields(Image, exclude=['created_at', 'updated_at', 'site'])
+        fields = ['id']+get_fields(Image, exclude=['created_at', 'updated_at', 'site'])
 
 class VisualizationGroupSerializer(DynamicDepthSerializer):
     visualization_group_count = serializers.IntegerField()
@@ -281,9 +280,7 @@ class GallerySerializer(DynamicDepthModelSerializer):
 
     class Meta:
         model = Image
-        # fields = ['id', 'width', 'height', 'site'] + get_fields(Image, exclude=DEFAULT_FIELDS+['site'])
         fields = ['id'] + get_fields(Image, exclude=DEFAULT_FIELDS)
-
         depth= 0
 
 
