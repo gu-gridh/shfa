@@ -562,7 +562,7 @@ class BoundingBoxPagination(PageNumberPagination):
         })
 class GalleryViewSet(BaseSearchViewSet):
     """Search images by category with pagination."""
-    serializer_class = serializers.GallerySerializer
+    serializer_class = serializers.GallerySerializerExcludeCoordinates
     pagination_class = BoundingBoxPagination # Use our new optimized class
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id'] + get_fields(models.Image, exclude=['iiif_file', 'file'])
