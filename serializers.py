@@ -179,7 +179,7 @@ class SHFA3DSerializerExcludeCoordinates(DynamicDepthSerializer):
         fields = ['id']+get_fields(SHFA3D, exclude=DEFAULT_FIELDS)+['image']
 
 class TIFFImageExcludeSiteSerializer(DynamicDepthSerializer):
-    site = SiteSerializerExcludeCoordinates()
+    # site = SiteSerializerExcludeCoordinates()
     width = serializers.SerializerMethodField()
     height = serializers.SerializerMethodField()
 
@@ -214,7 +214,7 @@ class TIFFImageExcludeSiteSerializer(DynamicDepthSerializer):
         return {}
     class Meta:
         model = Image
-        fields = ['id', 'width', 'height', 'site'] + get_fields(Image, exclude=['created_at', 'updated_at', 'site'])
+        fields = ['id', 'width', 'height'] + get_fields(Image, exclude=['created_at', 'updated_at', 'site'])
 
 class VisualizationGroupSerializer(DynamicDepthSerializer):
     visualization_group_count = serializers.IntegerField()
@@ -245,7 +245,7 @@ class VisualizationGroupSerializer(DynamicDepthSerializer):
 
 
 class GallerySerializer(DynamicDepthModelSerializer):
-    # site = SiteCoordinatesExcludeSerializer()
+    site = SiteCoordinatesExcludeSerializer()
     # width = serializers.SerializerMethodField()
     # height = serializers.SerializerMethodField()
 
