@@ -360,6 +360,12 @@ class Image(abstract.AbstractTIFFImageModel):
     site = models.ForeignKey(Site, null=True, blank=True, on_delete=models.PROTECT, verbose_name=_(
         "Site"), help_text=_("Rock carving site"))
 
+    # Image metadata
+    width = models.PositiveIntegerField(null=True, blank=True, verbose_name=_(
+        "Width"), help_text=_("Width of the image in pixels."))
+    height = models.PositiveIntegerField(null=True, blank=True, verbose_name=_(
+        "Height"), help_text=_("Height of the image in pixels."))
+
     # Metadata on collections
     collection = models.ForeignKey(Collection, null=True, blank=True, on_delete=models.SET_NULL, verbose_name=_(
         "Collection"), help_text=_("Collection from which the image originates."))

@@ -241,10 +241,9 @@ class VisualizationGroupSerializer(DynamicDepthSerializer):
         return representation
 
 
-
-
 class GallerySerializer(DynamicDepthModelSerializer):
     site = SiteCoordinatesExcludeSerializer()
+
 
     def get_width(self, obj):
         return TIFFImageSerializer().get_width(obj)
@@ -257,3 +256,4 @@ class GallerySerializer(DynamicDepthModelSerializer):
         fields = ['id'] + get_fields(Image, exclude=DEFAULT_FIELDS)
         depth = 0
         geo_field = 'coordinates'
+
