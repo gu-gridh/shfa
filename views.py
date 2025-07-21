@@ -529,37 +529,19 @@ class BoundingBoxPagination(PageNumberPagination):
     page_size_query_param = 'limit'
     max_page_size = 100
 
-    # This is the key optimization: override the count to be fast
     @cached_property
     def count(self):
-        """
-        Uses PostgreSQL's fast row estimation instead of a slow COUNT(*).
-        """
-        try:
-            # Use actual count for smaller datasets, estimate for larger ones
-            if hasattr(self, '_count_cache'):
-                return self._count_cache
-                
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT reltuples::BIGINT FROM pg_class WHERE relname = %s", 
-                            [self.object_list.model._meta.db_table])
-                estimate = cursor.fetchone()[0]
-                
-                # Cap the estimate to prevent runaway memory usage
-                self._count_cache = min(estimate + 1000, 1000000)  # Max 1M
-                return self._count_cache
-        except Exception:
-                # Fallback for safety if the estimation fails
-                return 10000 
+        """Always use the exact count from the paginator."""
+        return self.page.paginator.count
 
     def get_paginated_response(self, data):
         return Response({
             'count': self.count,
             'next': self.get_next_link(),
             'previous': self.get_previous_link(),
-            'estimated_count': True, # Inform the client this is an estimate
             'results': data
         })
+    
 class GalleryViewSet(BaseSearchViewSet):
     """Search images by category with pagination."""
     serializer_class = serializers.GallerySerializer
