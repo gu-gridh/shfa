@@ -500,7 +500,7 @@ class SearchCategoryViewSet(BaseSearchViewSet):
             queryset
             .values("type__id", "type__text", "type__english_translation")
             .annotate(img_count=Count("id", distinct=True))
-            .order_by("type__id")
+            .order_by("-img_count", "type__order")
         )
 
         category_dict = {
