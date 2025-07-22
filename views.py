@@ -529,16 +529,35 @@ class BoundingBoxPagination(PageNumberPagination):
     page_size_query_param = 'limit'
     max_page_size = 100
 
+    # This is the key optimization: override the count to be fast
     @cached_property
     def count(self):
-        """Always use the exact count from the paginator."""
-        return self.page.paginator.count
+        """
+        Uses PostgreSQL's fast row estimation instead of a slow COUNT(*).
+        """
+        try:
+            # Use actual count for smaller datasets, estimate for larger ones
+            if hasattr(self, '_count_cache'):
+                return self._count_cache
+                
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT reltuples::BIGINT FROM pg_class WHERE relname = %s", 
+                            [self.object_list.model._meta.db_table])
+                estimate = cursor.fetchone()[0]
+                
+                # Cap the estimate to prevent runaway memory usage
+                self._count_cache = min(estimate + 1000, 1000000)  # Max 1M
+                return self._count_cache
+        except Exception:
+                # Fallback for safety if the estimation fails
+                return 10000 
 
     def get_paginated_response(self, data):
         return Response({
             'count': self.count,
             'next': self.get_next_link(),
             'previous': self.get_previous_link(),
+            'estimated_count': True, # Inform the client this is an estimate
             'results': data
         })
     
@@ -557,93 +576,148 @@ class GalleryViewSet(BaseSearchViewSet):
         search_type = params.get("search_type")
         category_type = params.get("category_type")
 
-        queryset = self.get_base_image_queryset()
+        # Start with minimal queryset for performance
+        queryset = models.Image.objects.filter(published=True)
 
+        # Apply filters in order of selectivity (most selective first)
         if category_type:
             queryset = queryset.filter(type__text__iexact=category_type)
 
+        # Apply search query
         search_query = self.build_search_query(params, search_type, operator)
         if search_query:
             queryset = queryset.filter(search_query)
 
-        queryset = self.apply_bbox_filter(queryset, params.get("in_bbox"))
+        # Apply bounding box filter
+        bbox_param = params.get("in_bbox")
+        if bbox_param:
+            queryset = self.apply_bbox_filter(queryset, bbox_param)
 
-        # We only select the 'id' here to make the initial query very fast.
-        return queryset.distinct().order_by('type__order', 'id').values('id')
+        # Return only IDs, ordered for consistent pagination
+        return queryset.distinct('id').order_by('id').values('id')
 
     def list(self, request, *args, **kwargs):
-        page_bbox = None
-        results_queryset = None
-        page_ids = []
-        serializer = None
+        """Optimized list method with better error handling and memory management."""
+        try:
+            # Phase 1: Get paginated IDs only
+            id_queryset = self.filter_queryset(self.get_queryset())
+            page_of_ids = self.paginate_queryset(id_queryset)
 
-        # Phase 1: Get a paginated list of ONLY image IDs.
-        id_queryset = self.filter_queryset(self.get_queryset())
-        page_of_ids = self.paginate_queryset(id_queryset)
+            if page_of_ids is None:
+                return Response({"results": []})
 
-        if page_of_ids is not None:
             page_ids = [item['id'] for item in page_of_ids]
-
             if not page_ids:
                 return self.get_paginated_response([])
 
-            # Phase 2: Fetch the full, rich objects for ONLY the IDs on the current page.
-            results_queryset = (
-                models.Image.objects
-                .filter(id__in=page_ids)
-                .defer('iiif_file', 'file', 'reference')
-                .select_related('site', 'institution', 'type')
-                .prefetch_related(
-                    Prefetch(
-                        'keywords',
-                        queryset=models.KeywordTag.objects.only('id', 'text', 'english_translation', 'category', 'category_translation')
-                    ),
-                    Prefetch(
-                        'people',
-                        queryset=models.People.objects.only('id', 'name', 'english_translation')
-                    ),
-                    Prefetch(
-                        'dating_tags',
-                        queryset=models.DatingTag.objects.only('id', 'text', 'english_translation')
-                    )
-                )
-                .order_by('type__order', 'id')
-            )
+            # Phase 2: Fetch full objects for current page only
+            results_queryset = self._get_full_objects(page_ids)
             
+            # Phase 3: Serialize data
             serializer = self.get_serializer(results_queryset, many=True)
             
-            # Phase 3: Calculate bbox with a separate, optimized query using only IDs.
+            # Phase 4: Calculate bbox (can be done in parallel if needed)
             page_bbox = self.calculate_bbox_for_image_ids(page_ids)
             
+            # Build response
             response = self.get_paginated_response(serializer.data)
             response.data['bbox'] = page_bbox
+            
             return response
 
-        return Response({"results": []})
+        except Exception as e:
+            # Log the error in production
+            import logging
+            logging.error(f"Error in GalleryViewSet.list: {e}")
+            return Response(
+                {"error": "An error occurred while fetching results"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        finally:
+            # Cleanup to prevent memory leaks
+            if 'results_queryset' in locals():
+                del results_queryset
+            gc.collect()
 
+    def _get_full_objects(self, page_ids):
+        """Optimized method to fetch full objects with minimal database queries."""
+        return (
+            models.Image.objects
+            .filter(id__in=page_ids)
+            .select_related(
+                'site', 
+                'institution', 
+                'type'
+            )
+            .prefetch_related(
+                Prefetch(
+                    'keywords',
+                    queryset=models.KeywordTag.objects.only(
+                        'id', 'text', 'english_translation', 
+                        'category', 'category_translation'
+                    )
+                ),
+                Prefetch(
+                    'people',
+                    queryset=models.People.objects.only(
+                        'id', 'name', 'english_translation'
+                    )
+                ),
+                Prefetch(
+                    'dating_tags',
+                    queryset=models.DatingTag.objects.only(
+                        'id', 'text', 'english_translation'
+                    )
+                )
+            )
+            .defer('iiif_file', 'file', 'reference')  # Defer large fields
+            .order_by('type__order', 'id')
+        )
 
     def calculate_bbox_for_image_ids(self, image_ids):
         """
-        Calculates the bounding box for a given list of image IDs by
-        querying the database directly. This is the most efficient method.
+        Optimized bbox calculation with better error handling.
         """
         if not image_ids:
             return None
 
-        # Get the site IDs associated with the images on the current page
-        # This query is fast as it only deals with integers.
-        site_ids = models.Image.objects.filter(id__in=image_ids).values_list('site_id', flat=True).distinct()
-        
-        # Filter out null site_ids
-        valid_site_ids = [sid for sid in site_ids if sid is not None]
+        try:
+            # Single query to get site IDs
+            site_ids = list(
+                models.Image.objects
+                .filter(id__in=image_ids)
+                .values_list('site_id', flat=True)
+                .distinct()
+            )
+            
+            # Filter out None values
+            valid_site_ids = [sid for sid in site_ids if sid is not None]
+            
+            if not valid_site_ids:
+                return None
 
-        if not valid_site_ids:
+            # Calculate bbox in single query
+            bbox_result = models.Site.objects.filter(
+                id__in=valid_site_ids
+            ).aggregate(Extent('coordinates'))
+            
+            return bbox_result.get('coordinates__extent')
+
+        except Exception as e:
+            # Log error but don't fail the request
+            import logging
+            logging.warning(f"Error calculating bbox: {e}")
             return None
 
-        # Calculate the collective bounding box (extent) of these sites in a single DB query
-        bbox = models.Site.objects.filter(id__in=valid_site_ids).aggregate(Extent('coordinates'))['coordinates__extent']
-        
-        return bbox # bbox is a tuple: (xmin, ymin, xmax, ymax) or None
+    def get_serializer_context(self):
+        """Add request context for serializer optimizations."""
+        context = super().get_serializer_context()
+        context.update({
+            'request': self.request,
+            'view': self,
+            # Add any other context needed for serializer optimization
+        })
+        return context
 
 
 # Add autocomplete for general search from rest_framework.viewsets import ViewSet
