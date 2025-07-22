@@ -57,7 +57,7 @@
                     {% endif %}
                     
                     <country>{{data.site.municipality.superregion.country.name}}</country>
-                    <province></province>
+                    {% comment %} <province>{{data.site.municipality.superregion.province.name}}</province> {% endcomment %}
                     <parish>{{data.site.parish.name}}</parish>
                     <county>{{data.site.province.name}}</county>
                     <municipality>{{data.site.municipality.name}}</municipality>
