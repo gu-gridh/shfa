@@ -56,14 +56,19 @@
                     <site_name>{{data.site.placename}}</site_name>
                     {% endif %}
                     
+                    {% if data.site.province and data.site.province.country %}
                     <country>{{ data.site.province.country.name }}</country>
-
                     <province>{{ data.site.province.name }}</province>
-                    <county>{{ data.site.municipality.superregion.name }}</county>
-                    <municipality>{{ data.site.municipality.name }}</municipality>
+                    {% elif data.site.parish and data.site.parish.country %}
+                    <country>{{ data.site.parish.country.name }}</country>
                     <parish>{{ data.site.parish.name }}</parish>
-                    <latitude>{{ data.site.coordinates.coordinates|get_coord_at:1 }}</latitude>
-                    <longitude>{{ data.site.coordinates.coordinates|get_coord_at:0 }}</longitude>
+                    {% endif %}
+
+                    {% if data.site.municipality %}
+                    <municipality>{{ data.site.municipality.name }}</municipality>
+                    {% endif %}
+                    <latitude>{{ data.site.coordinates.coords|get_coord_at:1 }}</latitude>
+                    <longitude>{{ data.site.coordinates.coords|get_coord_at:0 }}</longitude>
                     <imageURL>{{data.file}}</imageURL>
                     <URL>https://shfa.dh.gu.se/image/{{data.id}}</URL>
                     <iiifFile>{{data.iiif_file}}</iiifFile>
