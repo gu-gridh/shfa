@@ -55,32 +55,13 @@
                     {% else %}
                     <site_name>{{data.site.placename}}</site_name>
                     {% endif %}
-                    
-                    {# 1) Country & Province from Site.province (Sweden) #}
-                    {% if data.site.province and data.site.province.country %}
-                    <country>{{ data.site.province.country.name }}</country>
-                    {% else %}
-                    <country> {{ data.site.municipality.superregion.country.name }}</country>
-                    {% endif %}
-                    
-                    {# 2) Province & Parish from Site.province (fallback) #}
 
-                    {# 2) Country & Parish from Site.parish (fallback) #}
+                    <country>{{ data.site.municipality.superregion.superregion.superregion.superregion.name }}</country>
+
+                    <municipality>{{ data.site.municipality.superregion.name }}</municipality>
+                    
                     <province>{{ data.site.province.name }}</province>
                     <parish>{{ data.site.parish.name }}</parish>
-
-                    {# 3) Municipality + its parent as “county” via superregion #}
-                    {% if data.site.municipality %}
-                    {% with muni=data.site.municipality %}
-                        {% with county=muni.superregion %}
-                        {% if county %}
-                            <county>{{ county.name }}</county>
-                        {% endif %}
-                        {% endwith %}
-                        <municipality>{{ muni.name }}</municipality>
-                    {% endwith %}
-                    {% endif %}
-
                     {# 5) Coordinates #}
                     <latitude>{{ data.site.coordinates.y }}</latitude>
                     <longitude>{{ data.site.coordinates.x }}</longitude>
