@@ -57,9 +57,7 @@
                     {% endif %}
 
                     <country>{{ data.site.municipality.superregion.superregion.superregion.superregion.name }}</country>
-
                     <municipality>{{ data.site.municipality.superregion.name }}</municipality>
-                    
                     <province>{{ data.site.province.name }}</province>
                     <parish>{{ data.site.parish.name }}</parish>
                     {# 5) Coordinates #}
