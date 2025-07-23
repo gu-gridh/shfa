@@ -63,10 +63,15 @@
                     <country>{{ data.site.parish.country.name }}</country>
                     <parish>{{ data.site.parish.name }}</parish>
                     {% endif %}
-
+                    {% if data.site.municipality and data.site.municipality.country %}
+                    <country>{{ data.site.municipality.country.name }}</country>
+                    <province>{{ data.site.municipality.province.name }}</province>
+                    <parish>{{ data.site.municipality.parish.name }}</parish>
+                    {% endif %}                   
                     {% if data.site.municipality %}
                     <municipality>{{ data.site.municipality.name }}</municipality>
                     {% endif %}
+                    
                     <latitude>{{ data.site.coordinates.coords|get_coord_at:1 }}</latitude>
                     <longitude>{{ data.site.coordinates.coords|get_coord_at:0 }}</longitude>
                     <imageURL>{{data.file}}</imageURL>
