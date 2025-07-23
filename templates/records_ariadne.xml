@@ -56,24 +56,38 @@
                     <site_name>{{data.site.placename}}</site_name>
                     {% endif %}
                     
+                    {# 1) Country & Province from Site.province (Sweden) #}
                     {% if data.site.province and data.site.province.country %}
                     <country>{{ data.site.province.country.name }}</country>
                     <province>{{ data.site.province.name }}</province>
-                    {% elif data.site.parish and data.site.parish.country %}
+                    {% endif %}
+
+                    {# 2) Country & Parish from Site.parish (fallback) #}
+                    {% if not data.site.province and data.site.parish and data.site.parish.country %}
                     <country>{{ data.site.parish.country.name }}</country>
                     <parish>{{ data.site.parish.name }}</parish>
                     {% endif %}
-                    {% if data.site.municipality and data.site.municipality.country %}
-                    <country>{{ data.site.municipality.country.name }}</country>
-                    <province>{{ data.site.municipality.province.name }}</province>
-                    <parish>{{ data.site.municipality.parish.name }}</parish>
-                    {% endif %}                   
+
+                    {# 3) Municipality + its parent as “county” via superregion #}
                     {% if data.site.municipality %}
-                    <municipality>{{ data.site.municipality.name }}</municipality>
+                    {% with muni=data.site.municipality %}
+                        {% with county=muni.superregion %}
+                        {% if county %}
+                            <county>{{ county.name }}</county>
+                        {% endif %}
+                        {% endwith %}
+                        <municipality>{{ muni.name }}</municipality>
+                    {% endwith %}
                     {% endif %}
-                    
-                    <latitude>{{ data.site.coordinates.coords|get_coord_at:1 }}</latitude>
-                    <longitude>{{ data.site.coordinates.coords|get_coord_at:0 }}</longitude>
+
+                    {# 4) Parish from Site.parish if not already shown #}
+                    {% if data.site.parish and not data.site.province %}
+                    <parish>{{ data.site.parish.name }}</parish>
+                    {% endif %}
+
+                    {# 5) Coordinates #}
+                    <latitude>{{ data.site.coordinates.y }}</latitude>
+                    <longitude>{{ data.site.coordinates.x }}</longitude>
                     <imageURL>{{data.file}}</imageURL>
                     <URL>https://shfa.dh.gu.se/image/{{data.id}}</URL>
                     <iiifFile>{{data.iiif_file}}</iiifFile>
