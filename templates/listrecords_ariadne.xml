@@ -56,11 +56,11 @@
                             <site_name>{{image.site.placename}}</site_name>
                             {% endif %}
                             
-                            <country>{{ image.site.municipality.superregion.superregion.superregion.country.name }}</country>
+                            <country>{{ image.site.municipality.superregion.superregion.superregion.superregion.name }}</country>
+                            <municipality>{{ image.site.municipality.superregion.name }}</municipality>
                             <province>{{ image.site.province.name }}</province>
                             <parish>{{image.site.parish.name}}</parish>
                             <county>{{image.site.province.name}}</county>
-                            <municipality>{{image.site.municipality.name}}</municipality>
                             <latitude>{{ image.site.coordinates.y }}</latitude>
                             <longitude>{{ image.site.coordinates.x }}</longitude>
                             <imageURL>{{image.file}}</imageURL>
