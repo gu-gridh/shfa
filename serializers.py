@@ -261,13 +261,13 @@ class GallerySerializer(DynamicDepthModelSerializer):
 
 
 class IIIFManifestSerializer:
-    """Generate IIIF Presentation API 3.0 compliant manifests for rock carving images."""
+    """Generate IIIF Presentation API 3.0 compliant manifests for rock art images."""
     
     def __init__(self, base_url: str = None):
         self.base_url = base_url or getattr(settings, 'IIIF_BASE_URL', 'ORIGINAL_URL')
     
     def create_manifest_for_image(self, image) -> Dict:
-        """Create a IIIF manifest for a single rock carving image."""
+        """Create a IIIF manifest for a single rock art image."""
         if not image.iiif_file:
             raise ValueError("Image must have an IIIF file")
         
@@ -353,22 +353,22 @@ class IIIFManifestSerializer:
                     ]
                 }
             ],
-            # Enhanced provider information
+            # Updated provider information
             "provider": [
                 {
-                    "id": "https://diana.gu.se/api/shfa/",
+                    "id": "https://www.gu.se/shfa",
                     "type": "Agent",
                     "label": {
-                        "en": ["Centre for Digital Humanities, University of Gothenburg"],
-                        "sv": ["Centrum för digital humaniora, Göteborgs universitet"]
+                        "en": ["SHFA - Rock Art Database"],
+                        "sv": ["SHFA - Bilddatabas"]
                     },
                     "homepage": [
                         {
-                            "id": "https://shfa.dh.gu.se/",
+                            "id": "https://shfa.dh.gu.se/about/en",
                             "type": "Text",
                             "label": {
-                                "en": ["DIANA - Rock Carvings Database"],
-                                "sv": ["SHFA - Hällristningsdatabas"]
+                                "en": ["SHFA - Rock Art Database"],
+                                "sv": ["SHFA - Bilddatabas"]
                             },
                             "format": "text/html"
                         }
@@ -403,8 +403,8 @@ class IIIFManifestSerializer:
         
         return manifest
     
-    def create_collection_manifest(self, images: List, title: str = "Rock Carving Collection") -> Dict:
-        """Create a IIIF collection manifest for multiple rock carving images."""
+    def create_collection_manifest(self, images: List, title: str = "Rock Art Collection") -> Dict:
+        """Create a IIIF collection manifest for multiple rock art images."""
         base_manifest_url = getattr(settings, 'IIIF_URL')
         collection_id = f"{base_manifest_url}/api/shfa/iiif/collection"
         
@@ -449,17 +449,17 @@ class IIIFManifestSerializer:
                 "sv": [title]
             },
             "summary": {
-                "en": ["Collection of rock carving documentation images from the DIANA database"],
-                "sv": ["Samling av hällristningsdokumentationsbilder från DIANA-databasen"]
+                "en": ["Collection of rock art documentation images from the SHFA rock art database"],
+                "sv": ["Samling av bergkonstdokumentationsbilder från SHFAs bilddatabas"]
             },
             "items": manifests,
             "provider": [
                 {
-                    "id": "https://dh.gu.se/",
+                    "id": "https://www.gu.se/shfa",
                     "type": "Agent",
                     "label": {
-                        "en": ["Centre for Digital Humanities, University of Gothenburg"],
-                        "sv": ["Centrum för digital humaniora, Göteborgs universitet"]
+                        "en": ["SHFA - Rock Art Database"],
+                        "sv": ["SHFA - Bilddatabas"]
                     }
                 }
             ]
@@ -468,10 +468,10 @@ class IIIFManifestSerializer:
         return collection
     
     def _get_image_title(self, image) -> Dict[str, str]:
-        """Generate a meaningful title for the rock carving image."""
+        """Generate a meaningful title for the rock art image."""
         # Build title based on available information
-        parts_en = ["Rock carving"]
-        parts_sv = ["Hällristning"]
+        parts_en = ["Rock art"]
+        parts_sv = ["Bergkonst"]
         
         # Add site information
         if image.site:
@@ -496,7 +496,7 @@ class IIIFManifestSerializer:
             parts_sv.append(f"- {image.year}")
         
         # Fallback to image ID if no other info
-        if len(parts_en) == 1:  # Only "Rock carving"
+        if len(parts_en) == 1:  # Only "Rock art"
             parts_en.append(f"(Image {image.id})")
             parts_sv.append(f"(Bild {image.id})")
         
@@ -506,7 +506,7 @@ class IIIFManifestSerializer:
         }
     
     def _get_summary(self, image) -> Dict[str, str]:
-        """Generate a meaningful summary for the rock carving image."""
+        """Generate a meaningful summary for the rock art image."""
         # Check for explicit description first
         if hasattr(image, 'description') and image.description:
             return {"en": image.description, "sv": image.description}
@@ -521,8 +521,8 @@ class IIIFManifestSerializer:
             summary_parts_en.append(f"{type_en} documentation")
             summary_parts_sv.append(f"{image.type.text}-dokumentation")
         else:
-            summary_parts_en.append("Rock carving documentation")
-            summary_parts_sv.append("Hällristningsdokumentation")
+            summary_parts_en.append("Rock art documentation")
+            summary_parts_sv.append("Bergkonstdokumentation")
         
         # Add site info
         if image.site and image.site.placename:
@@ -531,16 +531,16 @@ class IIIFManifestSerializer:
         
         # Add year
         if image.year:
-            summary_parts_en.append(f"photographed in {image.year}")
-            summary_parts_sv.append(f"fotograferat {image.year}")
+            summary_parts_en.append(f"from {image.year}.")
+            summary_parts_sv.append(f"från {image.year}.")
         
         # Add collection info
         if image.collection:
             summary_parts_en.append(f"Part of the {image.collection.name} collection")
             summary_parts_sv.append(f"Del av samlingen {image.collection.name}")
         
-        summary_parts_en.append("from the DIANA database.")
-        summary_parts_sv.append("från DIANA-databasen.")
+        summary_parts_en.append("from the SHFA rock art database.")
+        summary_parts_sv.append("från SHFAs bilddatabasen.")
         
         return {
             "en": " ".join(summary_parts_en),
@@ -563,10 +563,17 @@ class IIIFManifestSerializer:
             else:
                 parts.append(f"Institution: {image.institution.name}")
         
+        # Add year to attribution
+        if image.year:
+            if lang == "en":
+                parts.append(f"Year: {image.year}")
+            else:
+                parts.append(f"År: {image.year}")
+        
         if lang == "en":
-            parts.append(f"DIANA Rock Carvings Database. Image ID: {image.id}")
+            parts.append(f"SHFA Rock Art Database. Image ID: {image.id}")
         else:
-            parts.append(f"DIANA Hällristningsdatabas. Bild-ID: {image.id}")
+            parts.append(f"SHFA Bilddatabas. Bild-ID: {image.id}")
         
         return ". ".join(parts)
     
@@ -588,6 +595,19 @@ class IIIFManifestSerializer:
                     "value": {"en": [image.site.lamning_id], "sv": [image.site.lamning_id]}
                 })
             
+            # Add missing askeladden_id and lokalitet_id
+            if hasattr(image.site, 'askeladden_id') and image.site.askeladden_id:
+                metadata.append({
+                    "label": {"en": ["Askeladden ID"], "sv": ["Askeladden ID"]},
+                    "value": {"en": [image.site.askeladden_id], "sv": [image.site.askeladden_id]}
+                })
+            
+            if hasattr(image.site, 'lokalitet_id') and image.site.lokalitet_id:
+                metadata.append({
+                    "label": {"en": ["Lokalitet ID"], "sv": ["Lokalitet-ID"]},
+                    "value": {"en": [image.site.lokalitet_id], "sv": [image.site.lokalitet_id]}
+                })
+            
             if image.site.placename:
                 metadata.append({
                     "label": {"en": ["Location"], "sv": ["Plats"]},
@@ -600,16 +620,17 @@ class IIIFManifestSerializer:
                     "value": {"en": [image.site.municipality.name], "sv": [image.site.municipality.name]}
                 })
             
+            # Changed from "Province/Landskap" to "County/Län" 
             if image.site.province:
                 metadata.append({
-                    "label": {"en": ["Province"], "sv": ["Landskap"]},
+                    "label": {"en": ["County"], "sv": ["Län"]},
                     "value": {"en": [image.site.province.name], "sv": [image.site.province.name]}
                 })
         
-        # Rock carving object/area
+        # Rock art object/area (changed from "Rock Carving Area")
         if image.rock_carving_object:
             metadata.append({
-                "label": {"en": ["Rock Carving Area"], "sv": ["Hällristningsområde"]},
+                "label": {"en": ["Rock Art Area"], "sv": ["Bergkonstområde"]},
                 "value": {"en": [image.rock_carving_object.name], "sv": [image.rock_carving_object.name]}
             })
         

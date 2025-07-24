@@ -1080,7 +1080,7 @@ def oai(request):
 
 # Manifest view for IIIF
 class ManifestIIIFViewSet(viewsets.ViewSet):
-    """IIIF Presentation API endpoints for rock carving images."""
+    """IIIF Presentation API endpoints for rock art images."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1088,7 +1088,7 @@ class ManifestIIIFViewSet(viewsets.ViewSet):
     
     @method_decorator(cache_page(60 * 60 * 24))  # Cache for 24 hours
     def manifest(self, request, pk=None):
-        """Get IIIF manifest for a single rock carving image."""
+        """Get IIIF manifest for a single rock art image."""
         try:
             # Optimized query with all needed relationships
             image = get_object_or_404(
@@ -1154,7 +1154,7 @@ class ManifestIIIFViewSet(viewsets.ViewSet):
     
     @method_decorator(cache_page(60 * 30))  # Cache for 30 minutes
     def collection(self, request):
-        """Get IIIF collection manifest for multiple rock carving images."""
+        """Get IIIF collection manifest for multiple rock art images."""
         try:
             # Get query parameters for filtering
             site_id = request.GET.get('site_id')
@@ -1232,7 +1232,7 @@ class ManifestIIIFViewSet(viewsets.ViewSet):
             )
     
     def site_collection(self, request, site_id=None):
-        """Get IIIF collection for a specific rock carving site."""
+        """Get IIIF collection for a specific rock art site."""
         try:
             site = get_object_or_404(models.Site, pk=site_id)
             
@@ -1258,15 +1258,15 @@ class ManifestIIIFViewSet(viewsets.ViewSet):
                     status=status.HTTP_404_NOT_FOUND
                 )
             
-            # Build site-specific title
+            # Build site-specific title - Updated to "Rock Art"
             if site.placename:
-                title = f"Rock Carvings at {site.placename}"
+                title = f"Rock Art at {site.placename}"
             elif site.raa_id:
-                title = f"Rock Carvings at {site.raa_id}"
+                title = f"Rock Art at {site.raa_id}"
             elif site.lamning_id:
-                title = f"Rock Carvings at {site.lamning_id}"
+                title = f"Rock Art at {site.lamning_id}"
             else:
-                title = f"Rock Carvings at Site {site_id}"
+                title = f"Rock Art at Site {site_id}"
             
             collection = self.iiif_serializer.create_collection_manifest(images, title)
             
@@ -1289,7 +1289,7 @@ class ManifestIIIFViewSet(viewsets.ViewSet):
     
     def _build_collection_title(self, site_id, type_id, keywords):
         """Build a meaningful collection title based on filters."""
-        title_parts = ["Rock Carving Collection"]
+        title_parts = ["Rock Art Collection"]  # Changed from "Rock Carving Collection"
         
         if site_id:
             try:
