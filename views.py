@@ -22,6 +22,12 @@ from django.db import connection
 from django.utils.functional import cached_property
 from rest_framework.pagination import PageNumberPagination
 from itertools import chain
+from django.views.decorators.cache import cache_page
+from django.utils.decorators import method_decorator
+from django.core.cache import cache
+from django.http import JsonResponse, HttpResponse
+from django.shortcuts import get_object_or_404
+import json
 
 class SiteViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteSerializer
@@ -1071,6 +1077,242 @@ def oai(request):
 
     return output
 
+
+# Manifest view for IIIF
+class ManifestIIIFViewSet(viewsets.ViewSet):
+    """IIIF Presentation API endpoints for rock carving images."""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.iiif_serializer = serializers.IIIFManifestSerializer()
+    
+    @method_decorator(cache_page(60 * 60 * 24))  # Cache for 24 hours
+    def manifest(self, request, pk=None):
+        """Get IIIF manifest for a single rock carving image."""
+        try:
+            # Optimized query with all needed relationships
+            image = get_object_or_404(
+                models.Image.objects.select_related(
+                    'site',
+                    'site__municipality',
+                    'site__province',
+                    'site__parish',
+                    'institution',
+                    'type',
+                    'subtype',
+                    'author',
+                    'collection',
+                    'rock_carving_object',
+                    'group'
+                ).prefetch_related(
+                    'keywords',
+                    'people',
+                    'dating_tags'
+                ),
+                pk=pk,
+                published=True
+            )
+            
+            if not image.iiif_file:
+                return Response(
+                    {"error": "Image does not have IIIF support"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Create cache key that includes update timestamp
+            cache_key = f"iiif_manifest_{image.id}"
+            if hasattr(image, 'updated_at'):
+                cache_key += f"_{image.updated_at.timestamp()}"
+            
+            cached_manifest = cache.get(cache_key)
+            
+            if cached_manifest:
+                manifest_json = cached_manifest
+            else:
+                manifest_json = self.iiif_serializer.create_manifest_for_image(image)
+                cache.set(cache_key, manifest_json, timeout=60*60*24)  # Cache 24 hours
+            
+            # Create pretty-formatted JSON response
+            response = HttpResponse(
+                json.dumps(manifest_json, indent=2, ensure_ascii=False),
+                content_type='application/json;profile="http://iiif.io/api/presentation/3/context.json"'
+            )
+            
+            response['Access-Control-Allow-Origin'] = '*'
+            response['Cache-Control'] = 'public, max-age=86400'
+            response['Vary'] = 'Accept-Language'
+            
+            return response
+            
+        except Exception as e:
+            import logging
+            logging.error(f"Error creating manifest for image {pk}: {str(e)}")
+            return Response(
+                {"error": f"Error creating manifest: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @method_decorator(cache_page(60 * 30))  # Cache for 30 minutes
+    def collection(self, request):
+        """Get IIIF collection manifest for multiple rock carving images."""
+        try:
+            # Get query parameters for filtering
+            site_id = request.GET.get('site_id')
+            type_id = request.GET.get('type_id')
+            keywords = request.GET.get('keywords')
+            limit = min(int(request.GET.get('limit', 50)), 100)  # Max 100 items
+            
+            # Build cache key based on parameters
+            cache_key = f"iiif_collection_{site_id}_{type_id}_{keywords}_{limit}"
+            cached_collection = cache.get(cache_key)
+            
+            if cached_collection:
+                response = HttpResponse(
+                    json.dumps(cached_collection, indent=2, ensure_ascii=False),
+                    content_type='application/json;profile="http://iiif.io/api/presentation/3/context.json"'
+                )
+            else:
+                # Build optimized queryset
+                queryset = models.Image.objects.filter(
+                    published=True,
+                    iiif_file__isnull=False,
+                    width__isnull=False,
+                    height__isnull=False
+                ).select_related(
+                    'site',
+                    'type',
+                    'rock_carving_object'
+                ).only(
+                    'id', 'title', 'iiif_file', 'width', 'height', 'year',
+                    'site__placename', 'site__raa_id', 'site__lamning_id',
+                    'rock_carving_object__name'
+                )
+                
+                if site_id:
+                    queryset = queryset.filter(site_id=site_id)
+                
+                if type_id:
+                    queryset = queryset.filter(type_id=type_id)
+                
+                if keywords:
+                    queryset = queryset.filter(keywords__text__icontains=keywords)
+                
+                # Limit results
+                images = queryset[:limit]
+                
+                if not images:
+                    return Response(
+                        {"error": "No images found"},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+                
+                # Create collection title
+                title = self._build_collection_title(site_id, type_id, keywords)
+                
+                collection = self.iiif_serializer.create_collection_manifest(images, title)
+                cache.set(cache_key, collection, timeout=60*30)  # Cache 30 minutes
+                
+                response = HttpResponse(
+                    json.dumps(collection, indent=2, ensure_ascii=False),
+                    content_type='application/json;profile="http://iiif.io/api/presentation/3/context.json"'
+                )
+            
+            response['Access-Control-Allow-Origin'] = '*'
+            response['Cache-Control'] = 'public, max-age=1800'
+            response['Vary'] = 'Accept-Language'
+            
+            return response
+            
+        except Exception as e:
+            import logging
+            logging.error(f"Error creating collection: {str(e)}")
+            return Response(
+                {"error": f"Error creating collection: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def site_collection(self, request, site_id=None):
+        """Get IIIF collection for a specific rock carving site."""
+        try:
+            site = get_object_or_404(models.Site, pk=site_id)
+            
+            images = models.Image.objects.filter(
+                site=site,
+                published=True,
+                iiif_file__isnull=False,
+                width__isnull=False,
+                height__isnull=False
+            ).select_related(
+                'site',
+                'type',
+                'rock_carving_object'
+            ).only(
+                'id', 'title', 'iiif_file', 'width', 'height', 'year',
+                'site__placename', 'site__raa_id', 'site__lamning_id',
+                'rock_carving_object__name'
+            )
+            
+            if not images:
+                return Response(
+                    {"error": f"No images found for site {site.placename or site.raa_id or site_id}"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Build site-specific title
+            if site.placename:
+                title = f"Rock Carvings at {site.placename}"
+            elif site.raa_id:
+                title = f"Rock Carvings at {site.raa_id}"
+            elif site.lamning_id:
+                title = f"Rock Carvings at {site.lamning_id}"
+            else:
+                title = f"Rock Carvings at Site {site_id}"
+            
+            collection = self.iiif_serializer.create_collection_manifest(images, title)
+            
+            response = HttpResponse(
+                json.dumps(collection, indent=2, ensure_ascii=False),
+                content_type='application/json;profile="http://iiif.io/api/presentation/3/context.json"'
+            )
+            response['Access-Control-Allow-Origin'] = '*'
+            response['Cache-Control'] = 'public, max-age=3600'
+            
+            return response
+            
+        except Exception as e:
+            import logging
+            logging.error(f"Error creating site collection: {str(e)}")
+            return Response(
+                {"error": f"Error creating site collection: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def _build_collection_title(self, site_id, type_id, keywords):
+        """Build a meaningful collection title based on filters."""
+        title_parts = ["Rock Carving Collection"]
+        
+        if site_id:
+            try:
+                site = models.Site.objects.get(id=site_id)
+                if site.placename:
+                    title_parts.append(f"from {site.placename}")
+                elif site.raa_id:
+                    title_parts.append(f"from {site.raa_id}")
+            except:
+                pass
+        
+        if type_id:
+            try:
+                image_type = models.ImageTypeTag.objects.get(id=type_id)
+                type_name = image_type.english_translation or image_type.text
+                title_parts.append(f"({type_name})")
+            except:
+                pass
+        
+        if keywords:
+            title_parts.append(f"with keyword '{keywords}'")
+        
+        return " ".join(title_parts)
 
 # Add contact form view
 class ContactFormViewSet(viewsets.ViewSet):
