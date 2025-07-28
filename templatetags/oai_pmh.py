@@ -139,3 +139,21 @@ def get_coord_at(coords, index):
         return coords[index]
     except (IndexError, TypeError):
         return ''
+
+@register.simple_tag
+def get_image_specification(image):
+    """Get the item specification (what K-samsök calls itemSpecification)."""
+    if image.type:
+        return image.type.english_translation or image.type.text
+    return "Unknown type"
+
+@register.simple_tag
+def get_image_description(image):
+    """Get the item description from keywords/motifs."""
+    keywords = [keyword.text for keyword in image.keywords.all()]
+    return ", ".join(keywords) if keywords else ""
+
+@register.simple_tag
+def get_image_description_type():
+    """Return the type for ItemDescription."""
+    return "motivbeskrivning"
