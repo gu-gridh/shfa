@@ -3,6 +3,7 @@ from rest_framework import routers
 from . import views
 import diana.utils as utils
 from .views import oai
+from .manifest import urls as manifest_urls
 
 router = routers.DefaultRouter()
 endpoint = utils.build_app_endpoint("shfa")
@@ -65,9 +66,9 @@ router.register(rf'{endpoint}/camerameta',
                 views.CameraSpecificationViewSet, basename='camera meta data')
 router.register(rf'{endpoint}/null_visualization_group',
                 views.NullVisualizationGroupViewset, basename='Null Visualization images')    
-# Manifest IIIF endpoints
-router.register(rf'{endpoint}/iiif',
-                views.ManifestIIIFViewSet, basename='manifest iiif')
+# Manifest IIIF endpoints using the ManifestIIIFViewSet in manifest.urls
+path(rf'{endpoint}/iiif/', include('apps.shfa.manifest.urls')),
+
 # url for contact form
 router.register(rf'{contact_endpoint}', views.ContactFormViewSet, basename='contact')
 
@@ -76,22 +77,8 @@ urlpatterns = [
     # add oai-pmh end points
     path(rf'{endpoint}/OAICat/', views.oai, name="oai"),
     
-    # IIIF specific endpoints - ADD THESE
-    path(rf'{endpoint}/iiif/manifest/<int:pk>/', 
-         views.ManifestIIIFViewSet.as_view({'get': 'manifest'}), 
-         name='iiif-manifest'),
-    path(rf'{endpoint}/iiif/collection/', 
-         views.ManifestIIIFViewSet.as_view({'get': 'collection'}), 
-         name='iiif-collection'),
-    path(rf'{endpoint}/iiif/manifest/institution/<int:institution_id>/', 
-         views.ManifestIIIFViewSet.as_view({'get': 'institution_manifest'}), 
-         name='iiif-institution-manifest'),
-    path(rf'{endpoint}/iiif/site/<int:site_id>/', 
-         views.ManifestIIIFViewSet.as_view({'get': 'site_collection'}), 
-         name='iiif-site-collection'),
-    path(rf'{endpoint}/iiif/manifest/type/<str:type>/', 
-         views.ManifestIIIFViewSet.as_view({'get': 'type_manifest'}), 
-         name='iiif-type-manifest'),
+    # Include manifest module URLs
+    path(rf'{endpoint}/iiif/', include('apps.shfa.manifest.urls')),
     
     # Automatically generated views
     *utils.get_model_urls('shfa', endpoint,
