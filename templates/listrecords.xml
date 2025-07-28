@@ -38,7 +38,11 @@
                         <itemTitle>{{image.site.raa_id}}</itemTitle>
                         <itemLicense rdf:resource="http://kulturarvsdata.se/resurser/License#CC0"/>
                         <itemLicenseUrl rdf:resource="http://creativecommons.org/publicdomain/zero/1.0/"/>
-                        <itemName rdf:nodeID="name001" />
+
+                        <!-- FIXED: Replace itemName with itemSpecification and itemDescription -->
+                        <itemSpecification>{% get_image_specification image %}</itemSpecification>
+                        <itemDescription rdf:nodeID="desc001" />
+                        
                         <itemLabel>{{image.rock_carving_object.name}}</itemLabel>
                         <itemMotiveWord>{% get_image_tags image %}</itemMotiveWord>
                         <itemTechnique>{{image.type.text}}</itemTechnique>
@@ -47,6 +51,7 @@
                         <context rdf:nodeID="ctx001" />
                         <visualizes>http://kulturarvsdata.se/raa/lamning/{{image.site.ksamsok_id}}</visualizes>
                         <image rdf:nodeID="im001" />
+
                         <presentation rdf:parseType="Literal" xmlns:pres="http://kulturarvsdata.se/presentation#">
                         <pres:item>
                             <pres:version>1.3.0</pres:version>
@@ -147,10 +152,10 @@
                         <type>Lämningsnummer</type>
                         <number>{{image.site.lamning_id}}</number>
                     </ItemNumber>
-                    <ItemName rdf:nodeID="name001">
-                        <type>{% get_image_tags image %}</type>
-                        <name>hällristning</name>
-                    </ItemName>
+                    <ItemDescription rdf:nodeID="desc001">
+                        <desc>{% get_image_tags image %}</desc>
+                        <type>motivbeskrivning</type>
+                    </ItemDescription>
                     </rdf:RDF>
                 </metadata>
             </record>
