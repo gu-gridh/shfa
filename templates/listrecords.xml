@@ -140,19 +140,19 @@
                         <mediaLicense rdf:resource="http://kulturarvsdata.se/resurser/license#by"/>
                         <mediaLicenseUrl rdf:resource="https://creativecommons.org/licenses/by/4.0/"/>
                     </Image>
-                    <!-- FIXED: lowercase itemNumber -->
-                    <itemNumber rdf:nodeID="num001">
-                        <ItemNumber>
+                    
+                    {% comment %} <itemNumber rdf:nodeID="num001"> {% endcomment %}
+                    <ItemNumber>
                             <type>RAÄ-nummer</type>
                             <number>{{image.site.raa_id}}</number>
                         </ItemNumber>
-                    </itemNumber>
-                    <itemNumber rdf:nodeID="num002">
+                    {% comment %} </itemNumber> {% endcomment %}
+                    {% comment %} <itemNumber rdf:nodeID="num002"> {% endcomment %}
                         <ItemNumber>
                             <type>Lämningsnummer</type>
                             <number>{{image.site.lamning_id}}</number>
                         </ItemNumber>
-                    </itemNumber>
+                    {% comment %} </itemNumber> {% endcomment %}
                     <ItemDescription rdf:nodeID="desc001">
                         <desc>{% get_image_tags image %}</desc>
                         <type>motivbeskrivning</type>
