@@ -46,9 +46,9 @@ class CollectionFilter(AutocompleteFilter):
     field_name = 'collection'  # name of the foreign key field
 
 
-class AuthorFilter(AutocompleteFilter):
-    title = _('Creator')  # display title
-    field_name = 'author'  # name of the foreign key field
+# class AuthorFilter(AutocompleteFilter):
+#     title = _('Creator')  # display title
+#     field_name = 'author'  # name of the foreign key field
 
 
 class KeywordFilter(AutocompleteFilter):
@@ -100,7 +100,7 @@ class ImageModel(admin.ModelAdmin):
     autocomplete_fields = ['site', 'collection', 'institution',
                            'type', 'rock_carving_object', 'subtype']
     list_display = ['thumbnail_preview', 'site', 'rock_carving_object',
-                    'year', 'collection', 'author', 'institution', 'type', 'subtype', 'file']
+                    'year', 'collection', 'institution', 'type', 'subtype', 'file']
     search_fields = ['site__lamning_id', 'site__raa_id', 'rock_carving_object__name',
                      'site__municipality__name', 'site__parish__name', 'subtype__text', 'file']
     list_filter = [
@@ -110,7 +110,7 @@ class ImageModel(admin.ModelAdmin):
         'published',
         InstitutionFilter,
         CollectionFilter,
-        AuthorFilter,
+        # AuthorFilter,
         SiteFilter,
         KeywordFilter,
         'file'
