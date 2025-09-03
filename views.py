@@ -273,6 +273,46 @@ class TypeSearchViewSet(DynamicDepthViewSet):
                 english_translation__icontains=q).order_by('text')
         return queryset
 
+
+class SearchVisualizationGroupViewset(DynamicDepthViewSet):
+    serializer_class = serializers.SiteCoordinatesExcludeSerializer
+
+    def get_queryset(self):
+        q = self.request.GET.get("q", "").strip()
+        
+        # Start with sites that have either 3D models or images
+        queryset = models.Site.objects.filter(
+            Q(group__shfa3d_set__isnull=False) |  # Sites with 3D models through groups
+            Q(images_set__isnull=False)           # Sites with images
+        ).distinct()
+        
+        # Apply search filter if query exists
+        if q:
+            queryset = queryset.filter(
+                Q(raa_id__icontains=q) |
+                Q(placename__icontains=q) |
+                Q(lamning_id__icontains=q) |
+                Q(ksamsok_id__icontains=q) |
+                Q(askeladden_id__icontains=q) |
+                Q(lokalitet_id__icontains=q)
+            )
+        
+        # Add annotations for counts
+        queryset = queryset.annotate(
+            visualization_group_count=Count('group__shfa3d_set', distinct=True),
+            images_count=Count('images_set', distinct=True)
+        )
+        
+        # Filter to only sites that actually have 3D models or images
+        queryset = queryset.filter(
+            Q(visualization_group_count__gt=0) | Q(images_count__gt=0)
+        )
+        
+        return queryset.order_by('-visualization_group_count', '-images_count', 'raa_id')
+
+    filterset_fields = get_fields(models.Site, exclude=DEFAULT_FIELDS + ['coordinates'])
+
+
 class RegionSearchViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteCoordinatesExcludeSerializer
 

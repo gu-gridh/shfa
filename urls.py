@@ -39,6 +39,8 @@ router.register(rf'{endpoint}/search/advance',
                 views.AdvancedSearch, basename='advanced search')
 router.register(rf'{endpoint}/search/region',
                 views.RegionSearchViewSet, basename='region search')
+router.register(rf'{endpoint}/search/visualization_group',
+                views.SearchVisualizationGroupViewset, basename='visualization group search')
 router.register(rf'{endpoint}/search/autocomplete',
                 views.GeneralSearchAutocomplete, basename='general search autocomplete')
 
