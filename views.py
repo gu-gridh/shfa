@@ -278,7 +278,7 @@ class SearchVisualizationGroupViewset(DynamicDepthViewSet):
     serializer_class = serializers.SiteCoordinatesExcludeSerializer
 
     def get_queryset(self):
-        q = self.request.GET.get("q", "").strip()
+        q = self.request.GET.get("site_name", "").strip()
         
         # Start with sites that have either 3D models or images
         queryset = models.Site.objects.filter(
