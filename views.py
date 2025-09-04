@@ -282,8 +282,8 @@ class SearchVisualizationGroupViewset(DynamicDepthViewSet):
         
         # Start with sites that have either 3D models or images
         queryset = models.Site.objects.filter(
-            Q(group__shfa3d_set__isnull=False) |  # Sites with 3D models through groups
-            Q(images_set__isnull=False)           # Sites with images
+            Q(shfa3d__isnull=False) |  # Sites with 3D models directly
+            Q(image__isnull=False)     # Sites with images directly
         ).distinct()
         
         # Apply search filter if query exists
@@ -299,8 +299,8 @@ class SearchVisualizationGroupViewset(DynamicDepthViewSet):
         
         # Add annotations for counts
         queryset = queryset.annotate(
-            visualization_group_count=Count('group__shfa3d_set', distinct=True),
-            images_count=Count('images_set', distinct=True)
+            visualization_group_count=Count('shfa3d', distinct=True),
+            images_count=Count('image', distinct=True)
         )
         
         # Filter to only sites that actually have 3D models or images
@@ -311,7 +311,6 @@ class SearchVisualizationGroupViewset(DynamicDepthViewSet):
         return queryset.order_by('-visualization_group_count', '-images_count', 'raa_id')
 
     filterset_fields = get_fields(models.Site, exclude=DEFAULT_FIELDS + ['coordinates'])
-
 
 class RegionSearchViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteCoordinatesExcludeSerializer
