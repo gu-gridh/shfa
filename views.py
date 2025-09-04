@@ -448,8 +448,8 @@ class BaseSearchViewSet(DynamicDepthViewSet):
             "general": ["q"],
         }, ALL_FIELDS
     
-    def build_search_query(self, params, search_type="general", operator="OR"):
-        """Build dynamic search query based on parameters."""
+    def build_search_query(self, params, search_type="advanced", operator="OR"):
+        """Build dynamic search query based on parameters with field-specific operator control."""
         TYPE_FIELD_KEYS, ALL_FIELDS = self.get_type_field_keys()
         
         field_keys = TYPE_FIELD_KEYS.get(search_type, list(ALL_FIELDS.keys()))
@@ -457,24 +457,53 @@ class BaseSearchViewSet(DynamicDepthViewSet):
         
         query_conditions = []
         
+        # Fields that can use field-specific operators
+        operator_controlled_fields = ["author_name", "keyword", "dating_tag"]
+        
+        # Define field-specific operator parameter mapping
+        field_operator_mapping = {
+            "author_name": "author_operator",
+            "keyword": "keyword_operator", 
+            "dating_tag": "dating_operator"
+        }
+        
         # Apply dynamic search filters
         for param_key, fields in mapping_filter_fields.items():
             values = self.parse_multi_values(params.getlist(param_key))
             if values:
+                # Determine which operator to use for this field
+                if param_key in operator_controlled_fields:
+                    # Get field-specific operator, fallback to general operator, then default to OR
+                    operator_param = field_operator_mapping.get(param_key)
+                    field_operator = params.get(operator_param, operator).upper()
+                    if field_operator not in ["AND", "OR"]:
+                        field_operator = "OR"  # Safety fallback
+                else:
+                    # Always use OR for other fields
+                    field_operator = "OR"
+                
                 q_obj = Q()
                 for value in values:
                     sub_q = Q()
                     for field in fields:
                         sub_q |= Q(**{f"{field}__icontains": value})
-                    q_obj |= sub_q
+                    
+                    # Combine values within this field using the determined operator
+                    if field_operator == "AND":
+                        # For AND: each value must match (intersection)
+                        if not q_obj:
+                            q_obj = sub_q
+                        else:
+                            q_obj &= sub_q
+                    else:
+                        # For OR: any value can match (union)
+                        q_obj |= sub_q
+                
                 query_conditions.append(q_obj)
         
-        # Combine conditions based on operator
+        # Always combine different categories/fields with AND
         if query_conditions:
-            combined_q = reduce(
-                (lambda x, y: x & y) if operator == "AND" else (lambda x, y: x | y),
-                query_conditions
-            )
+            combined_q = reduce(lambda x, y: x & y, query_conditions)
             return combined_q
         
         return Q()
@@ -1023,23 +1052,17 @@ class SummaryViewSet(BaseSearchViewSet):
             }
             for entry in type_counts if entry["type__text"]
         ]
-        
+
+        # In the summarize_results method, replace the motifs section with:
         summary["motifs"] = [
             {
                 "motif": entry["keywords__text"],
                 "translation": entry.get("keywords__english_translation"),
-                "count": entry["count"]
+                "count": entry["count"],
+                "figurative": entry.get("keywords__figurative", False)
             }
             for entry in motif_counts
-            if "figure" in (entry.get("keywords__category_translation") or "").lower()
-        ] + [
-            {
-                "figurative motif": entry["keywords__text"],
-                "translation": entry.get("keywords__english_translation"),
-                "count": entry["count"]
-            }
-            for entry in motif_counts
-            if entry.get("keywords__figurative") is True
+            if "figure" in (entry.get("keywords__category_translation") or "").lower() and entry["keywords__text"]
         ]
 
         summary["year"] = [
@@ -1113,27 +1136,56 @@ def oai(request):
     return output
 
 
-# Add contact form view
+# Add contact form for shfa
+# Receive contact form submissions
 class ContactFormViewSet(viewsets.ViewSet):
     def create(self, request):
-        if request.method == 'POST':
-            form = ContactForm(request.POST)
-            if form.is_valid():
-                # Process the form data
-                name = form.cleaned_data['name']
-                email = form.cleaned_data['email']
-                subject = form.cleaned_data['subject']
-                message = form.cleaned_data['message']
+        # The method check is redundant since DRF handles this
+        form = ContactForm(request.data)  # Use request.data instead of request.POST
+        
+        if form.is_valid():
+            # Process the form data
+            name = form.cleaned_data['name']
+            email = form.cleaned_data['email']
+            subject = form.cleaned_data['subject']
+            message = form.cleaned_data['message']
+            
+            try:
+                # Send an email with better formatting
+                email_subject = f'SHFA Contact Form: {subject}'
+                email_body = f"""
+                    Contact Form Submission
+
+                    From: {name}
+                    Email: {email}
+                    Subject: {subject}
+
+                    Message:
+                    {message}
+                """
                 
-                # Send an email
                 send_mail(
-                    f'From {name}, Subject: {subject}',
-                    f'Message: {message}\n',
-                    email,  # From email
-                    [settings.EMAIL_HOST_USER],  # To email
+                    email_subject,
+                    email_body,
+                    settings.DEFAULT_FROM_EMAIL,  # Use DEFAULT_FROM_EMAIL instead
+                    [settings.EMAIL_HOST_USER],   # To email
+                    reply_to=[email],             # Add reply-to for better UX
                     fail_silently=False,
                 )
-            return Response({'message': 'Email sent successfully'}, status=status.HTTP_200_OK)
+                
+                return Response(
+                    {'message': 'Email sent successfully'}, 
+                    status=status.HTTP_201_CREATED  # Use 201 for successful creation
+                )
+                
+            except Exception as e:
+                return Response(
+                    {'error': 'Failed to send email. Please try again later.'}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
         else:
-            form = ContactForm()
-        return Response({'error': 'Invalid request method'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+            # Return form validation errors
+            return Response(
+                {'error': 'Invalid form data', 'details': form.errors}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
