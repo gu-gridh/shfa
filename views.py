@@ -605,30 +605,26 @@ class BoundingBoxPagination(PageNumberPagination):
         Uses PostgreSQL's fast row estimation instead of a slow COUNT(*).
         """
         try:
-            # Use actual count for smaller datasets, estimate for larger ones
-            if hasattr(self, '_count_cache'):
-                return self._count_cache
-                
+            # This is getting the TOTAL table size, not your filtered queryset!
             with connection.cursor() as cursor:
                 cursor.execute("SELECT reltuples::BIGINT FROM pg_class WHERE relname = %s", 
                             [self.object_list.model._meta.db_table])
                 estimate = cursor.fetchone()[0]
                 
-                # Cap the estimate to prevent runaway memory usage
+                # This returns the entire table size, not your search results
                 self._count_cache = min(estimate + 1000, 1000000)  # Max 1M
                 return self._count_cache
         except Exception:
-                # Fallback for safety if the estimation fails
-                return 10000 
+            return 10000  # This fallback is probably what you're seeing
 
-    def get_paginated_response(self, data):
-        return Response({
-            'count': self.count,
-            'next': self.get_next_link(),
-            'previous': self.get_previous_link(),
-            'estimated_count': True, # Inform the client this is an estimate
-            'results': data
-        })
+        def get_paginated_response(self, data):
+            return Response({
+                'count': self.count,
+                'next': self.get_next_link(),
+                'previous': self.get_previous_link(),
+                'estimated_count': True, # Inform the client this is an estimate
+                'results': data
+            })
     
 class GalleryViewSet(BaseSearchViewSet):
     """Search images by category with pagination."""
