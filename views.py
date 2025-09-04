@@ -417,7 +417,17 @@ class BaseSearchViewSet(DynamicDepthViewSet):
     
     def parse_multi_values(self, values):
         """Helper method to parse multiple values from query parameters."""
-        return [v for v in values if v]
+        parsed_values = []
+        for value in values:
+            if value:
+                # Handle both formats: "value1&value2" and separate parameters
+                if '&' in value:
+                    # Split by & and add each part
+                    parsed_values.extend([v.strip() for v in value.split('&') if v.strip()])
+                else:
+                    # Single value
+                    parsed_values.append(value.strip())
+        return parsed_values
     
     def get_search_fields_mapping(self):
         """Define the mapping between search parameters and model fields."""
