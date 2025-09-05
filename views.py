@@ -489,9 +489,6 @@ class BaseSearchViewSet(DynamicDepthViewSet):
         chain_filters = []   # For AND operations (separate joins)
         grouped_qs = []      # For OR operations (combined)
 
-        print(f"DEBUG: search_type={search_type}, operator={operator}")
-        print(f"DEBUG: Raw params: {dict(params)}")
-
         for param_key, fields in mapping_filter_fields.items():
             values = self.parse_multi_values(params.getlist(param_key))
             if not values:
@@ -505,8 +502,6 @@ class BaseSearchViewSet(DynamicDepthViewSet):
             else:
                 field_operator = "OR"
 
-            print(f"DEBUG: {param_key} values={values} operator={field_operator}")
-
             # Build OR cluster per value
             per_value_clusters = []
             for val in values:
@@ -514,26 +509,20 @@ class BaseSearchViewSet(DynamicDepthViewSet):
                 for f in fields:
                     cluster |= Q(**{f"{f}__icontains": val})
                 per_value_clusters.append(cluster)
-                print(f"DEBUG: {param_key} cluster '{val}': {cluster}")
 
             if field_operator == "AND" and param_key in operator_controlled_fields:
                 # Keep each cluster separate for separate joins
                 chain_filters.extend(per_value_clusters)
-                print(f"DEBUG: Added {len(per_value_clusters)} clusters to chain_filters")
             else:
                 # Collapse to one OR group
                 if per_value_clusters:
                     or_group = reduce(lambda x, y: x | y, per_value_clusters)
                     grouped_qs.append(or_group)
-                    print(f"DEBUG: {param_key} OR group: {or_group}")
 
         # Combine OR groups
         single_q = None
         if grouped_qs:
             single_q = reduce(lambda x, y: x & y, grouped_qs)
-            print(f"DEBUG: combined single_q: {single_q}")
-
-        print(f"DEBUG: Returning {len(chain_filters)} chain_filters and single_q")
         
         return {
             "chain_filters": chain_filters,
