@@ -280,10 +280,9 @@ class SearchVisualizationGroupViewset(DynamicDepthViewSet):
     def get_queryset(self):
         q = self.request.GET.get("site_name", "").strip()
         
-        # Start with sites that have either 3D models or images
+        # Start with sites that have only 3D models 
         queryset = models.Site.objects.filter(
-            Q(shfa3d__isnull=False) |  # Sites with 3D models directly
-            Q(image__isnull=False)     # Sites with images directly
+            Q(shfa3d__isnull=False)
         ).distinct()
         
         # Apply search filter if query exists
