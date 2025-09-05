@@ -415,14 +415,23 @@ class BaseSearchViewSet(DynamicDepthViewSet):
     """Base class containing common search functionality."""
     
     def parse_multi_values(self, values):
-        """Helper method to parse multiple values from query parameters."""
+        """Helper method to parse multiple values from query parameters.
+        
+        Supports three formats:
+        1. Multiple parameters: ?param=val1&param=val2
+        2. Ampersand separated: ?param=val1%26val2  
+        3. Comma separated: ?param=val1,val2
+        """
         parsed_values = []
         for value in values:
             if value:
-                # Handle both formats: "value1&value2" and separate parameters
+                # Handle multiple formats
                 if '&' in value:
-                    # Split by & and add each part
+                    # Split by & (URL encoded as %26)
                     parsed_values.extend([v.strip() for v in value.split('&') if v.strip()])
+                elif ',' in value:
+                    # Split by comma
+                    parsed_values.extend([v.strip() for v in value.split(',') if v.strip()])
                 else:
                     # Single value
                     parsed_values.append(value.strip())
