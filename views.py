@@ -413,7 +413,9 @@ class AdvancedSearch(DynamicDepthViewSet):
 # New Module search views
 class BaseSearchViewSet(DynamicDepthViewSet):
     """Base class containing common search functionality."""
-    
+
+    # Helper method to parse multiple values from query parameters.
+    # Values can be splitted by comma, ampersand or as multiple parameters.
     def parse_multi_values(self, values):
         """Helper method to parse multiple values from query parameters.
         
@@ -466,64 +468,77 @@ class BaseSearchViewSet(DynamicDepthViewSet):
         }, ALL_FIELDS
     
     def build_search_query(self, params, search_type="advanced", operator="OR"):
-        """Build dynamic search query based on parameters with field-specific operator control."""
-        TYPE_FIELD_KEYS, ALL_FIELDS = self.get_type_field_keys()
+        """
+        Build search structure that supports AND operators with separate joins.
         
+        Returns dict with:
+        - chain_filters: list of Q objects applied sequentially (for AND operations)  
+        - single_q: combined Q object for OR operations
+        """
+        TYPE_FIELD_KEYS, ALL_FIELDS = self.get_type_field_keys()
         field_keys = TYPE_FIELD_KEYS.get(search_type, list(ALL_FIELDS.keys()))
         mapping_filter_fields = {key: ALL_FIELDS[key] for key in field_keys}
-        
-        query_conditions = []
-        
-        # Fields that can use field-specific operators
+
         operator_controlled_fields = ["author_name", "keyword", "dating_tag"]
-        
-        # Define field-specific operator parameter mapping
         field_operator_mapping = {
             "author_name": "author_operator",
-            "keyword": "keyword_operator", 
+            "keyword": "keyword_operator",
             "dating_tag": "dating_operator"
         }
-        
-        # Apply dynamic search filters
+
+        chain_filters = []   # For AND operations (separate joins)
+        grouped_qs = []      # For OR operations (combined)
+
+        print(f"DEBUG: search_type={search_type}, operator={operator}")
+        print(f"DEBUG: Raw params: {dict(params)}")
+
         for param_key, fields in mapping_filter_fields.items():
             values = self.parse_multi_values(params.getlist(param_key))
-            if values:
-                # Determine which operator to use for this field
-                if param_key in operator_controlled_fields:
-                    # Get field-specific operator, fallback to general operator, then default to OR
-                    operator_param = field_operator_mapping.get(param_key)
-                    field_operator = params.get(operator_param, operator).upper()
-                    if field_operator not in ["AND", "OR"]:
-                        field_operator = "OR"  # Safety fallback
-                else:
-                    # Always use OR for other fields
+            if not values:
+                continue
+
+            if param_key in operator_controlled_fields:
+                op_param = field_operator_mapping.get(param_key)
+                field_operator = params.get(op_param, operator).upper()
+                if field_operator not in ["AND", "OR"]:
                     field_operator = "OR"
-                
-                q_obj = Q()
-                for value in values:
-                    sub_q = Q()
-                    for field in fields:
-                        sub_q |= Q(**{f"{field}__icontains": value})
-                    
-                    # Combine values within this field using the determined operator
-                    if field_operator == "AND":
-                        # For AND: each value must match (intersection)
-                        if not q_obj:
-                            q_obj = sub_q
-                        else:
-                            q_obj &= sub_q
-                    else:
-                        # For OR: any value can match (union)
-                        q_obj |= sub_q
-                
-                query_conditions.append(q_obj)
+            else:
+                field_operator = "OR"
+
+            print(f"DEBUG: {param_key} values={values} operator={field_operator}")
+
+            # Build OR cluster per value
+            per_value_clusters = []
+            for val in values:
+                cluster = Q()
+                for f in fields:
+                    cluster |= Q(**{f"{f}__icontains": val})
+                per_value_clusters.append(cluster)
+                print(f"DEBUG: {param_key} cluster '{val}': {cluster}")
+
+            if field_operator == "AND" and param_key in operator_controlled_fields:
+                # Keep each cluster separate for separate joins
+                chain_filters.extend(per_value_clusters)
+                print(f"DEBUG: Added {len(per_value_clusters)} clusters to chain_filters")
+            else:
+                # Collapse to one OR group
+                if per_value_clusters:
+                    or_group = reduce(lambda x, y: x | y, per_value_clusters)
+                    grouped_qs.append(or_group)
+                    print(f"DEBUG: {param_key} OR group: {or_group}")
+
+        # Combine OR groups
+        single_q = None
+        if grouped_qs:
+            single_q = reduce(lambda x, y: x & y, grouped_qs)
+            print(f"DEBUG: combined single_q: {single_q}")
+
+        print(f"DEBUG: Returning {len(chain_filters)} chain_filters and single_q")
         
-        # Always combine different categories/fields with AND
-        if query_conditions:
-            combined_q = reduce(lambda x, y: x & y, query_conditions)
-            return combined_q
-        
-        return Q()
+        return {
+            "chain_filters": chain_filters,
+            "single_q": single_q
+        }
             
 
     def apply_bbox_filter(self, queryset, bbox_param):
@@ -567,18 +582,17 @@ class SearchCategoryViewSet(BaseSearchViewSet):
 
         queryset = self.get_base_image_queryset()
 
-        # Filter by category_type first for performance
         if category_type:
             queryset = queryset.filter(type__text__iexact=category_type)
 
-        # Apply search filters using base class method
-        search_query = self.build_search_query(params, search_type, operator)
-        if search_query:
-            queryset = queryset.filter(search_query)
+        # Apply search filters using new structure
+        search_struct = self.build_search_query(params, search_type, operator)
+        for q_part in search_struct["chain_filters"]:
+            queryset = queryset.filter(q_part)
+        if search_struct["single_q"]:
+            queryset = queryset.filter(search_struct["single_q"])
 
-        # Apply bbox filtering using base class method
         queryset = self.apply_bbox_filter(queryset, params.get("in_bbox"))
-
         return queryset.distinct().order_by('type__order', 'id')
 
     def categorize_by_type(self, queryset):
@@ -653,7 +667,6 @@ class GalleryViewSet(BaseSearchViewSet):
     bbox_filter_field = 'coordinates'
 
     def get_queryset(self):
-        # This method remains the same, defining the filtering logic.
         params = self.request.GET
         operator = params.get("operator", "OR")
         search_type = params.get("search_type")
@@ -666,10 +679,16 @@ class GalleryViewSet(BaseSearchViewSet):
         if category_type:
             queryset = queryset.filter(type__text__iexact=category_type)
 
-        # Apply search query
-        search_query = self.build_search_query(params, search_type, operator)
-        if search_query:
-            queryset = queryset.filter(search_query)
+        # Get search structure and apply filters correctly
+        search_struct = self.build_search_query(params, search_type, operator)
+        
+        # Apply chain filters first (each creates separate join)
+        for q_part in search_struct["chain_filters"]:
+            queryset = queryset.filter(q_part)
+        
+        # Apply combined OR query
+        if search_struct["single_q"]:
+            queryset = queryset.filter(search_struct["single_q"])
 
         # Apply bounding box filter
         bbox_param = params.get("in_bbox")
@@ -929,18 +948,17 @@ class SummaryViewSet(BaseSearchViewSet):
 
         queryset = self.get_base_image_queryset()
 
-        # Filter by category_type first for performance
         if category_type:
             queryset = queryset.filter(type__text__iexact=category_type)
 
-        # Apply search filters using base class method
-        search_query = self.build_search_query(params, search_type, operator)
-        if search_query:
-            queryset = queryset.filter(search_query)
+        # Apply search filters using new structure
+        search_struct = self.build_search_query(params, search_type, operator)
+        for q_part in search_struct["chain_filters"]:
+            queryset = queryset.filter(q_part)
+        if search_struct["single_q"]:
+            queryset = queryset.filter(search_struct["single_q"])
 
-        # Apply bbox filtering using base class method
         queryset = self.apply_bbox_filter(queryset, params.get("in_bbox"))
-
         return queryset.distinct().order_by('type__order', 'id')
 
     def list(self, request, *args, **kwargs):
