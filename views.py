@@ -566,19 +566,14 @@ class SearchCategoryViewSet(BaseSearchViewSet):
     def get_queryset(self):
         params = self.request.GET
         operator = params.get("operator", "OR")
-        search_type = params.get("search_type", "advanced")  # Default to advanced
-        category_type = params.get("category_type")
+        search_type = params.get("search_type", "general")  # Default to general
 
         queryset = self.get_base_image_queryset()
 
-        # Handle category filtering - "All" should not filter by type
-        if category_type and category_type.lower() != "all":
-            queryset = queryset.filter(type__text__iexact=category_type)
-
         # Apply search filters using the corrected build_search_query method
         if any(params.get(field) for field in ["site_name", "author_name", "dating_tag", 
-                                            "image_type", "institution_name", "region_name", 
-                                            "visualization_group", "keyword", "rock_carving_object", "q"]):
+                                              "image_type", "institution_name", "region_name", 
+                                              "visualization_group", "keyword", "rock_carving_object", "q"]):
             search_struct = self.build_search_query(params, search_type, operator)
             
             # Apply chain filters first (each creates separate join)
@@ -592,6 +587,7 @@ class SearchCategoryViewSet(BaseSearchViewSet):
         # Apply bbox filter
         queryset = self.apply_bbox_filter(queryset, params.get("in_bbox"))
         return queryset.distinct().order_by('type__order', 'id')
+
 
     def categorize_by_type(self, queryset):
         """Groups queryset results by type with counts.
@@ -633,24 +629,12 @@ class SearchCategoryViewSet(BaseSearchViewSet):
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        categorized_data = self.categorize_by_type(queryset)
 
-        # Check if category summary is requested
-        if request.query_params.get('summary_only', 'false').lower() == 'true':
-            # Return category summary
-            categorized_data = self.categorize_by_type(queryset)
-            response_data = {
-                "categories": categorized_data
-            }
-            return Response(response_data, status=status.HTTP_200_OK)
-        else:
-            # Return paginated image results (including when category_type=All)
-            page = self.paginate_queryset(queryset)
-            if page is not None:
-                serializer = self.get_serializer(page, many=True)
-                return self.get_paginated_response(serializer.data)
-
-            serializer = self.get_serializer(queryset, many=True)
-            return Response(serializer.data)
+        response_data = {
+            "categories": categorized_data
+        }
+        return Response(response_data, status=status.HTTP_200_OK)
 
 # Custom pagination class to return bounding box for paginated results
 class BoundingBoxPagination(PageNumberPagination):
@@ -687,9 +671,9 @@ class BoundingBoxPagination(PageNumberPagination):
             })
     
 class GalleryViewSet(BaseSearchViewSet):
-    """Search images by category with pagination."""
+    """Search images by category with pagination and full search capabilities."""
     serializer_class = serializers.GallerySerializer
-    pagination_class = BoundingBoxPagination # Use our new optimized class
+    pagination_class = BoundingBoxPagination
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id'] + get_fields(models.Image, exclude=['iiif_file', 'file'])
     bbox_filter_field = 'coordinates'
@@ -697,26 +681,29 @@ class GalleryViewSet(BaseSearchViewSet):
     def get_queryset(self):
         params = self.request.GET
         operator = params.get("operator", "OR")
-        search_type = params.get("search_type")
+        search_type = params.get("search_type", "advanced")  # Default to advanced
         category_type = params.get("category_type")
 
         # Start with minimal queryset for performance
         queryset = models.Image.objects.filter(published=True)
 
-        # Apply filters in order of selectivity (most selective first)
-        if category_type:
+        # Apply category filter - handle "All" category
+        if category_type and category_type.lower() != "all":
             queryset = queryset.filter(type__text__iexact=category_type)
 
-        # Get search structure and apply filters correctly
-        search_struct = self.build_search_query(params, search_type, operator)
-        
-        # Apply chain filters first (each creates separate join)
-        for q_part in search_struct["chain_filters"]:
-            queryset = queryset.filter(q_part)
-        
-        # Apply combined OR query
-        if search_struct["single_q"]:
-            queryset = queryset.filter(search_struct["single_q"])
+        # Apply search filters
+        if any(params.get(field) for field in ["site_name", "author_name", "dating_tag", 
+                                              "image_type", "institution_name", "region_name", 
+                                              "visualization_group", "keyword", "rock_carving_object", "q"]):
+            search_struct = self.build_search_query(params, search_type, operator)
+            
+            # Apply chain filters first (each creates separate join)
+            for q_part in search_struct["chain_filters"]:
+                queryset = queryset.filter(q_part)
+            
+            # Apply combined OR query
+            if search_struct["single_q"]:
+                queryset = queryset.filter(search_struct["single_q"])
 
         # Apply bounding box filter
         bbox_param = params.get("in_bbox")
@@ -805,9 +792,7 @@ class GalleryViewSet(BaseSearchViewSet):
         )
 
     def calculate_bbox_for_image_ids(self, image_ids):
-        """
-        Optimized bbox calculation with better error handling.
-        """
+        """Optimized bbox calculation with better error handling."""
         if not image_ids:
             return None
 
@@ -845,7 +830,6 @@ class GalleryViewSet(BaseSearchViewSet):
         context.update({
             'request': self.request,
             'view': self,
-            # Add any other context needed for serializer optimization
         })
         return context
 
