@@ -566,26 +566,35 @@ class SearchCategoryViewSet(BaseSearchViewSet):
     def get_queryset(self):
         params = self.request.GET
         operator = params.get("operator", "OR")
-        search_type = params.get("search_type")
+        search_type = params.get("search_type", "advanced")  # Default to advanced
         category_type = params.get("category_type")
 
         queryset = self.get_base_image_queryset()
 
-        if category_type:
+        # Handle category filtering - "All" should not filter by type
+        if category_type and category_type.lower() != "all":
             queryset = queryset.filter(type__text__iexact=category_type)
 
-        # Apply search filters using new structure
-        search_struct = self.build_search_query(params, search_type, operator)
-        for q_part in search_struct["chain_filters"]:
-            queryset = queryset.filter(q_part)
-        if search_struct["single_q"]:
-            queryset = queryset.filter(search_struct["single_q"])
+        # Apply search filters using the corrected build_search_query method
+        if any(params.get(field) for field in ["site_name", "author_name", "dating_tag", 
+                                              "image_type", "institution_name", "region_name", 
+                                              "visualization_group", "keyword", "rock_carving_object", "q"]):
+            search_query = self.build_search_query(params, search_type, operator)
+            if search_query:
+                queryset = queryset.filter(search_query)
 
+        # Apply bbox filter
         queryset = self.apply_bbox_filter(queryset, params.get("in_bbox"))
         return queryset.distinct().order_by('type__order', 'id')
 
     def categorize_by_type(self, queryset):
-        """Groups queryset results by type with counts."""
+        """Groups queryset results by type with counts.
+        Includes an 'All' category that contains the total count of all images.
+        """
+        # Get total count for "All" category
+        total_count = queryset.count()
+        
+        # Get counts by type
         grouped_data = (
             queryset
             .values("type__id", "type__text", "type__english_translation")
@@ -593,25 +602,49 @@ class SearchCategoryViewSet(BaseSearchViewSet):
             .order_by("-img_count", "type__order")
         )
 
-        category_dict = {
-            entry["type__id"]: {
-                "type": entry["type__text"],
-                "type_translation": entry.get("type__english_translation", "Unknown"),
-                "count": entry["img_count"],
-            }
-            for entry in grouped_data
-        }
-        return list(category_dict.values())
+        categories = []
+        
+        # Add "All" category first
+        if total_count > 0:
+            categories.append({
+                "type_id": "all",
+                "type": "All",
+                "type_translation": "All Images",
+                "count": total_count,
+            })
 
+        # Add individual type categories
+        for entry in grouped_data:
+            if entry["type__text"]:  # Only include entries with valid type text
+                categories.append({
+                    "type_id": entry["type__id"],
+                    "type": entry["type__text"],
+                    "type_translation": entry.get("type__english_translation", "Unknown"),
+                    "count": entry["img_count"],
+                })
+
+        return categories
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
-        categorized_data = self.categorize_by_type(queryset)
 
-        response_data = {
-            "categories": categorized_data
-        }
-        return Response(response_data, status=status.HTTP_200_OK)
+        # Check if category summary is requested
+        if request.query_params.get('summary_only', 'false').lower() == 'true':
+            # Return category summary
+            categorized_data = self.categorize_by_type(queryset)
+            response_data = {
+                "categories": categorized_data
+            }
+            return Response(response_data, status=status.HTTP_200_OK)
+        else:
+            # Return paginated image results (including when category_type=All)
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
 
 # Custom pagination class to return bounding box for paginated results
 class BoundingBoxPagination(PageNumberPagination):
