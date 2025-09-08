@@ -577,11 +577,17 @@ class SearchCategoryViewSet(BaseSearchViewSet):
 
         # Apply search filters using the corrected build_search_query method
         if any(params.get(field) for field in ["site_name", "author_name", "dating_tag", 
-                                              "image_type", "institution_name", "region_name", 
-                                              "visualization_group", "keyword", "rock_carving_object", "q"]):
-            search_query = self.build_search_query(params, search_type, operator)
-            if search_query:
-                queryset = queryset.filter(search_query)
+                                            "image_type", "institution_name", "region_name", 
+                                            "visualization_group", "keyword", "rock_carving_object", "q"]):
+            search_struct = self.build_search_query(params, search_type, operator)
+            
+            # Apply chain filters first (each creates separate join)
+            for q_part in search_struct["chain_filters"]:
+                queryset = queryset.filter(q_part)
+            
+            # Apply combined OR query
+            if search_struct["single_q"]:
+                queryset = queryset.filter(search_struct["single_q"])
 
         # Apply bbox filter
         queryset = self.apply_bbox_filter(queryset, params.get("in_bbox"))
