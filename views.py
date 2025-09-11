@@ -518,11 +518,6 @@ class BaseSearchViewSet(DynamicDepthViewSet):
     def parse_region_brackets(self, region_values):
         """
         Parse region values that may contain bracket notation.
-        
-        Handles formats like:
-        - ["Alsen, Krokom, Jämtland, SVERIGE"]
-        - ["region": "Alskog, Gotland, Gotlands län, SVERIGE"]
-        
         Returns list of region groups for OR operation between brackets.
         """
         region_groups = []
@@ -537,19 +532,17 @@ class BaseSearchViewSet(DynamicDepthViewSet):
                 inner_content = region_value[1:-1].strip()
                 
                 # Handle different bracket formats
-                if inner_content.startswith('"') and inner_content.endswith('"'):
-                    # Format: ["Alsen, Krokom, Jämtland, SVERIGE"]
-                    region_parts = [part.strip() for part in inner_content[1:-1].split(',')]
-                elif '": "' in inner_content:
-                    # Format: ["region": "Alskog, Gotland, Gotlands län, SVERIGE"]
-                    if '"region": "' in inner_content:
-                        region_content = inner_content.split('"region": "')[1].rstrip('"')
+                if ': ' in inner_content:
+                    # Format: [region: Alskog, Gotland, Gotlands län, SVERIGE]
+                    if 'region: ' in inner_content:
+                        region_content = inner_content.split('region: ')[1]
                         region_parts = [part.strip() for part in region_content.split(',')]
                     else:
                         # Fallback for other key-value formats
                         region_parts = [part.strip() for part in inner_content.split(',')]
                 else:
                     # Simple comma-separated content in brackets
+                    # Format: [Alsen, Krokom, Jämtland, SVERIGE]
                     region_parts = [part.strip() for part in inner_content.split(',')]
             else:
                 # No brackets, treat as comma-separated
