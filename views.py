@@ -515,10 +515,20 @@ class BaseSearchViewSet(DynamicDepthViewSet):
                     parsed_values.append(value.strip())
         return parsed_values
 
-    def parse_region_brackets(self, region_values):
+    def parse_region_groups(self, region_values):
         """
-        Parse region values that may contain bracket notation.
-        Returns list of region groups for OR operation between brackets.
+        Parse region values into groups for OR operation between groups, AND within groups.
+        
+        Each region_name parameter becomes a group where all parts must match (AND).
+        Between different region_name parameters, we use OR.
+        
+        Example:
+        ?region_name=Angelstad,Ljungby,Kronobergs län,SVERIGE&region_name=Alsen,Krokom,Jämtland,SVERIGE
+        
+        Returns: [
+            ['Angelstad', 'Ljungby', 'Kronobergs län', 'SVERIGE'],
+            ['Alsen', 'Krokom', 'Jämtland', 'SVERIGE']
+        ]
         """
         region_groups = []
         
@@ -526,27 +536,8 @@ class BaseSearchViewSet(DynamicDepthViewSet):
             if not region_value:
                 continue
                 
-            # Handle bracket notation
-            if region_value.startswith('[') and region_value.endswith(']'):
-                # Remove brackets and parse
-                inner_content = region_value[1:-1].strip()
-                
-                # Handle different bracket formats
-                if ': ' in inner_content:
-                    # Format: [region: Alskog, Gotland, Gotlands län, SVERIGE]
-                    if 'region: ' in inner_content:
-                        region_content = inner_content.split('region: ')[1]
-                        region_parts = [part.strip() for part in region_content.split(',')]
-                    else:
-                        # Fallback for other key-value formats
-                        region_parts = [part.strip() for part in inner_content.split(',')]
-                else:
-                    # Simple comma-separated content in brackets
-                    # Format: [Alsen, Krokom, Jämtland, SVERIGE]
-                    region_parts = [part.strip() for part in inner_content.split(',')]
-            else:
-                # No brackets, treat as comma-separated
-                region_parts = [part.strip() for part in region_value.split(',')]
+            # Split by comma to get individual parts
+            region_parts = [part.strip() for part in region_value.split(',')]
             
             # Filter out empty parts and add to groups
             filtered_parts = [part for part in region_parts if part]
@@ -588,7 +579,7 @@ class BaseSearchViewSet(DynamicDepthViewSet):
     def build_search_query(self, params, search_type="advanced", operator="OR"):
         """
         Build search structure that supports AND operators with separate joins.
-        Special handling for region_name with bracket notation.
+        Special handling for region_name with multiple parameter groups.
         
         Returns dict with:
         - chain_filters: list of Q objects applied sequentially (for AND operations)  
@@ -613,35 +604,35 @@ class BaseSearchViewSet(DynamicDepthViewSet):
             if not raw_values:
                 continue
 
-            # Special handling for region_name with bracket notation
+            # Special handling for region_name with group logic
             if param_key == "region_name":
-                region_groups = self.parse_region_brackets(raw_values)
+                region_groups = self.parse_region_groups(raw_values)
                 if region_groups:
-                    bracket_or_conditions = []
+                    group_or_conditions = []
                     
-                    # Each group (bracket) becomes an AND condition
+                    # Each group (parameter) becomes an AND condition
                     for region_parts in region_groups:
-                        bracket_and_conditions = []
+                        group_and_conditions = []
                         
-                        # Within each bracket, all parts must match (AND)
+                        # Within each group, all parts must match (AND)
                         for part in region_parts:
                             part_or_conditions = []
                             for field in fields:
                                 part_or_conditions.append(Q(**{f"{field}__icontains": part}))
                             
                             if part_or_conditions:
-                                bracket_and_conditions.append(
+                                group_and_conditions.append(
                                     reduce(lambda x, y: x | y, part_or_conditions)
                                 )
                         
-                        # Combine all parts in this bracket with AND
-                        if bracket_and_conditions:
-                            bracket_condition = reduce(lambda x, y: x & y, bracket_and_conditions)
-                            bracket_or_conditions.append(bracket_condition)
+                        # Combine all parts in this group with AND
+                        if group_and_conditions:
+                            group_condition = reduce(lambda x, y: x & y, group_and_conditions)
+                            group_or_conditions.append(group_condition)
                     
-                    # Combine all brackets with OR
-                    if bracket_or_conditions:
-                        region_query = reduce(lambda x, y: x | y, bracket_or_conditions)
+                    # Combine all groups with OR
+                    if group_or_conditions:
+                        region_query = reduce(lambda x, y: x | y, group_or_conditions)
                         grouped_qs.append(region_query)
                 
                 continue  # Skip normal processing for region_name
