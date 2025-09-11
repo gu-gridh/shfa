@@ -492,8 +492,6 @@ class AdvancedSearch(DynamicDepthViewSet):
 class BaseSearchViewSet(DynamicDepthViewSet):
     """Base class containing common search functionality."""
 
-    # Helper method to parse multiple values from query parameters.
-    # Values can be splitted by comma, ampersand or as multiple parameters.
     def parse_multi_values(self, values):
         """Helper method to parse multiple values from query parameters.
         
@@ -516,6 +514,53 @@ class BaseSearchViewSet(DynamicDepthViewSet):
                     # Single value
                     parsed_values.append(value.strip())
         return parsed_values
+
+    def parse_region_brackets(self, region_values):
+        """
+        Parse region values that may contain bracket notation.
+        
+        Handles formats like:
+        - ["Alsen, Krokom, Jämtland, SVERIGE"]
+        - ["region": "Alskog, Gotland, Gotlands län, SVERIGE"]
+        
+        Returns list of region groups for OR operation between brackets.
+        """
+        region_groups = []
+        
+        for region_value in region_values:
+            if not region_value:
+                continue
+                
+            # Handle bracket notation
+            if region_value.startswith('[') and region_value.endswith(']'):
+                # Remove brackets and parse
+                inner_content = region_value[1:-1].strip()
+                
+                # Handle different bracket formats
+                if inner_content.startswith('"') and inner_content.endswith('"'):
+                    # Format: ["Alsen, Krokom, Jämtland, SVERIGE"]
+                    region_parts = [part.strip() for part in inner_content[1:-1].split(',')]
+                elif '": "' in inner_content:
+                    # Format: ["region": "Alskog, Gotland, Gotlands län, SVERIGE"]
+                    if '"region": "' in inner_content:
+                        region_content = inner_content.split('"region": "')[1].rstrip('"')
+                        region_parts = [part.strip() for part in region_content.split(',')]
+                    else:
+                        # Fallback for other key-value formats
+                        region_parts = [part.strip() for part in inner_content.split(',')]
+                else:
+                    # Simple comma-separated content in brackets
+                    region_parts = [part.strip() for part in inner_content.split(',')]
+            else:
+                # No brackets, treat as comma-separated
+                region_parts = [part.strip() for part in region_value.split(',')]
+            
+            # Filter out empty parts and add to groups
+            filtered_parts = [part for part in region_parts if part]
+            if filtered_parts:
+                region_groups.append(filtered_parts)
+        
+        return region_groups
     
     def get_search_fields_mapping(self):
         """Define the mapping between search parameters and model fields."""
@@ -526,7 +571,9 @@ class BaseSearchViewSet(DynamicDepthViewSet):
             "dating_tag": ["dating_tags__text", "dating_tags__english_translation"],
             "image_type": ["type__text", "type__english_translation"],
             "institution_name": ["institution__name"],
-            "region_name": ["site__parish__name", "site__municipality__name", "site__province__name"],
+            "region_name": ["site__parish__name", "site__municipality__name", "site__province__name",
+                           "site__province__country__name", 
+                           "site__municipality__superregion__superregion__superregion__superregion__name"],
             "visualization_group": ["group__text"],
             "keyword": ["keywords__text", "keywords__english_translation",
                             "keywords__category", "keywords__category_translation"],
@@ -548,6 +595,7 @@ class BaseSearchViewSet(DynamicDepthViewSet):
     def build_search_query(self, params, search_type="advanced", operator="OR"):
         """
         Build search structure that supports AND operators with separate joins.
+        Special handling for region_name with bracket notation.
         
         Returns dict with:
         - chain_filters: list of Q objects applied sequentially (for AND operations)  
@@ -568,7 +616,45 @@ class BaseSearchViewSet(DynamicDepthViewSet):
         grouped_qs = []      # For OR operations (combined)
 
         for param_key, fields in mapping_filter_fields.items():
-            values = self.parse_multi_values(params.getlist(param_key))
+            raw_values = params.getlist(param_key)
+            if not raw_values:
+                continue
+
+            # Special handling for region_name with bracket notation
+            if param_key == "region_name":
+                region_groups = self.parse_region_brackets(raw_values)
+                if region_groups:
+                    bracket_or_conditions = []
+                    
+                    # Each group (bracket) becomes an AND condition
+                    for region_parts in region_groups:
+                        bracket_and_conditions = []
+                        
+                        # Within each bracket, all parts must match (AND)
+                        for part in region_parts:
+                            part_or_conditions = []
+                            for field in fields:
+                                part_or_conditions.append(Q(**{f"{field}__icontains": part}))
+                            
+                            if part_or_conditions:
+                                bracket_and_conditions.append(
+                                    reduce(lambda x, y: x | y, part_or_conditions)
+                                )
+                        
+                        # Combine all parts in this bracket with AND
+                        if bracket_and_conditions:
+                            bracket_condition = reduce(lambda x, y: x & y, bracket_and_conditions)
+                            bracket_or_conditions.append(bracket_condition)
+                    
+                    # Combine all brackets with OR
+                    if bracket_or_conditions:
+                        region_query = reduce(lambda x, y: x | y, bracket_or_conditions)
+                        grouped_qs.append(region_query)
+                
+                continue  # Skip normal processing for region_name
+
+            # Normal processing for other fields
+            values = self.parse_multi_values(raw_values)
             if not values:
                 continue
 
@@ -606,7 +692,6 @@ class BaseSearchViewSet(DynamicDepthViewSet):
             "chain_filters": chain_filters,
             "single_q": single_q
         }
-            
 
     def apply_bbox_filter(self, queryset, bbox_param):
         """Apply bounding box filter to queryset."""
