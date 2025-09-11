@@ -3,7 +3,7 @@ from rest_framework_gis.serializers import GeoFeatureModelSerializer
 from diana.utils import get_fields, DEFAULT_FIELDS
 from .models import *
 from rest_framework import serializers
-from apps.geography.models import *
+
 class DynamicDepthModelSerializer(serializers.ModelSerializer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

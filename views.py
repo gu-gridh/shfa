@@ -22,7 +22,6 @@ from django.db import connection
 from django.utils.functional import cached_property
 from rest_framework.pagination import PageNumberPagination
 from itertools import chain
-from apps.geography.models import Region
 
 class SiteViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteSerializer
