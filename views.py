@@ -312,18 +312,6 @@ class SearchVisualizationGroupViewset(DynamicDepthViewSet):
 
 class RegionSearchViewSet(DynamicDepthViewSet):
     serializer_class = serializers.RegionSerializer
-
-    # Result should be a list of regions with country that we can get these from sites
-    # Result should show up like this not site names:
-    '''
-    parish, municipality, län, country
-    municipality, country
-    län, country
-    province/landskap, country 
-    '''
-class RegionSearchViewSet(DynamicDepthViewSet):
-    serializer_class = serializers.RegionSerializer
-    # Add filter_backends to prevent auto-filtering issues
     filter_backends = []  # Disable automatic filtering since we're doing custom logic
 
     def get_queryset(self):
@@ -335,21 +323,23 @@ class RegionSearchViewSet(DynamicDepthViewSet):
             id__in=models.Image.objects.values_list('site', flat=True)
         )
 
-        # Apply region search filter if provided
+        # Apply region search filter if provided - use the same relationships as SummaryViewSet
         if region_query:
             sites = sites.filter(
                 Q(parish__name__icontains=region_query) |
                 Q(municipality__name__icontains=region_query) |
                 Q(province__name__icontains=region_query) |
-                Q(province__country__name__icontains=region_query)
+                Q(province__country__name__icontains=region_query) |
+                Q(municipality__superregion__superregion__superregion__superregion__name__icontains=region_query)
             )
 
-        # Build unique region combinations
+        # Build unique region combinations - use the same fields as SummaryViewSet
         regions = sites.values(
             'parish__name',
             'municipality__name', 
             'province__name',
-            'province__country__name'
+            'province__country__name',
+            'municipality__superregion__superregion__superregion__superregion__name'
         ).distinct()
 
         # Filter out completely empty rows
@@ -357,7 +347,8 @@ class RegionSearchViewSet(DynamicDepthViewSet):
             parish__name__isnull=True,
             municipality__name__isnull=True,
             province__name__isnull=True,
-            province__country__name__isnull=True
+            province__country__name__isnull=True,
+            municipality__superregion__superregion__superregion__superregion__name__isnull=True
         )
 
         return regions
@@ -373,17 +364,19 @@ class RegionSearchViewSet(DynamicDepthViewSet):
             parish = region.get('parish__name')
             municipality = region.get('municipality__name') 
             province = region.get('province__name')
-            country = region.get('province__country__name')
+            # Use the same country logic as SummaryViewSet
+            country = (region.get('province__country__name') or 
+                      region.get('municipality__superregion__superregion__superregion__superregion__name'))
             
             # Build region string based on available fields
-            region_parts = []
-            
             if parish and municipality and province and country:
                 region_str = f"{parish}, {municipality}, {province}, {country}"
-            elif municipality and country:
-                region_str = f"{municipality}, {country}"
+            elif municipality and province and country:
+                region_str = f"{municipality}, {province}, {country}"
             elif province and country:
                 region_str = f"{province}, {country}"
+            elif municipality and country:
+                region_str = f"{municipality}, {country}"
             elif country:
                 region_str = country
             else:
@@ -407,7 +400,6 @@ class RegionSearchViewSet(DynamicDepthViewSet):
             "count": len(results),
             "results": results
         })
-
 
 
 # Add general search query
