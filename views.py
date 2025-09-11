@@ -22,7 +22,7 @@ from django.db import connection
 from django.utils.functional import cached_property
 from rest_framework.pagination import PageNumberPagination
 from itertools import chain
-
+from apps.geography.models import Region
 
 class SiteViewSet(DynamicDepthViewSet):
     serializer_class = serializers.SiteSerializer
@@ -312,17 +312,104 @@ class SearchVisualizationGroupViewset(DynamicDepthViewSet):
     filterset_fields = get_fields(models.Site, exclude=DEFAULT_FIELDS + ['coordinates'])
 
 class RegionSearchViewSet(DynamicDepthViewSet):
-    serializer_class = serializers.SiteCoordinatesExcludeSerializer
+    serializer_class = serializers.RegionSerializer
+
+    # Result should be a list of regions with country that we can get these from sites
+    # Result should show up like this not site names:
+    '''
+    parish, municipality, län, country
+    municipality, country
+    län, country
+    province/landskap, country 
+    '''
+class RegionSearchViewSet(DynamicDepthViewSet):
+    serializer_class = serializers.RegionSerializer
+    # Add filter_backends to prevent auto-filtering issues
+    filter_backends = []  # Disable automatic filtering since we're doing custom logic
 
     def get_queryset(self):
-        q = self.request.GET["region_name"]
-        # Search amoung parishes, municipalities and provinces names    
-        queryset = models.Site.objects.filter(
-            Q(parish__name__icontains=q) | Q(municipality__name__icontains=q) | Q(province__name__icontains=q)
+        # Get search parameter
+        region_query = self.request.GET.get('region_name', '').strip()
+        
+        # Get all unique region combinations from sites with images
+        sites = models.Site.objects.filter(
+            id__in=models.Image.objects.values_list('site', flat=True)
         )
-        return queryset
-    filterset_fields = get_fields(
-        models.Site, exclude=DEFAULT_FIELDS + ['coordinates'])
+
+        # Apply region search filter if provided
+        if region_query:
+            sites = sites.filter(
+                Q(parish__name__icontains=region_query) |
+                Q(municipality__name__icontains=region_query) |
+                Q(province__name__icontains=region_query) |
+                Q(province__country__name__icontains=region_query)
+            )
+
+        # Build unique region combinations
+        regions = sites.values(
+            'parish__name',
+            'municipality__name', 
+            'province__name',
+            'province__country__name'
+        ).distinct()
+
+        # Filter out completely empty rows
+        regions = regions.exclude(
+            parish__name__isnull=True,
+            municipality__name__isnull=True,
+            province__name__isnull=True,
+            province__country__name__isnull=True
+        )
+
+        return regions
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+
+        # Format results as requested
+        results = []
+        seen_regions = set()  # To avoid duplicates
+        
+        for region in queryset:
+            parish = region.get('parish__name')
+            municipality = region.get('municipality__name') 
+            province = region.get('province__name')
+            country = region.get('province__country__name')
+            
+            # Build region string based on available fields
+            region_parts = []
+            
+            if parish and municipality and province and country:
+                region_str = f"{parish}, {municipality}, {province}, {country}"
+            elif municipality and country:
+                region_str = f"{municipality}, {country}"
+            elif province and country:
+                region_str = f"{province}, {country}"
+            elif country:
+                region_str = country
+            else:
+                continue  # Skip if no meaningful data
+            
+            # Avoid duplicates
+            if region_str not in seen_regions:
+                seen_regions.add(region_str)
+                results.append({
+                    "region": region_str,
+                    "parish": parish,
+                    "municipality": municipality,
+                    "province": province,
+                    "country": country
+                })
+
+        # Sort results alphabetically
+        results.sort(key=lambda x: x['region'])
+        
+        return Response({
+            "count": len(results),
+            "results": results
+        })
+
+
 
 # Add general search query
 class GeneralSearch(DynamicDepthViewSet):

@@ -4,6 +4,7 @@ from . import views
 import diana.utils as utils
 from .views import oai
 from .manifest import urls as manifest_urls
+from apps.geography.models import *
 
 router = routers.DefaultRouter()
 endpoint = utils.build_app_endpoint("shfa")
