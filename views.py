@@ -314,26 +314,63 @@ class RegionSearchViewSet(DynamicDepthViewSet):
     serializer_class = serializers.RegionSerializer
     filter_backends = []  # Disable automatic filtering since we're doing custom logic
 
+    def parse_region_string(self, region_string):
+        """Parse region string by fixed chunks (assuming 4 parts per region)."""
+        if not region_string:
+            return []
+        
+        parts = [part.strip() for part in region_string.split(',')]
+        entries = []
+        
+        # Chunk into groups of 4 (parish, municipality, province, country)
+        for i in parts:
+            if i:  # Avoid empty parts
+                entries.append(i)
+        
+        return entries
+
+    def extract_search_terms(self, region_entries):
+        """Extract all searchable terms from region entries."""
+        search_terms = set()
+        
+        for entry in region_entries:
+            parts = [part.strip() for part in entry.split(',')]
+            for part in parts:
+                search_terms.add(part)
+        
+        return list(search_terms)
+
     def get_queryset(self):
         # Get search parameter
-        region_query = self.request.GET.get('region_name', '').strip()
+        region_query = self.request.GET.get('region_name', '')
         
         # Get all unique region combinations from sites with images
         sites = models.Site.objects.filter(
             id__in=models.Image.objects.values_list('site', flat=True)
         )
 
-        # Apply region search filter if provided - use the same relationships as SummaryViewSet
+        # Apply region search filter if provided
         if region_query:
-            sites = sites.filter(
-                Q(parish__name__icontains=region_query) |
-                Q(municipality__name__icontains=region_query) |
-                Q(province__name__icontains=region_query) |
-                Q(province__country__name__icontains=region_query) |
-                Q(municipality__superregion__superregion__superregion__superregion__name__icontains=region_query)
-            )
+            # Parse the complex region string
+            region_entries = self.parse_region_string(region_query)
+            search_terms = self.extract_search_terms(region_entries)
 
-        # Build unique region combinations - use the same fields as SummaryViewSet
+
+            if search_terms:
+                # Build OR conditions for all search terms
+                q_conditions = Q()
+                for term in search_terms:
+                    q_conditions |= (
+                        Q(parish__name__icontains=term) |
+                        Q(municipality__name__icontains=term) |
+                        Q(province__name__icontains=term) |
+                        Q(province__country__name__icontains=term) |
+                        Q(municipality__superregion__superregion__superregion__superregion__name__icontains=term)
+                    )
+                
+                sites = sites.filter(q_conditions)
+
+        # Build unique region combinations
         regions = sites.values(
             'parish__name',
             'municipality__name', 
@@ -355,7 +392,7 @@ class RegionSearchViewSet(DynamicDepthViewSet):
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
-
+        
         # Format results as requested
         results = []
         seen_regions = set()  # To avoid duplicates
@@ -364,7 +401,6 @@ class RegionSearchViewSet(DynamicDepthViewSet):
             parish = region.get('parish__name')
             municipality = region.get('municipality__name') 
             province = region.get('province__name')
-            # Use the same country logic as SummaryViewSet
             country = (region.get('province__country__name') or 
                       region.get('municipality__superregion__superregion__superregion__superregion__name'))
             
@@ -396,10 +432,13 @@ class RegionSearchViewSet(DynamicDepthViewSet):
         # Sort results alphabetically
         results.sort(key=lambda x: x['region'])
         
-        return Response({
+        # Add metadata about the parsed regions
+        response_data = {
             "count": len(results),
-            "results": results
-        })
+            "results": results,
+        }
+        
+        return Response(response_data)
 
 
 # Add general search query
