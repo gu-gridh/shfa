@@ -13,7 +13,7 @@ from rest_framework.viewsets import ViewSet
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.response import Response
 from diana.forms import ContactForm
-from django.core.mail import send_mail
+from django.core.mail import send_mail, BadHeaderError
 from django.conf import settings
 from rest_framework import status
 from django.contrib.gis.db.models.aggregates import Extent
@@ -1349,28 +1349,33 @@ class ContactFormViewSet(viewsets.ViewSet):
                     From: {name}
                     Email: {email}
                     Subject: {subject}
-
                     Message:
                     {message}
-                """
+                                    """
                 
+                # Remove the reply_to parameter - it's not supported in older Django versions
                 send_mail(
                     email_subject,
                     email_body,
-                    settings.DEFAULT_FROM_EMAIL,  # Use DEFAULT_FROM_EMAIL instead
-                    [settings.EMAIL_HOST_USER],   # To email
-                    reply_to=[email],             # Add reply-to for better UX
+                    settings.DEFAULT_FROM_EMAIL,  # From email
+                    [settings.SHFA_EMAIL_HOST_USER],   # To email
                     fail_silently=False,
                 )
                 
                 return Response(
                     {'message': 'Email sent successfully'}, 
-                    status=status.HTTP_201_CREATED  # Use 201 for successful creation
+                    status=status.HTTP_201_CREATED
                 )
-                
-            except Exception as e:
+
+            except BadHeaderError:
                 return Response(
                     {'error': 'Failed to send email. Please try again later.'}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            except Exception as e:
+                # Add general exception handling
+                return Response(
+                    {'error': f'Failed to send email: {str(e)}'}, 
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
         else:
