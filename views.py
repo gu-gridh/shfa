@@ -278,8 +278,7 @@ class SearchVisualizationGroupViewset(DynamicDepthViewSet):
 
     def get_queryset(self):
         q = self.request.GET.get("site_name", "").strip()
-        
-        # Start with sites that have only 3D models 
+
         queryset = models.Site.objects.filter(
             Q(shfa3d__isnull=False)
         ).distinct()
@@ -298,7 +297,7 @@ class SearchVisualizationGroupViewset(DynamicDepthViewSet):
         # Add annotations for counts
         queryset = queryset.annotate(
             visualization_group_count=Count('shfa3d', distinct=True),
-            images_count=Count('image', distinct=True)
+            images_count=Count('image', filter=Q(image__group__isnull=False), distinct=True)
         )
         
         # Filter to only sites that actually have 3D models or images
