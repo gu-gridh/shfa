@@ -560,6 +560,8 @@ class BaseSearchViewSet(DynamicDepthViewSet):
             "visualization_group": ["group__text"],
             "keyword": ["keywords__text", "keywords__english_translation",
                             "keywords__category", "keywords__category_translation"],
+            "3d_site": ["shfa3d__site__id", "shfa3d__site__raa_id", "shfa3d__site__placename", "shfa3d__site__lamning_id",
+                        "shfa3d__site__askeladden_id", "shfa3d__site__lokalitet_id", "shfa3d__site__ksamsok_id"],
             "rock_carving_object": ["rock_carving_object__name"],
         }
     
@@ -571,7 +573,7 @@ class BaseSearchViewSet(DynamicDepthViewSet):
         return {
             "advanced": ["site_name", "author_name", "dating_tag",
                         "image_type", "institution_name", "region_name",
-                        "visualization_group", "keyword", "rock_carving_object"],
+                        "visualization_group", "keyword", "rock_carving_object", "3d_site"],
             "general": ["q"],
         }, ALL_FIELDS
     
@@ -670,7 +672,17 @@ class BaseSearchViewSet(DynamicDepthViewSet):
         single_q = None
         if grouped_qs:
             single_q = reduce(lambda x, y: x & y, grouped_qs)
-        
+
+        # If both site_name and 3d_site are present, add image group filter
+        threed_site_present = bool(params.getlist("3d_site"))
+        if threed_site_present:
+            # This filter will be applied to the image queryset
+            group_filter = Q(group__isnull=False) & Q(published=True)
+            if single_q:
+                single_q = single_q & group_filter
+            else:
+                single_q = group_filter
+
         return {
             "chain_filters": chain_filters,
             "single_q": single_q
@@ -840,7 +852,7 @@ class GalleryViewSet(BaseSearchViewSet):
         # Apply search filters
         if any(params.get(field) for field in ["site_name", "author_name", "dating_tag", 
                                               "image_type", "institution_name", "region_name", 
-                                              "visualization_group", "keyword", "rock_carving_object", "q"]):
+                                              "visualization_group", "keyword", "rock_carving_object", "3d_site", "q"]):
             search_struct = self.build_search_query(params, search_type, operator)
             
             # Apply chain filters first (each creates separate join)
