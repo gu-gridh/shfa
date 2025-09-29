@@ -560,8 +560,8 @@ class BaseSearchViewSet(DynamicDepthViewSet):
             "visualization_group": ["group__text"],
             "keyword": ["keywords__text", "keywords__english_translation",
                             "keywords__category", "keywords__category_translation"],
-            "3d_site": ["shfa3d__site__id", "shfa3d__site__raa_id", "shfa3d__site__placename", "shfa3d__site__lamning_id",
-                        "shfa3d__site__askeladden_id", "shfa3d__site__lokalitet_id", "shfa3d__site__ksamsok_id"],
+            "3d_site": ["site__id", "site__raa_id", "site__placename", "site__lamning_id",
+                        "site__askeladden_id", "site__lokalitet_id", "site__ksamsok_id"],
             "rock_carving_object": ["rock_carving_object__name"],
         }
     
