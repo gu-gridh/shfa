@@ -673,7 +673,7 @@ class BaseSearchViewSet(DynamicDepthViewSet):
         if grouped_qs:
             single_q = reduce(lambda x, y: x & y, grouped_qs)
 
-        # If both site_name and 3d_site are present, add image group filter
+        # If 3d_site are present, add image group filter
         threed_site_present = bool(params.getlist("3d_site"))
         if threed_site_present:
             # This filter will be applied to the image queryset
