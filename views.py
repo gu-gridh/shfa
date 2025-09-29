@@ -731,7 +731,7 @@ class SearchCategoryViewSet(BaseSearchViewSet):
         # Apply search filters using the corrected build_search_query method
         if any(params.get(field) for field in ["site_name", "author_name", "dating_tag", 
                                               "image_type", "institution_name", "region_name", 
-                                              "visualization_group", "keyword", "rock_carving_object", "q"]):
+                                              "visualization_group", "keyword", "rock_carving_object", "3d_site", "q"]):
             search_struct = self.build_search_query(params, search_type, operator)
             
             # Apply chain filters first (each creates separate join)
